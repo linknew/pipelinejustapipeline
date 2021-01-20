@@ -1,0 +1,899 @@
+#! /bin/bash
+
+####格式: echo -e "\033[字背景颜色;字体颜色m字符串\033[0m"
+####
+####例如:
+####echo -e "\033[41;36m something here \033[0m"
+####
+####其中41的位置代表底色, 36的位置是代表字的颜色
+####
+####
+####那些ascii code 是对颜色调用的始末.
+####\033[ ; m …… \033[0m
+####
+####
+####
+####字背景颜色范围:40----49
+####40:黑
+####41:深红
+####42:绿
+####43:黄色
+####44:蓝色
+####45:紫色
+####46:深绿
+####47:白色
+####
+####字颜色:30-----------39
+####30:黑
+####31:红
+####32:绿
+####33:黄
+####34:蓝色
+####35:紫色
+####36:深绿
+####37:白色
+####
+####===============================================ANSI控制码的说明
+####\33[0m 关闭所有属性
+####\33[1m 设置高亮度
+####\33[4m 下划线
+####\33[5m 闪烁
+####\33[7m 反显
+####\33[8m 消隐
+####\33[30m -- \33[37m 设置前景色
+####\33[40m -- \33[47m 设置背景色
+####\33[nA 光标上移n行
+####\33[nB 光标下移n行
+####\33[nC 光标右移n行
+####\33[nD 光标左移n行
+####\33[y;xH设置光标位置
+####\33[2J 清屏
+####\33[K 清除从光标到行尾的内容
+####\33[s 保存光标位置
+####\33[u 恢复光标位置
+####\33[?25l 隐藏光标
+####\33[?25h 显示光标
+
+
+
+ctrl_k=$'\033[K'
+#
+#
+#functions for cursor operating
+#
+function _mvCursor()
+{
+#Descriptions:
+#   move cursor.
+#Parameters:
+#   $1, the direction of moving.
+#       `l' move left,   mapping to \033[D
+#       `r' move righ,   mapping to \033[C
+#       `u' move up,     mapping to \033[A
+#       `d' move down,   mapping to \033[B
+#       `g' goto column, mapping to \033[G
+#       `j' jump to x;y, mapping to \033[H
+#   $2, count of repeats. for `j', specify the `x'
+#   $3, only used for `j', specify the `y'
+#
+#
+    local _direction=`echo $1 | tr ludgjr DABGHC`
+    echo -ne "\033[${2:-1}${3:+;$3}${_direction}" >/dev/tty
+}
+function cursorLeft()
+{
+    _mvCursor l "$1"
+}
+function cursorRight()
+{
+    _mvCursor r "$1"
+}
+function cursorUp()
+{
+    _mvCursor u "$1"
+}
+function cursorDown()
+{
+    _mvCursor d "$1"
+}
+function cursorHor()
+{
+    _mvCursor g "$1"
+}
+function cursorTo()
+{
+    _mvCursor j "$1" "$2"
+}
+#
+#
+function hideCursor()
+{
+    echo -n $'\033[?25l'
+}
+#
+#
+function showCursor()
+{
+    echo -n $'\033[?25h'
+}
+#
+#
+function saveCursor()
+{
+    echo -n $'\033[s'
+}
+#
+#
+function restoreCursor()
+{
+    echo -n $'\033[u'
+}
+#
+#
+function blinkCursor()
+{
+    local _x
+#
+    while true; do
+        hideCursor
+        sleep 0.1
+        showCursor
+        read -s -n1 -t1 _x </dev/tty && break
+    done
+    echo $_x
+}
+#
+#
+function getCurPos()
+{
+    exec </dev/tty
+    _bakTTY=$(stty -g)
+    stty raw -echo min 0
+    echo -n $'\033[6n' >/dev/tty
+    read -dR pos
+    stty $_bakTTY
+    echo "${pos##*[}"
+}
+#============================================================================
+
+#functions for screen operating.
+function _clrScr()
+{
+#Descriptions:
+#   clean screen, using ANSI $'\033[nJ'
+#Parameters:
+#   $1, clearing type
+#       `a' clearing above, mappint to `1'
+#       `b' clearing below, mappint to `0'
+#       `h' clearing whole screen, mappint to `2'  <-- the default
+#
+    local _type=`echo ${1:-2} | tr abh 102`
+    echo -ne "\033[${_type}J"
+}
+function clrScr()
+{
+    _clrScr h
+}
+function clrUpScr()
+{
+    _clrScr a
+}
+function clrDnScr()
+{
+    _clrScr b
+}
+#
+#
+function clrInLine()
+{
+#Descriptions:
+#   clean in current line, using ANSI $'\033[nK'
+#Parameters:
+#   $1, clearning type
+#       `a' clearing above(to head), mapping to `1'
+#       `b' clearing below(to tail), mapping to `0' <-- the default
+#       `h' clearing whole line, mapping to `2'
+#
+    local _type=`echo $1 | tr ahb 120`
+    echo -ne "\033[${_type}K"
+}
+function clrLine()
+{
+    _clrInLine h
+}
+function clrHeadLine()
+{
+    _clrInLine a
+}
+function clrTailLine()
+{
+    _clrInLine b
+}
+#
+#
+function _scrlScr()
+{
+#Descriptions:
+#   scroll screen, using ANSI $'\033[nS' for up and $'\033[nT' for down
+#Parameters:
+#   $1, scroll type
+#       `u' scroll up, mapping to `S'
+#       `d' scroll down, mapping to `T'
+#   $2, scroll line numbers
+#
+    local _type=`echo $1 | tr ud ST`
+    echo -ne "\033[${2:-1}${_type}"
+}
+#============================================================================
+
+#functions for functional message displaying
+function _showMsg()
+{
+#Descriptions:
+#   display functional messages such as Warning,Error,Fail...
+#   implement by useing ``echo -ne"
+#   caller should handle the format issues.
+#   insert `\r' `\n' etc. in the message to control the format
+#Parameters:
+#   $1, message type
+#       `N'     normal message
+#       `H'     highlight message
+#       `W'     warning message
+#       `A'     Alert message
+#       `E'     error message
+#       `F'     failure message
+#       `S'     success message
+#   $2, message content
+#
+    local _msgType=$1
+    local _color=''
+    local -r _colrN=$'\033[0m'
+#
+    case $_msgType in
+    A|a) _color=$'\033[1;31m' ;;
+    H|h) _color=$'\033[1;36m' ;;
+    W|w) _color=$'\033[1;33m' ;;
+    E|e) _color=$'\033[1;31m' ;;
+    S|s) _color=$'\033[7;32m' ;;
+    F|f) _color=$'\033[7;31m' ;;
+    *)   _color=$'\033[0m' ;;
+    esac
+#
+    echo -ne "$_color$2$_colrN"
+}
+#
+function showMsg()
+{
+    echo -ne "$@"
+}
+function showHi()
+{
+    _showMsg H "$1"
+}
+function showWarn()
+{
+    _showMsg W "$1"
+}
+function showErr()
+{
+    _showMsg E "$1"
+}
+function showOk()
+{
+    _showMsg S "$1"
+}
+function showFail()
+{
+    _showMsg F "$1"
+}
+function showAlrt()
+{
+    _showMsg A "$1"
+}
+#============================================================================
+
+#functions for ...
+function getActualDate()
+{
+#Descriptions:
+#    get actual working date
+#Parameters:
+#    $1, adjuster
+#    $2, baseDate
+#Output:
+#    YYYY-MM-DD
+#
+    local       _baseDate=''
+    local   -i  _actWorkingDays=0
+    local   -i  _weekDay=''
+    local   -i  _fix=0
+#
+    [[ $# -lt 1 || $# -gt 2 ]] && echo "only 1 or 2 arguments supported" >&2 && return 1
+    [[ $# == 1 ]] && _baseDate=$(date "+%Y-%m-%d")
+    [[ $# == 2 ]] && _baseDate=$2
+    _weekDay=$(date -j -f "%Y-%m-%d" $_baseDate "+%u")
+#
+    if [[ ${1:0:1} == '-' || ${1} == '0' ]] ; then
+        let _actWorkingDays=-$1
+        let _fix=0
+        [[ $_weekDay -eq 6 ]] && let _weekDay=1 && let _fix=-2      #add 2 days, move to next monsday
+        [[ $_weekDay -eq 7 ]] && let _weekDay=1 && let _fix=-1      #add 1 days, move to next monsday
+        [[ $(($_actWorkingDays%5)) -gt $(($_weekDay-1)) ]] && let _fix+=2
+        let _actWorkingDays=$(( $_actWorkingDays/5*7 + $_actWorkingDays%5 + $_fix ))
+        [[ _actWorkingDays -lt 0 ]] && let _actWorkingDays=0
+        echo $(date -j -v -${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+    elif [[ ${1:0:1} == '+' ]] ; then
+        let _actWorkingDays=$1
+        if [[ $_weekDay -eq 6 ]] ; then
+            let _fix=1
+        elif [[ $((5-$_weekDay)) -ge $(($_actWorkingDays%5)) || $_weekDay -eq 7 ]] ; then
+            let _fix=0
+        else
+            let _fix=2
+        fi
+        let _actWorkingDays=$(( ($_actWorkingDays/5)*7 + ($_actWorkingDays%5) + $_fix ))
+        echo $(date -j -v +${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+    elif [[ ${1:4:1} == '-' && ${1:7:1} == '-' ]] ; then
+        echo $1
+    elif [[ $1 -le 31 ]] ; then
+        _baseDate=$(date "+%Y-%m-%d")
+        date -j -v ${1}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d"
+    else
+        echo "unknown argument $1"
+        return 1
+    fi
+#
+    return $?
+}
+#============================================================================
+
+#function for kit tools
+function abs()
+{
+#Descriptions:
+#    get non_nagtive value
+#Parameters:
+#    $1, value
+#Output:
+#    JUE_DUI_ZHI?
+#
+    [[ $1 -lt 0 ]] && echo $((-$1)) || echo $1
+    return 0
+}
+#============================================================================
+#
+function doExit()
+#$1, exit code
+#$2, do something before exit, each command each line
+{
+    bash <<< "$2"
+#
+    [[ $1 -eq 0 ]] && echo *complete executing $$ >&2 || echo *break executing $$ >&2
+    exit $1 ;
+}
+#============================================================================
+
+#function for awk script
+awkFunction_asortSet=$(cat - <<-AWK_FUNCTION_ASORTSET_EOF
+function _asort(    \
+    src,            # array for sorting. this parameter must be presented
+                    # this array must be 1 dimension arry. multiple field will be handeled in this function internel.
+    dest,           # array for saving result. this parameter must be presented
+    numeric,        # this parameter is optional, default is false(sorting by literal)
+    revert,         # this parameter is optional, default is false(sorting from SMALL to BIG)
+    keyFields,      # the key fields for sorting, is an digital number less then 100 or 2 dimensions arry, each item has 3 values: "prio", "numeric", "revert"
+                    # keyFields[N,"prio"] is the sorting priorty and keyFields[0,"prio"] is the highest
+                    # keyFields[N,"numeric"] indicat that sorting with numeric or non_numeric, its value will override the option numric.
+                    # keyFields[N,"revert"] indicat that sorting with revertion or non_revertion, its value will override the option revert.
+                    # this parameter is optional, default is keyFields[0,"prio"]=1, keyFields[0,"numeric"]=option_numeric, keyFields[0,"revert"]=option_revert
+    start,          # this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
+                    # only do sort on the part(star~end) the first position is indexed by 0. this parameter is optional, default is 0.
+    end,            # this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
+                    # only do sort on the part(star~end) the first position is indexed by 0. this parameter is optional, default is 0.
+                    #
+                    # above are paramters, below are local various
+                    #
+    i,j,k,l,_keyField,_cnt,_seed,_cmpr,_tmp,_idxs,_dest)
+{
+#
+    if(length(dest)==0){
+        print "_asort funtion need at least 2 parameters: src and dest" > "/dev/stderr" ;
+        return -1 ;
+    }
+#
+    _cnt = 0 ;
+    if(!numeric) numeric = 0 ;
+    if(!revert) revert = 0 ;
+    if(length(keyFields)==0){
+        keyFields[0,"prio"]=1 ;
+        keyFields[0,"numeric"]=numeric ;
+        keyFields[0,"revert"]=revert ;
+    }
+#
+    if(length(start) || length(end)){
+        #src subscript must be numeric
+        for(i=0; i<length(src); i++) _idxs[_cnt++] = i ;
+    }else{
+        for(i in src) _idxs[_cnt++] = i ;
+    }
+    if(length(start)==0) start = 0 ;
+    if(length(end)==0) end = _cnt-1 ;
+#
+    #keyFields, support multiple sorting, the priority of the keyFields[0] is the highest
+    #so, we will sort with the lowest priority, then the higher.
+    #be care for, keyFields is a 2 dimensions arry, each item has 3 values, so its length is 3*N
+#
+    for(l=length(keyFields)/3-1; l>=0; l--){
+        _keyField = keyFields[l,"prio"]+0 ;
+        numeric = keyFields[l,"numeric"] ;
+        revert = keyFields[l,"revert"] ;
+#
+        #insert sortting is ok
+        for(i=start+1; i<= end; i++){
+            _seed = src[_idxs[i]] ;
+            if(_keyField>0){
+                split(_seed, _fileds) ;
+                _seed = _fileds[_keyField] ;
+            }
+            _seed = numeric ? _seed+0 : _seed"" ;
+#
+            for(j=start; j<i; j++){
+                _cmpr = src[_idxs[j]] ;
+                if(_keyField>0){
+                    split(_cmpr, _fileds) ;
+                    _cmpr = _fileds[_keyField] ;
+                }
+                _cmpr = numeric ? _cmpr+0 : _cmpr"" ;
+#
+                if( (revert && _seed > _cmpr) || (!revert && _seed < _cmpr) ){
+                    _tmp = _idxs[i] ;
+                    for(k=i; k>j; k--){
+                        _idxs[k] = _idxs[k-1] ;
+                    }
+                    _idxs[j] = _tmp ;
+                    break ;
+                }
+            }
+        }
+    }
+#
+    #construct result
+    for(i=start; i<=end; i++){
+        _dest[i] = src[_idxs[i]] ;
+    }
+    for(i=start; i<=end; i++){
+        dest[i] = _dest[i] ;
+    }
+#
+    return 0 ;
+}
+#
+function asort(         \
+    src,
+    dest,
+    numeric,
+    revert,
+    keyField,
+    start,
+    end,
+#
+    _keyFields)
+{
+    if(length(keyField)){
+        _keyFields[0,"prio"]=keyField ;
+        _keyFields[0,"numeric"]=numeric ;
+        _keyFields[0,"revert"]=revert ;
+    }
+#
+    _asort(src,dest,numeric,revert,_keyFields,start,end) ;
+#
+    return 0 ;
+}
+#
+function asortMult(     \
+    src,
+    dest,
+    numeric,
+    revert,
+    keyFields,
+    start,
+    end)
+{
+    return _asort(src,dest,numeric,revert,keyFields,start,end) ;
+}
+#
+AWK_FUNCTION_ASORTSET_EOF)
+#
+awkFunction_around=$(cat - <<-AWK_FUNCTION_AROUND_EOF
+function around(seed,       ret)
+{
+    ret = int(seed) ;
+    if(seed < 0 && seed != ret) ret = ret - 1 ;
+    return ret ;
+}
+AWK_FUNCTION_AROUND_EOF)
+#============================================================================
+#
+awkFunction_time2int=$(cat - <<-AWK_FUNCTION_TIME2INT_EOF
+function time2int(time,     h,m,s)
+{
+    if(length(time)!=8) return -1 ;
+#
+    h = substr(time,1,2) ;
+    m = substr(time,4,2) ;
+    s = substr(time,7,2) ;
+#
+    return h*3600+m*60+s ;
+}
+AWK_FUNCTION_TIME2INT_EOF)
+#============================================================================
+#
+awkFunction_int2time=$(cat - <<-AWK_FUNCTION_INT2TIME_EOF
+function int2time(intTime,      h,m,s)
+{
+    if(intTime+0 < 0 || intTime+0 >= 24*3600) return "xx:xx:xx" ;
+#
+    h = int(intTime/3600) ;
+    m = int((intTime%3600)/60) ;
+    s = intTime%60 ;
+#
+    return sprintf("%02d:%02d:%02d",h,m,s) ;
+}
+AWK_FUNCTION_INT2TIME_EOF)
+#============================================================================
+#
+awkFunction_permutation=$(cat - <<-AWK_FUNCTION_PERMUTATION_EOF
+function permutation(   \
+    m,
+    n,
+    data,       # array index from 1 !!!
+    rslt,
+                        \
+    i,j,k,l,idxs,flags,cnt)
+{
+    if(length(data) != m) return -1 ;
+    if(n+0>m || m+0<0 || n+0<0) return -1 ;
+#
+    if(n==0) return 0 ;
+#
+    cnt = 0 ;
+    delete rslt ;
+    for(i=1;i<=n;i++) idxs[i] = i ;  # set the minimal permutation
+#
+    while(1){
+        # update rslt
+        k = data[idxs[1]] ;
+        for(i=2;i<=n;i++){
+            k = k "," data[idxs[i]] ;
+        }
+        cnt++ ;
+        rslt[cnt]=k ;
+#
+        # update idxs
+        while(1){
+            idxs[n]++ ;         # +1
+#
+            # check carry
+            for(i=n;i>1;i--){   # not include 1
+                if(idxs[i]>m){
+                    idxs[i-1]++ ;
+                    idxs[i]=1 ;
+                }else{
+                    break ;
+                }
+            }
+#
+            if(idxs[1]+0>m) return 0 ;
+#
+            # check conflict
+            for(i=1;i<=m;i++) flags[i]=0 ;
+            for(i=1;i<=n;i++){
+                flags[idxs[i]] ++ ;
+                if(flags[idxs[i]]>1) break ;
+            }
+            if(i<=n) continue ;  #found conflict
+            break ;
+        }
+    }
+#
+    return 0 ;
+}
+AWK_FUNCTION_PERMUTATION_EOF)
+#============================================================================
+#
+awkFunction_combination=$(cat - <<-AWK_FUNCTION_COMBINATION_EOF
+function combination(   \
+    m,
+    n,
+    data,       # array index from 1 !!!
+    rslt,
+                        \
+    i,j,k,l,a,buf)
+{
+    if(n>1){
+        combination(m,n-1,data,rslt) ;
+        for(i in rslt){
+            l=split(i,a,SUBSEP) ;
+            for(j=a[l]+1; j<=m; j++){
+                buf[i,j] = rslt[i]"," data[j] ;
+            }
+        }
+        delete rslt ;
+        for(i in buf) rslt[i] = buf[i] ;
+    }else if(n==1){
+        for(i=1;i<=m;i++) rslt[i] = data[i] ;
+    }else{  #n==0
+        ;
+    }
+#
+    return 0 ;
+}
+AWK_FUNCTION_COMBINATION_EOF)
+#============================================================================
+# listInfo, store the lists which used to combination
+# select one item from each list to combine
+# listInfo has 3 basecal items:
+#   "listNum"           : indicate the number of lists
+#   "len",idx       : indicate the element number of each list (idx, from 1)
+#   listIdx,elementIdx  : indicate each element on each list (xxxIdx, from 1)
+# rslt has 2 basecal items:
+#   "startIdx"
+#   "endIdx"
+awkFunction_combineEachList=$(cat - <<-AWK_FUNCTION_COMBINEEACHLIST_EOF
+function combineEachList(   \
+    listInfo,
+    rslt,
+                            \
+    i,j,k,appendCtn,appendIdx,startIdx,endIdx)
+{
+    delete rslt ;
+    rslt["startIdx"] = 1 ;
+    rslt["endIdx"] = 0 ;
+#
+    for(i=1;i<=listInfo["listNum"];i++){
+        if(i==1){
+            for(j=1;j<=listInfo["len",1];j++){
+                rslt[rslt["endIdx"]+1] = listInfo[i,j] ;
+                rslt["endIdx"] ++ ;
+            }
+        }else{
+           startIdx = rslt["startIdx"] ;
+           endIdx = rslt["endIdx"] ;
+           appendIdx = endIdx+1 ;
+           for(j=1;j<=listInfo["len",i];j++){
+               appendCtn = listInfo[i,j] ;
+               for((k=startIdx); k<=endIdx; k++){
+                   rslt[appendIdx++] = rslt[k] " " listInfo[i,j] ;
+               }
+           }
+           if(appendIdx>endIdx+1){
+               for(j=startIdx;j<=endIdx;j++) delete rslt[j] ;
+               rslt["startIdx"] = endIdx+1 ;
+               rslt["endIdx"] = appendIdx-1 ;
+           }
+        }
+    }
+#
+    return 0 ;
+}
+AWK_FUNCTION_COMBINEEACHLIST_EOF)
+#============================================================================
+#
+awkFunction_qsort=$(cat - <<-AWK_FUNCTION_QSORT_EOF
+function qsort( \
+    arry,
+    idxArry,
+    from,
+    to,         \
+                \
+    i,k,l,r,t,c \
+    )
+{
+        if(from+0>=to+0) return ;
+#
+        l=from ;
+        r=to ;
+        k=idxArry[r] ;
+        c=0 ;           #check on the left side if "c" equals 0
+#
+        #print l,r ;
+        while(l!=r){
+            if(c==0){
+                if(arry[idxArry[l]]+0<=arry[k]+0){
+                    l++ ;
+                }else{
+                    idxArry[r] = idxArry[l] ;
+                    r-- ;
+                    c=1 ;
+                }
+            }else{
+                if(arry[idxArry[r]]+0>arry[k]+0){
+                    r-- ;
+                }else{
+                    idxArry[l] = idxArry[r] ;
+                    l++ ;
+                    c=0 ;
+                }
+            }
+        }
+        idxArry[l]=k ;
+#
+        qsort(arry,idxArry,from,l-1) ;
+        qsort(arry,idxArry,l+1,to) ;
+}
+AWK_FUNCTION_QSORT_EOF)
+#============================================================================
+#
+# the array, result of split, its index based on 0
+#
+awkFunction_split2=$(cat - <<-AWK_FUNCTION_SPLIT2_EOF
+function split2( \
+    str,
+    arry,
+    sep,        \
+                \
+    len, i      \
+    )
+{
+    len = split(str,arry,sep) ;
+    for(i=0;i<len;i++) arry[i] = arry[i+1] ;
+    if(len>0) delete arry[i+1] ;
+    return len ;
+}
+AWK_FUNCTION_SPLIT2_EOF)
+#============================================================================
+#
+awkFunction_getUpDnRat=$(cat - <<-'EOF'
+    function getUpDnRat(    \
+        arry,               #input array, base on 0
+        len,
+        dur,
+        upA,                #output arry, base on 0
+        dnA,                #output arry, base on 0
+                            \
+        j,i,_hIdx,_lIdx     \
+    )
+    {
+        if(dur+0>len+0 || len+0<1){
+            for(i=0;i+0<len+0;i++){
+                upA[i] = dnA[i] = "NONE" ;
+            }
+            return ;
+        }
+#
+        if(dur == 1){
+            for(i=0;i+0<len+0;i++){
+                upA[i] = dnA[i] = 0 ;
+            }
+            return ;
+        }
+#
+        _hIdx = 0 ;
+        _lIdx = 0 ;
+        for(i=0; i+0<dur+0; i++){
+            if(arry[i]+0 >= arry[_hIdx]+0){
+                _hIdx = i ;
+            }
+            if(arry[i]+0 <= arry[_lIdx]+0){
+                _lIdx = i ;
+            }
+        }
+        upA[0] = 100*(arry[_hIdx] - arry[0])/arry[0] ;
+        dnA[0] = 100*(arry[_lIdx] - arry[0])/arry[0] ;
+#
+        for(i=1; i+0<len-dur+1; i++){
+            #remove i-1 and add i+dur-1
+#
+            #update _hIdx and _lIdx
+            if(arry[i+dur-1]+0 >= arry[_hIdx]+0) _hIdx = i+dur-1 ;
+            if(arry[i+dur-1]+0 <= arry[_lIdx]+0) _lIdx = i+dur-1 ;
+            if(_hIdx == i-1){
+                _hIdx = i ;
+                for(j=i; j+0<i+dur; j++){
+                    if(arry[j]+0 >= arry[_hIdx]+0) _hIdx = j ;
+                }
+            }
+            if(_lIdx == i-1){
+                _lIdx = i ;
+                for(j=i; j+0<i+dur; j++){
+                    if(arry[j]+0 <= arry[_lIdx]+0) _lIdx = j ;
+                }
+            }
+#
+            upA[i] = 100*(arry[_hIdx]-arry[i])/arry[i] ;
+            dnA[i] = 100*(arry[_lIdx]-arry[i])/arry[i] ;
+        }
+#
+        for(i=len-dur+1; i+0<len+0; i++){
+            upA[i] = dnA[i] = "NONE" ;
+        }
+    }
+EOF
+)
+#============================================================================
+#
+awkFunction_getMaxMin=$(cat - <<-'EOF'
+    function getMaxMin(     \
+        arry,               #input arry, base on 0
+        from,
+        to,
+        outputA,            #"maxIdx","minIdx", index base on 0. awk only support arry for output.
+        lastMaxFlag,        #flag for lastMax, if(arry[i] == max) max = arry[i] ;
+        lastMinFlag,        #flog for lastMin, if(arry[i] == min) min = arry[i] ;
+                            \
+        prefixForArry,      #awk support 1 dimension arry, if the input arry has "multiple dimension", we need specify a "prefix" for accessing the last dimension
+                            \
+        _maxIdx,_minIdx,i   \
+        )
+    {
+        if(from+0>to+0) return -1 ;
+#
+        _maxIdx = _minIdx = from ;
+#
+        for(i=from+0; i<=to+0; i++){
+            if(arry[prefixForArry i]+0 > arry[prefixForArry _maxIdx]+0 ||
+               (arry[prefixForArry i] == arry[prefixForArry _maxIdx] && lastMaxFlag) ){
+                _maxIdx = i ;
+            }
+#
+            if(arry[prefixForArry i]+0 < arry[prefixForArry _minIdx]+0 ||
+               (arry[prefixForArry i] == arry[prefixForArry _minIdx] && lastMinFlag) ){
+                _minIdx = i ;
+            }
+        }
+        outputA["maxIdx"] = _maxIdx ;
+        outputA["minIdx"] = _minIdx ;
+        #print from,to,_maxIdx"="arry[prefixForArry _maxIdx],_minIdx"="arry[prefixForArry _minIdx] ;
+#
+        return 0 ;
+    }
+EOF
+)
+#============================================================================
+#
+awkFunction_getAvrg=$(cat - <<-'EOF'
+    function getAvrg(       \
+        arry,               #input arry, base on 0
+        from,
+        to,
+                            \
+        prefixForArry,      #awk support 1 dimension arry, if the input arry has "multiple dimension", we need specify a "prefix" for accessing the last dimension
+                            \
+        _t,i   \
+        )
+    {
+        if(from+0 > to+0) return "INF" ;
+#
+        for(i=from; i+0<=to+0; i++){
+            _t += arry[prefixForArry i] ;
+        }
+#
+        return _t/(to-from+1) ;
+    }
+EOF
+)
+#============================================================================
+#
+awkFunction_getSum=$(cat - <<-'EOF'
+    function getSum(     \
+        arry,               #input arry, base on 0
+        from,
+        to,
+                        \
+        prefixForArry,      #awk support 1 dimension arry, if the input arry has "multiple dimension", we need specify a "prefix" for accessing the last dimension
+                        \
+        _t,i   \
+        )
+    {
+        if(from+0 > to+0) return "INF" ;
+#
+        for(i=from; i+0<=to+0; i++){
+            _t += arry[prefixForArry i] ;
+        }
+#
+        return _t ;
+    }
+EOF
+)
+#============================================================================
+
