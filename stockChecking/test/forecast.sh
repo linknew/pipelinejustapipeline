@@ -145,31 +145,24 @@ awk ${start:+ -v start=$start}  \
             if(start && $9<start) next ;
             if(end && $9>end) next ;
             if($10 in files){
-                file_key[$10] = $1;
-                file_date[$10] = $9 ;
+                print forecastCont[$1],$9,substr($10,13,6),$1 ;
             }
         }else if("'"$cntgData"'" == FILENAME){
             #    1.........................................................................................................................................................NF
             #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  inf%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
 
-            if($1 !~ "#") forecastCont[$NF] = $0 ;
+            if($1 !~ "#"){
+                seed = $NF ;
+                $NF = "" ;
+                forecastCont[seed] = $0 ;
+            }
         }else if("-" == FILENAME){
             codeNum = split2($0,a," ") ;
             for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
         }
     }
 
-    END{
-        for(file in file_key){
-            key = file_key[file] ;
-            date = file_date[file] ;
-            $0 = forecastCont[key] ;
-            $NF = "" ;
-            print $0,date,substr(file,13,6),key ;
-        }
-    }
-
-    ' - "$segData" "$cntgData" > "$forecastData"
+    ' -  "$cntgData" "$segData" > "$forecastData"
 
 echo *Save forecast data to "$forecastData" >&2
 #endif
