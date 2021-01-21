@@ -103,15 +103,15 @@ if [[ $genCounting -eq 1 ]]; then
 
             {
                 if("'"$segData"'" == FILENAME){
-                    #                          1       2       3       4       5       6          7          8          9                     10
-                    #[264k<66k<132k<22k<5k<1k]-3   1.94%  -8.48%  -6.65% -12.39% -10.22% 2020-07-15 2020-07-17 2020-07-17 sorting-raw/603799.raw
+                    #                          1       2       3       4       5       6          7          8          9    10                     11
+                    #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 sorting-raw/603799.raw
 
                     if(start && $9<start) next ;
                     if(end && $9>end) next ;
                     if($1 ~ "#") next ;
                     if($8 ~ "NONE") next ;
 
-                    if($10 in files) print ;
+                    if($11 in files) print ;
 
                 }else if("-" == FILENAME){
                     codeNum = split2($0,a," ") ;
@@ -138,14 +138,14 @@ awk ${start:+ -v start=$start}  \
 
     {
         if("'"$segData"'" == FILENAME){
-            #                          1       2       3       4       5       6          7          8          9                     10
-            #[264k<66k<132k<22k<5k<1k]-3   1.94%  -8.48%  -6.65% -12.39% -10.22% 2020-07-15 2020-07-17 2020-07-17 sorting-raw/603799.raw
+            #                          1       2       3       4       5       6          7          8          9    10                     11
+            #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 sorting-raw/603799.raw
 
             if($1 ~ "#") next ;
             if(start && $9<start) next ;
             if(end && $9>end) next ;
-            if($10 in files){
-                print forecastCont[$1],$9,substr($10,13,6),$1 ;
+            if($11 in files){
+                print forecastCont[$1],$9,$10,substr($11,13,6),$1 ;
             }
         }else if("'"$cntgData"'" == FILENAME){
             #    1.........................................................................................................................................................NF
