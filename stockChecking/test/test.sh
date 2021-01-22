@@ -1,5 +1,14 @@
 #! /bin/bash
 
+
+echo yes
+echo 1>&2 no
+echo 1>&4 output to 4
+read x 0<&19
+echo $'read from .3(<19)': $x
+
+exit 
+
 WKD=$(dirname $0)   #working directory
 BKD=$(pwd)          #back directory
 cd $WKD
@@ -7,6 +16,13 @@ cd $WKD
 . comm.lib
 
 durDef=3
+
+
+
+
+
+doStart
+doExit
 
 for i in "${@}"
 do
