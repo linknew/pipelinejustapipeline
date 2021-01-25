@@ -108,7 +108,7 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
             iconv -f GBK -t utf8 |
             sed -n '$d; 2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' | 
             awk '($4>0){print}' |
-            tail -r
+            sed -n '1{x;n;};${G;p;q};G;x'   # tail -r is not supported in many scenarios, use sed to instead of
         )
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2
