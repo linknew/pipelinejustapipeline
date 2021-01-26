@@ -17,7 +17,7 @@ function Help
         --genRaw, generate raw data
         --genSegment, generate segment data from raw data
         --genCounting, gencounting data from segment data
-        --build, is the abbrevation of --genRaw --genSegment --genCounting
+        --build, is the abbrevation of --genRaw --genSegment --genCounting --doForecast=0
         --doForecast, make forecasting
         --help
 
@@ -47,7 +47,7 @@ do
     [[ ${i} == "--genCounting" ]] && genCounting=1 && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
-    [[ ${i} == "--build" ]] && genRaw=1 && genSegment=1 && genCounting=1 && continue
+    [[ ${i} == "--build" ]] && genRaw=1 && genSegment=1 && genCounting=1 && doForecast=0 && continue
     [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$oprtB4Exit"
     [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$oprtB4Exit"
     list=$i
