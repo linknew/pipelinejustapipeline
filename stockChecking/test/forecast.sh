@@ -6,6 +6,13 @@ cd $WKD
 
 . comm.lib
 
+doForecastDef=1
+durDef=3
+genRawDef=0
+genSegmentDef=0
+genCountingDef=0
+oprtB4Exit="cd $BKD"
+
 function Help
 {
     echo -ne "
@@ -27,13 +34,6 @@ function Help
     Default: --dur=$durDef --doForecast=$doForecastDef
 \n"
 }
-
-doForecastDef=1
-durDef=3
-genRawDef=0
-genSegmentDef=0
-genCountingDef=0
-oprtB4Exit="cd $BKD"
 
 echo -ne "\n*executing $0($$)\n" >&2
 
