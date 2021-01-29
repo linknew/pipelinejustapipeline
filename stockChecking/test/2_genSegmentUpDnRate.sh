@@ -27,7 +27,7 @@ disSrc=${disSrc:-1}
 describtion="#input:\n\
 #\t(1)sorting (2)amp (3)date (4)close (5)hig (6)low (7)open (8)amp (9)xchg (10)vol (11)val (12)1k=avg (13)5k (14)22k (15)66k (16)132k (17)264k\n\
 #output:\n\
-#\t(1)sorting (2)upAMPCeiling (3)upAMPFloor (4)dnAMPCeiling (5)dnAMPFloor (6)durAmp (7)dateStart (8)dateEnd (9)curDate (10)close (11)srcFile"
+#\t(1)sorting (2)upAMPCeiling (3)upAMPFloor (4)dnAMPCeiling (5)dnAMPFloor (6)durAmp (7)dateStart (8)dateEnd (9)curDate (10)close (11)hig (12)low (13)srcFile"
 
 echo "*[$code]" >&2
 echo *dur=$dur >&2
@@ -233,7 +233,7 @@ awk                             \
 
 ./serialize.sh --seed=1 \
                --describtion="$describtion"    \
-               --format='"%-27s %6.2f%% %6.2f%% %6.2f%% %6.2f%% %6.2f%% %10s %10s %10s %7.2f %s\n",$1,$18,$19,$20,$21,$22,$23,$24,$3,$4,$30'
+               --format='"%-27s %6.2f%% %6.2f%% %6.2f%% %6.2f%% %6.2f%% %10s %10s %10s %7.2f %7.2f %7.2f %s\n",$1,$18,$19,$20,$21,$22,$23,$24,$3,$4,$5,$6,$30'
 
 doExit 0 
 

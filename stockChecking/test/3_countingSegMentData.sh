@@ -10,7 +10,7 @@ awk '
 #do counting
     BEGIN{
         print "#input:" ;
-        print "#\t(1)sorting (2)upAMPCeiling (3)upAMPFloor (4)dnAMPCeiling (5)dnAMPFloor (6)durAmp (7)dateStart (8)dateEnd (9)curDate (10)close (11)srcFile"
+        print "#\t(1)sorting (2)upAMPCeiling (3)upAMPFloor (4)dnAMPCeiling (5)dnAMPFloor (6)durAmp (7)dateStart (8)dateEnd (9)curDate (10)close (11)high (12)low (13)srcFile"
         print "#output:" ;
         print "#\t(1)count (2)cntUP/cntUN (3)cntUP(ttUP/cntUP (4)cntUN(ttUN/cntUN) (5)cntDP(ttDP/cntDP) (6)cntDN(ttDN/cntDN) (7)cntAP/cntAN (8)cntAP(ttAP/cntAP) (9)cntAN(ttAN/cntAN) (10)serialized-sorting" ;
     }
