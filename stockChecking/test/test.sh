@@ -105,15 +105,15 @@ if [[ $genCounting -eq 1 ]]; then
 
             {
                 if("'"$segData"'" == FILENAME){
-                    #                          1       2       3       4       5       6          7          8          9    10                     11
-                    #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 sorting-raw/603799.raw
+                    #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
+                    #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
 
                     if(start && $9<start) next ;
                     if(end && $9>end) next ;
                     if($1 ~ "#") next ;
                     if($8 ~ "NONE") next ;
 
-                    if($11 in files) print ;
+                    if($NF in files) print ;
 
                 }else if("-" == FILENAME){
                     codeNum = split2($0,a," ") ;
@@ -139,14 +139,14 @@ if [[ $doForecast -eq 1 ]] ; then
 
         {
             if("'"$segData"'" == FILENAME){
-                #                          1       2       3       4       5       6          7          8          9    10                     11
-                #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 sorting-raw/603799.raw
+                #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
+                #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
 
                 if($1 ~ "#") next ;
                 if(start && $9<start) next ;
                 if(end && $9>end) next ;
-                if($11 in files){
-                    print forecastCont[$1],$9,$10,substr($11,13,6),$1 ;
+                if($NF in files){
+                    print forecastCont[$1],$9,$10,substr($NF,13,6),$1 ;
                 }
             }else if("'"$cntgData"'" == FILENAME){
                 #    1.........................................................................................................................................................NF
@@ -171,17 +171,185 @@ fi
 
 #if 1
 if [[ $verify -eq 1 ]] ; then
+
+    #generate processing table
+
     echo $codes | 
     awk ${start:+ -v start=$start}  \
         ${end:+ -v end=$end}        \
         '
         '"$awkFunction_split2"'
 
-        {
-            exit
+        BEGIN{
+            print "#output:"
+            print "#\t(1)forecastLowPrice(forecastLowCnt) (2)forecastHig(forecastHigCnt) (3)low (4)hig (5)date (6)closePrice (7)code (8)seed"
+            print "#note:"
+            print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
         }
 
-        ' - "$cntgData" "$segData"
+        {
+            if("'"$segData"'" == FILENAME){
+
+                #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
+                #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
+
+                if($1 ~ "#") next ;
+                if(start && $9<start) next ;
+                if(end && $9>end) next ;
+
+                if($NF in files){
+                    clsP = $10+0 ;
+                    low = $12 ;
+                    hig = $11 ;
+                    date = $9 ;
+                    code = substr($NF,13,6) ;
+                    seed = $1 ;
+                    cnt=$0 ;
+                    $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp
+                    upCnt = $1 ;
+                    upAmp = $2 ;
+                    upPrice = (100+upAmp)*clsP/100 ;
+                    dnCnt = $3 ;
+                    dnAmp = $4 ;
+                    dnPrice = (100+dnAmp)*clsP/100 ;
+                    print dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", low, hig, date, clsP, code, seed ;
+                }
+
+            }else if("'"$cntgData"'" == FILENAME){
+
+                #    1.........................................................................................................................................................NF
+                #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  inf%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
+
+                if($1 ~ "#") next ;
+
+                seed = $NF ;
+
+                #get UP info
+                {
+                    s = index($0,"UP=") ;
+                    if(s>0){
+                        e = index(substr($0, s+3), ")") ;
+                        upStr = substr($0, s+3, e) ;        #from s+3, length equals to e
+                        gsub(/\(|\)|%/, " ", upStr) ;
+                    }else{
+                        upStr = "" ;
+                    }
+                }
+
+                #get DN info
+                {
+                    s = index($0,"DN=") ;
+                    if(s>0){
+                        e = index(substr($0, s+3), ")") ;
+                        dnStr = substr($0, s+3, e) ;        #from s+3, length equals to e
+                        gsub(/\(|\)|%/, " ", dnStr) ;
+                    }else{
+                        dnStr = "" ;
+                    }
+                }
+
+                forecastCont[seed] = upStr " " dnStr ;      #upCnt upAmp dnCnt dnAmp
+
+            }else if("-" == FILENAME){
+
+                codeNum = split2($0,a," ") ;
+                for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+
+            }
+        }
+
+        ' - "$cntgData" "$segData"      |
+
+    awk -v dur=$dur                     \
+        '
+
+        '"$awkFunction_getMaxMin"'
+        '"$awkFunction_around"'
+
+        BEGIN{
+            print "#input:"
+            print "#\t(1)forecastLowPrice(forecastLowCnt) (2)forecastHig(forecastHigCnt) (3)low (4)hig (5)date (6)closePrice (7)code (8)seed"
+            print "#note:"
+            print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
+
+            cnt = 0 ;
+            money = 20000 ;
+            stockNum = 0 ;
+        }
+
+        ($1 !~ "#"){
+            # generate processing table: forecastLowPrice forecastHigPrice low hig 
+
+            fcstL = $1+0 ;
+            fcstH = $2+0 ;
+            low   = $3+0 ;
+            hig   = $4+0 ;
+            originCont[cnt] = $0 ;
+            forecastLowArry[cnt] = fcstL ;
+            forecastHigArry[cnt] = fcstH ;
+            lowArry[cnt] = low ;
+            higArry[cnt] = hig ;
+
+            date[cnt] = $5 ;
+
+            cnt ++ ;
+        }
+
+        END{
+            # do buy and sell demonstration
+            for(i=1; i<cnt-dur; i++){
+                from = i - dur ;
+                to   = i - 1 ;
+                if(from < 0) from = 0 ;
+                if(to < 0) to = 0 ;
+
+                # before open
+                {
+                    if(stockNum){
+                        getMaxMin(forecastHigArry, from, to, a) ;
+                        selV = forecastHigArry[a["minIdx"]] + 0 ;
+                        print date[i],"set *SELL value to:", selV,"@",originCont[i] ;
+                    }else{
+                        getMaxMin(forecastLowArry, from, to, a) ;
+                        buyV = forecastLowArry[a["minIdx"]] + 0 ;
+                        print date[i],"set *BUY value to:", buyV,"@",originCont[i] ;
+                    }
+                }
+
+                # after close
+                {
+                    if(stockNum){
+                        if(selV < higArry[i]){
+                            money += stockNum * selV ;
+                            print "sold",stockNum,"*",selV,". And now, we have", money ;
+                            stockNum = 0 ;
+                        }
+                    }else{
+                        if(buyV > lowArry[i]){
+                            stockNum = around(money/buyV) ;
+                            money -= buyV * stockNum ;
+                            print "buy",stockNum,"with",buyV,". And now, we have", money ;
+                        }
+                    }
+
+                    for(j=from; j<=to; j++){
+                        if(forecastHigArry[j] <= higArry[i]){
+                            forecastHigArry[j] = "inf" ;
+                            forecastLowArry[j] = "inf" ;
+                        }
+                        if(forecastLowArry[j] >= lowArry[i]){
+                            forecastLowArry[j] = "inf" ;
+                        }
+                    }
+
+                    if(i-dur+1<i && i-dur+1>0){
+                        forecastLowArry[i-dur+1] = "inf" ;
+                    }
+                }
+            }
+        }
+        
+        '
 fi
 #endif
 
