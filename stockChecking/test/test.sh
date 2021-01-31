@@ -11,12 +11,14 @@ genRawDef=0
 genSegmentDef=0
 genCountingDef=0
 verifyDef=0
+buyFixDef=0
+selFixDef=-0.03
 oprtB4Exit="cd $BKD"
 
 function Help
 {
     echo -ne "
-    Usage: ${0} [--dur=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--build] [--genRaw] [--genSegment] [--genCounting] [--doForecast=N] [--verify] [--help] list
+    Usage: ${0} [--dur=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--build] [--genRaw] [--genSegment] [--genCounting] [--doForecast=N] [--verify [--buyFix=N] [--selFix=N]] [--help] list
 
         --dur, duration for segment data
         --start, limited the range when generate segment
@@ -64,6 +66,8 @@ genRaw=${genRaw:-$genRawDef}
 genSegment=${genSegment:-$genSegmentDef}
 genCounting=${genCounting:-$genCountingDef}
 verify=${verify:-$verifyDef}
+buyFix=${buyFix:-$buyFixDef}
+selFix=${selFix:-$selFixDef}
 segData=.t$dur.segData
 cntgData=.t$dur.counting
 forecastData=.t$dur.forecast$postFilename${start:+.from.$start}${end:+.to.$end}
@@ -76,6 +80,10 @@ echo     *genSegment="$genSegment"   >&2
 echo     *genCounting="$genCounting" >&2
 echo     *doForecast="$doForecast"   >&2
 echo     *verify="$verify"  >&2
+if [[ $verify -eq 1 ]] ; then
+    echo     *buyFix="$buyFix"  >&2
+    echo     *selFix="$selFix"  >&2
+fi
 
 #generate rawData and segment data
 #if 1
@@ -261,6 +269,8 @@ if [[ $verify -eq 1 ]] ; then
         ' - "$cntgData" "$segData"      |
 
     awk -v dur=$dur                     \
+        -v buyFix=$buyFix               \
+        -v selFix=$selFix               \
         '
 
         '"$awkFunction_getMaxMin"'
@@ -307,12 +317,12 @@ if [[ $verify -eq 1 ]] ; then
                 {
                     if(stockNum){
                         getMaxMin(forecastHigArry, from, to, a) ;
-                        selV = forecastHigArry[a["minIdx"]] + 0 ;
-                        print date[i],"set *SELL value to:", selV,"@",originCont[i] ;
+                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
+                        print date[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "@", originCont[i] ;
                     }else{
                         getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = forecastLowArry[a["minIdx"]] + 0 ;
-                        print date[i],"set *BUY value to:", buyV,"@",originCont[i] ;
+                        buyV = around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+                        print date[i],"set *BUY value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "@", originCont[i] ;
                     }
                 }
 
@@ -321,14 +331,14 @@ if [[ $verify -eq 1 ]] ; then
                     if(stockNum){
                         if(selV < higArry[i]){
                             money += stockNum * selV ;
-                            print "sold",stockNum,"*",selV,". And now, we have", money ;
+                            print "sold",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
                         if(buyV > lowArry[i]){
                             stockNum = around(money/buyV) ;
                             money -= buyV * stockNum ;
-                            print "buy",stockNum,"with",buyV,". And now, we have", money ;
+                            print "buy",stockNum,"with",buyV "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
                         }
                     }
 
