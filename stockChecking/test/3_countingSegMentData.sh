@@ -54,6 +54,9 @@ awk '
     END{
         #get rid of the first 1/20 MAXs and 1/20 MINs
         for(seed in cnt){
+            #counting UpP UpN DnP DnN AmpP AmpN
+            #after counting, fixing inf and -inf
+
             #process UpP
             {
                 _maxNum = _minNum = int(cntUpP[seed]/20) ;
@@ -162,6 +165,15 @@ awk '
                 cntDurAmpN[seed] = _cnt ;
             }
 
+            #fix inf and -inf
+            {
+                if(avrgUpP[seed] == "-inf") avrgUpP[seed] = avrgUpN[seed];
+                if(avrgUpN[seed] == "inf") avrgUpN[seed] = avrgUpP[seed];
+                if(avrgDnP[seed] == "-inf") avrgDnP[seed] = avrgDnN[seed];
+                if(avrgDnN[seed] == "inf") avrgDnN[seed] = avrgDnP[seed];
+                if(avrgDurAmpP[seed] == "-inf") avrgDurAmpP[seed] = avrgDurAmpN[seed];
+                if(avrgDurAmpN[seed] == "inf") avrgDurAmpN[seed] = avrgDurAmpP[seed];
+            }
         }
 
         for(i in cnt) printf("%06d  UP/UN=%5.2f  UP=%06d(%5.2f%%)  UN=%06d(%5.2f%%)  DP=%06d(%5.2f%%)  DN=%06d(%5.2f%%)  AP/AN=%5.2f  AP=%06d(%5.2f%%)  AN=%06d(%5.2f%%)  %s\n",

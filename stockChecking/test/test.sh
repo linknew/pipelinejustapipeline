@@ -11,7 +11,7 @@ genRawDef=0
 genSegmentDef=0
 genCountingDef=0
 verifyDef=0
-buyFixDef=0
+buyFixDef=+0.03
 selFixDef=-0.03
 oprtB4Exit="cd $BKD"
 
@@ -321,8 +321,8 @@ if [[ $verify -eq 1 ]] ; then
                         print date[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "@", originCont[i] ;
                     }else{
                         getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
-                        print date[i],"set *BUY value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "@", originCont[i] ;
+                        buyV = (forecastLowArry[a["minIdx"]] == "inf") ? "-inf" : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+                        print date[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "@", originCont[i] ;
                     }
                 }
 
@@ -330,15 +330,17 @@ if [[ $verify -eq 1 ]] ; then
                 {
                     if(stockNum){
                         if(selV < higArry[i]){
+                            if(selV < lowArry[i]) selV = lowArry[i] ;
                             money += stockNum * selV ;
-                            print "sold",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+                            print date[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
                         if(buyV > lowArry[i]){
+                            if(buyV > higArry[i]) buyV = higArry[i] ;
                             stockNum = around(money/buyV) ;
                             money -= buyV * stockNum ;
-                            print "buy",stockNum,"with",buyV "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+                            print date[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
                         }
                     }
 
