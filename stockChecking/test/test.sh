@@ -11,7 +11,7 @@ genRawDef=0
 genSegmentDef=0
 genCountingDef=0
 verifyDef=0
-buyFixDef=+0.03
+buyFixDef=0
 selFixDef=-0.03
 oprtB4Exit="cd $BKD"
 
@@ -29,6 +29,8 @@ function Help
         --build, is the abbrevation of --genRaw --genSegment --genCounting --doForecast=0
         --doForecast, make forecasting
         --verify, do verifications
+            -- buyFix=N, set buy price plus N
+            -- selFix=N, set sell price pus N
         --help
 
     Note:
@@ -44,6 +46,8 @@ do
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
     [[ ${i%%=*} == "--doForecast" ]] && doForecast=${i##*=} && continue
     [[ ${i%%=*} == "--verify" ]] && verify=1 && continue
+    [[ ${i%%=*} == "--buyFix" ]] && buyFix=${i##*=} && continue
+    [[ ${i%%=*} == "--selFix" ]] && selFix=${i##*=} && continue
     [[ ${i} == "--genRaw" ]] && genRaw=1 && continue
     [[ ${i} == "--genSegment" ]] && genSegment=1 && continue
     [[ ${i} == "--genCounting" ]] && genCounting=1 && continue
@@ -104,7 +108,7 @@ done
 #if 1
 if [[ $genCounting -eq 1 ]]; then
     echo "*NOTE, only the item which in the code list will be procceed in counting" >&2
-
+    echo "#start=$start end=$end" > "$cntgData"
     echo $codes     | 
         awk ${start:+ -v start=$start}  \
             ${end:+ -v end=$end}        \
@@ -129,7 +133,7 @@ if [[ $genCounting -eq 1 ]]; then
                 }
             }
             ' - $segData    |
-        ./3_countingSegMentData.sh > "$cntgData"
+        ./3_countingSegMentData.sh >> "$cntgData"
 
     echo *Save counting data to "$cntgData" >&2
 fi
@@ -157,8 +161,8 @@ if [[ $doForecast -eq 1 ]] ; then
                     print forecastCont[$1],$9,$10,substr($NF,13,6),$1 ;
                 }
             }else if("'"$cntgData"'" == FILENAME){
-                #    1.........................................................................................................................................................NF
-                #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  inf%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
+                #    1..........................................................................................................................................................NF
+                #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  5.29%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
 
                 if($1 !~ "#"){
                     seed = $NF ;
@@ -225,8 +229,8 @@ if [[ $verify -eq 1 ]] ; then
 
             }else if("'"$cntgData"'" == FILENAME){
 
-                #    1.........................................................................................................................................................NF
-                #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  inf%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
+                #    1..........................................................................................................................................................NF
+                #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  5.29%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
 
                 if($1 ~ "#") next ;
 
@@ -285,6 +289,9 @@ if [[ $verify -eq 1 ]] ; then
             cnt = 0 ;
             money = 20000 ;
             stockNum = 0 ;
+
+            infP = 9999.99 ;
+            infN = -9999.99
         }
 
         ($1 !~ "#"){
@@ -318,11 +325,11 @@ if [[ $verify -eq 1 ]] ; then
                     if(stockNum){
                         getMaxMin(forecastHigArry, from, to, a) ;
                         selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
-                        print date[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "@", originCont[i] ;
+                        print date[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
                     }else{
                         getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = (forecastLowArry[a["minIdx"]] == "inf") ? "-inf" : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
-                        print date[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "@", originCont[i] ;
+                        buyV = (forecastLowArry[a["minIdx"]] == infP) ? infN : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+                        print date[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
                     }
                 }
 
@@ -345,17 +352,17 @@ if [[ $verify -eq 1 ]] ; then
                     }
 
                     for(j=from; j<=to; j++){
-                        if(forecastHigArry[j] <= higArry[i]){
-                            forecastHigArry[j] = "inf" ;
-                            forecastLowArry[j] = "inf" ;
+                        if(higArry[i] >= forecastHigArry[j]){
+                            forecastHigArry[j] = infP ;
+                            forecastLowArry[j] = infP ;
                         }
-                        if(forecastLowArry[j] >= lowArry[i]){
-                            forecastLowArry[j] = "inf" ;
+                        if(lowArry[i] <= forecastLowArry[j]){
+                            forecastLowArry[j] = infP ;
                         }
                     }
 
                     if(i-dur+1<i && i-dur+1>0){
-                        forecastLowArry[i-dur+1] = "inf" ;
+                        forecastLowArry[i-dur+1] = infP ;
                     }
                 }
             }
