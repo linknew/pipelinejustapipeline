@@ -117,8 +117,7 @@ if [[ $genCounting -eq 1 ]]; then
 
             {
                 if("'"$segData"'" == FILENAME){
-                    #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
-                    #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
+                    # (1)sorting  (2)upP  (3)upN  (4)dnP  (5)dnN  (6)durAMP  (7)dateS  (8)dateE  (9)DateC  (10)opn  (11)cls  (12)hig  (13)low  (14)srcFile"
 
                     if(start && $9<start) next ;
                     if(end && $9>end) next ;
@@ -151,14 +150,13 @@ if [[ $doForecast -eq 1 ]] ; then
 
         {
             if("'"$segData"'" == FILENAME){
-                #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
-                #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
+                # (1)sorting  (2)upP  (3)upN  (4)dnP  (5)dnN  (6)durAMP  (7)dateS  (8)dateE  (9)DateC  (10)opn  (11)cls  (12)hig  (13)low  (14)srcFile"
 
                 if($1 ~ "#") next ;
                 if(start && $9<start) next ;
                 if(end && $9>end) next ;
                 if($NF in files){
-                    print forecastCont[$1],$9,$10,substr($NF,13,6),$1 ;
+                    print forecastCont[$1],$9,$11,substr($NF,13,6),$1 ;
                 }
             }else if("'"$cntgData"'" == FILENAME){
                 #    1..........................................................................................................................................................NF
@@ -194,7 +192,7 @@ if [[ $verify -eq 1 ]] ; then
 
         BEGIN{
             print "#output:"
-            print "#\t(1)forecastLowPrice(forecastLowCnt) (2)forecastHig(forecastHigCnt) (3)low (4)hig (5)date (6)closePrice (7)code (8)seed"
+            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)date (8)code (9)seed"
             print "#note:"
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
         }
@@ -202,29 +200,28 @@ if [[ $verify -eq 1 ]] ; then
         {
             if("'"$segData"'" == FILENAME){
 
-                #                          1       2       3       4       5       6          7          8          9    10    11    12                     13
-                #[264k<132k<66k<22k<1k<5k]-3   6.40%   4.16%  -0.88%  -5.54%  -3.02% 2021-01-15 2021-01-19 2021-01-14 81.00 82.00 80.00 sorting-raw/603799.raw
+                # (1)sorting  (2)upP  (3)upN  (4)dnP  (5)dnN  (6)durAMP  (7)dateS  (8)dateE  (9)DateC  (10)opn  (11)cls  (12)hig  (13)low  (14)srcFile"
 
                 if($1 ~ "#") next ;
                 if(start && $9<start) next ;
                 if(end && $9>end) next ;
 
                 if($NF in files){
-                    clsP = $10+0 ;
-                    low = $12 ;
-                    hig = $11 ;
+                    opn = $10+0 ;
+                    cls = $11+0 ;
+                    low = $13+0 ;
+                    hig = $12+0 ;
                     date = $9 ;
                     code = substr($NF,13,6) ;
                     seed = $1 ;
-                    cnt=$0 ;
                     $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp
                     upCnt = $1 ;
                     upAmp = $2 ;
-                    upPrice = (100+upAmp)*clsP/100 ;
+                    upPrice = (100+upAmp)*cls/100 ;
                     dnCnt = $3 ;
                     dnAmp = $4 ;
-                    dnPrice = (100+dnAmp)*clsP/100 ;
-                    print dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", low, hig, date, clsP, code, seed ;
+                    dnPrice = (100+dnAmp)*cls/100 ;
+                    print low, hig, opn, cls, dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", date, code, seed ;
                 }
 
             }else if("'"$cntgData"'" == FILENAME){
@@ -282,6 +279,8 @@ if [[ $verify -eq 1 ]] ; then
 
         BEGIN{
             print "#input:"
+            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)date (8)code (9)seed"
+
             print "#\t(1)forecastLowPrice(forecastLowCnt) (2)forecastHig(forecastHigCnt) (3)low (4)hig (5)date (6)closePrice (7)code (8)seed"
             print "#note:"
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
@@ -297,17 +296,17 @@ if [[ $verify -eq 1 ]] ; then
         ($1 !~ "#"){
             # generate processing table: forecastLowPrice forecastHigPrice low hig 
 
-            fcstL = $1+0 ;
-            fcstH = $2+0 ;
-            low   = $3+0 ;
-            hig   = $4+0 ;
+            fcstL = $5+0 ;
+            fcstH = $6+0 ;
+            low   = $1+0 ;
+            hig   = $2+0 ;
             originCont[cnt] = $0 ;
             forecastLowArry[cnt] = fcstL ;
             forecastHigArry[cnt] = fcstH ;
             lowArry[cnt] = low ;
             higArry[cnt] = hig ;
 
-            date[cnt] = $5 ;
+            date[cnt] = $7 ;
 
             cnt ++ ;
         }
