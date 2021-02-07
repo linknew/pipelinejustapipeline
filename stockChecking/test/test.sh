@@ -192,7 +192,7 @@ if [[ $verify -eq 1 ]] ; then
 
         BEGIN{
             print "#output:"
-            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)date (8)code (9)seed"
+            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)upCnt/unCnt (8)date (9)code (10)seed"
             print "#note:"
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
         }
@@ -214,50 +214,30 @@ if [[ $verify -eq 1 ]] ; then
                     date = $9 ;
                     code = substr($NF,13,6) ;
                     seed = $1 ;
-                    $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp
+                    $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp upCnt/unCnt
                     upCnt = $1 ;
                     upAmp = $2 ;
                     upPrice = (100+upAmp)*cls/100 ;
                     dnCnt = $3 ;
                     dnAmp = $4 ;
                     dnPrice = (100+dnAmp)*cls/100 ;
-                    print low, hig, opn, cls, dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", date, code, seed ;
+                    upRate = $5 ;
+                    print low, hig, opn, cls, dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", upRate, date, code, seed ;
                 }
 
             }else if("'"$cntgData"'" == FILENAME){
 
                 #    1..........................................................................................................................................................NF
                 #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  5.29%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
-
                 if($1 ~ "#") next ;
 
                 seed = $NF ;
 
-                #get UP info
-                {
-                    s = index($0,"UP=") ;
-                    if(s>0){
-                        e = index(substr($0, s+3), ")") ;
-                        upStr = substr($0, s+3, e) ;        #from s+3, length equals to e
-                        gsub(/\(|\)|%/, " ", upStr) ;
-                    }else{
-                        upStr = "" ;
-                    }
-                }
+                gsub(/(UP)|(UN)|(DP)|(DN)|(AP)|(AN)|=|\(|\)|\/|%/," ") ;
+                #now, we get :
+                #(1)cnt  (2)UPC/UNC (3)UPC (4)UPA (5)UNC (6)UNA (7)DPC (8)DPA (9)DNC (10)DNA (11)AP/AN (12) APC (13)APA (14)ANC (15)ANA ... (NF)seed
 
-                #get DN info
-                {
-                    s = index($0,"DN=") ;
-                    if(s>0){
-                        e = index(substr($0, s+3), ")") ;
-                        dnStr = substr($0, s+3, e) ;        #from s+3, length equals to e
-                        gsub(/\(|\)|%/, " ", dnStr) ;
-                    }else{
-                        dnStr = "" ;
-                    }
-                }
-
-                forecastCont[seed] = upStr " " dnStr ;      #upCnt upAmp dnCnt dnAmp
+                forecastCont[seed] = $3 " " $4 " " $9 " " $10 " " $2 ;      #upCnt upAmp dnCnt dnAmp upCnt/unCnt
 
             }else if("-" == FILENAME){
 
@@ -279,9 +259,7 @@ if [[ $verify -eq 1 ]] ; then
 
         BEGIN{
             print "#input:"
-            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)date (8)code (9)seed"
-
-            print "#\t(1)forecastLowPrice(forecastLowCnt) (2)forecastHig(forecastHigCnt) (3)low (4)hig (5)date (6)closePrice (7)code (8)seed"
+            print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)upCnt/unCnt (8)date (9)code (10)seed"
             print "#note:"
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
 
@@ -305,6 +283,7 @@ if [[ $verify -eq 1 ]] ; then
             fcstH = $6+0 ;
             sub(/.*\(/,"",$6) ;
             fcstHCnt = $6+0 ;
+            upRate = $7+0 ;
 
             lowArry[cnt] = low ;
             higArry[cnt] = hig ;
@@ -312,7 +291,8 @@ if [[ $verify -eq 1 ]] ; then
             forecastLowCntArry[cnt] = fcstLCnt ;
             forecastHigArry[cnt] = fcstH ;
             forecastHigCntArry[cnt] = fcstHCnt ;
-            dateArry[cnt] = $7 ;
+            forecastUPC_DIV_UNC[cnt] = upRate ;
+            dateArry[cnt] = $8 ;
 
             cnt ++ ;
         }
@@ -408,7 +388,7 @@ if [[ $verify -eq 1 ]] ; then
                     stockNum,
                     money,
                                         \
-                    idx,rate,tmpRate,selV,buyV,a,from,to,i,j )
+                    idx,rate,selV,buyV,a,from,to,i,j )
         {
             # do buy and sell demonstration
             for(i=1; i<cnt-dur; i++){
@@ -428,14 +408,13 @@ if [[ $verify -eq 1 ]] ; then
                         rate = 0 ;
                         for(j=from; j<=to; j++){
                             if(forecastHigCntArry[j] <300) continue ;
-                            tmpRate = (forecastHigCntArry[j]/forecastLowCntArry[j]) ;
-                            if(tmpRate < 1) continue ;
-                            if(tmpRate > rate){
-                                rate = tmpRate ;
+                            if(forecastUPC_DIV_UNC[j] < 12.33) continue ;
+                            if(rate < forecastUPC_DIV_UNC[j]){
+                                rate = forecastUPC_DIV_UNC[j] ;
                                 idx = j ;
                             }
                         }
-                        buyV = (idx == -1) ? INF_N : around(forecastLowArry[idx]*100)/100+buyFix ;
+                        buyV = (idx == -1 || INF_P == forecastLowArry[idx]) ? INF_N : around(forecastLowArry[idx]*100)/100+buyFix ;
                         print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
                     }
                 }
@@ -477,60 +456,7 @@ if [[ $verify -eq 1 ]] ; then
         }
 
         END{
-            strategy_2(originCont, lowArry, higArry, forecastLowArry, forecastLowCntArry, forecastHigArry, forecastHigCntArry, dateArry, cnt, dur, selFix, buyFix, stockNum, money) ;
-#            # do buy and sell demonstration
-#            for(i=1; i<cnt-dur; i++){
-#                from = i - dur ;
-#                to   = i - 1 ;
-#                if(from < 0) from = 0 ;
-#                if(to < 0) to = 0 ;
-#
-#                # before open
-#                {
-#                    if(stockNum){
-#                        getMaxMin(forecastHigArry, from, to, a) ;
-#                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
-#                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
-#                    }else{
-#                        getMaxMin(forecastLowArry, from, to, a) ;
-#                        buyV = (forecastLowArry[a["minIdx"]] == INF_P) ? INF_N : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
-#                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
-#                    }
-#                }
-#
-#                # after close
-#                {
-#                    if(stockNum){
-#                        if(selV < higArry[i]){
-#                            if(selV < lowArry[i]) selV = lowArry[i] ;
-#                            money += stockNum * selV ;
-#                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
-#                            stockNum = 0 ;
-#                        }
-#                    }else{
-#                        if(buyV > lowArry[i]){
-#                            if(buyV > higArry[i]) buyV = higArry[i] ;
-#                            stockNum = around(money/buyV) ;
-#                            money -= buyV * stockNum ;
-#                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
-#                        }
-#                    }
-#
-#                    for(j=from; j<=to; j++){
-#                        if(higArry[i] >= forecastHigArry[j]){
-#                            forecastHigArry[j] = INF_P ;
-#                            forecastLowArry[j] = INF_P ;
-#                        }
-#                        if(lowArry[i] <= forecastLowArry[j]){
-#                            forecastLowArry[j] = INF_P ;
-#                        }
-#                    }
-#
-#                    if(i-dur+1<i && i-dur+1>0){
-#                        forecastLowArry[i-dur+1] = INF_P ;
-#                    }
-#                }
-#            }
+            strategy_1(originCont, lowArry, higArry, forecastLowArry, forecastLowCntArry, forecastHigArry, forecastHigCntArry, dateArry, cnt, dur, selFix, buyFix, stockNum, money) ;
         }
 
         '
