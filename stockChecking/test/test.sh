@@ -289,29 +289,53 @@ if [[ $verify -eq 1 ]] ; then
             money = 20000 ;
             stockNum = 0 ;
 
-            infP = 9999.99 ;
-            infN = -9999.99
+            INF_P = 9999.99 ;
+            INF_N = -9999.99
         }
 
         ($1 !~ "#"){
             # generate processing table: forecastLowPrice forecastHigPrice low hig 
 
-            fcstL = $5+0 ;
-            fcstH = $6+0 ;
+            originCont[cnt] = $0 ;
             low   = $1+0 ;
             hig   = $2+0 ;
-            originCont[cnt] = $0 ;
-            forecastLowArry[cnt] = fcstL ;
-            forecastHigArry[cnt] = fcstH ;
+            fcstL = $5+0 ;
+            sub(/.*\(/,"",$5) ;
+            fcstLCnt = $5+0 ;
+            fcstH = $6+0 ;
+            sub(/.*\(/,"",$6) ;
+            fcstHCnt = $6+0 ;
+
             lowArry[cnt] = low ;
             higArry[cnt] = hig ;
-
-            date[cnt] = $7 ;
+            forecastLowArry[cnt] = fcstL ;
+            forecastLowCntArry[cnt] = fcstLCnt ;
+            forecastHigArry[cnt] = fcstH ;
+            forecastHigCntArry[cnt] = fcstHCnt ;
+            dateArry[cnt] = $7 ;
 
             cnt ++ ;
         }
 
-        END{
+
+        function strategy_1(            \
+                    originCont,
+                    lowArry,
+                    higArry,
+                    forecastLowArry,
+                    forecastLowCntArry,
+                    forecastHigArry,
+                    forecastHigCntArry,
+                    dateArry,
+                    cnt,
+                    dur,
+                    selFix,
+                    buyFix,
+                    stockNum,
+                    money,
+                                        \
+                    selV,buyV,a,from,to,i,j )
+        {
             # do buy and sell demonstration
             for(i=1; i<cnt-dur; i++){
                 from = i - dur ;
@@ -324,11 +348,11 @@ if [[ $verify -eq 1 ]] ; then
                     if(stockNum){
                         getMaxMin(forecastHigArry, from, to, a) ;
                         selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
-                        print date[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
+                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
                     }else{
                         getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = (forecastLowArry[a["minIdx"]] == infP) ? infN : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
-                        print date[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
+                        buyV = (forecastLowArry[a["minIdx"]] == INF_P) ? INF_N : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
                     }
                 }
 
@@ -338,7 +362,7 @@ if [[ $verify -eq 1 ]] ; then
                         if(selV < higArry[i]){
                             if(selV < lowArry[i]) selV = lowArry[i] ;
                             money += stockNum * selV ;
-                            print date[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
@@ -346,27 +370,169 @@ if [[ $verify -eq 1 ]] ; then
                             if(buyV > higArry[i]) buyV = higArry[i] ;
                             stockNum = around(money/buyV) ;
                             money -= buyV * stockNum ;
-                            print date[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
                         }
                     }
 
                     for(j=from; j<=to; j++){
                         if(higArry[i] >= forecastHigArry[j]){
-                            forecastHigArry[j] = infP ;
-                            forecastLowArry[j] = infP ;
+                            forecastHigArry[j] = INF_P ;
+                            forecastLowArry[j] = INF_P ;
                         }
                         if(lowArry[i] <= forecastLowArry[j]){
-                            forecastLowArry[j] = infP ;
+                            forecastLowArry[j] = INF_P ;
                         }
                     }
 
                     if(i-dur+1<i && i-dur+1>0){
-                        forecastLowArry[i-dur+1] = infP ;
+                        forecastLowArry[i-dur+1] = INF_P ;
                     }
                 }
             }
+            return 0 ;
         }
-        
+
+        function strategy_2(            \
+                    originCont,
+                    lowArry,
+                    higArry,
+                    forecastLowArry,
+                    forecastLowCntArry,
+                    forecastHigArry,
+                    forecastHigCntArry,
+                    dateArry,
+                    cnt,
+                    dur,
+                    selFix,
+                    buyFix,
+                    stockNum,
+                    money,
+                                        \
+                    idx,rate,tmpRate,selV,buyV,a,from,to,i,j )
+        {
+            # do buy and sell demonstration
+            for(i=1; i<cnt-dur; i++){
+                from = i - dur ;
+                to   = i - 1 ;
+                if(from < 0) from = 0 ;
+                if(to < 0) to = 0 ;
+
+                # before open
+                {
+                    if(stockNum){
+                        getMaxMin(forecastHigArry, from, to, a) ;
+                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
+                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
+                    }else{
+                        idx = -1 ;
+                        rate = 0 ;
+                        for(j=from; j<=to; j++){
+                            if(forecastHigCntArry[j] <300) continue ;
+                            tmpRate = (forecastHigCntArry[j]/forecastLowCntArry[j]) ;
+                            if(tmpRate < 1) continue ;
+                            if(tmpRate > rate){
+                                rate = tmpRate ;
+                                idx = j ;
+                            }
+                        }
+                        buyV = (idx == -1) ? INF_N : around(forecastLowArry[idx]*100)/100+buyFix ;
+                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
+                    }
+                }
+
+                # after close
+                {
+                    if(stockNum){
+                        if(selV < higArry[i]){
+                            if(selV < lowArry[i]) selV = lowArry[i] ;
+                            money += stockNum * selV ;
+                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+                            stockNum = 0 ;
+                        }
+                    }else{
+                        if(buyV > lowArry[i]){
+                            if(buyV > higArry[i]) buyV = higArry[i] ;
+                            stockNum = around(money/buyV) ;
+                            money -= buyV * stockNum ;
+                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+                        }
+                    }
+
+                    for(j=from; j<=to; j++){
+                        if(higArry[i] >= forecastHigArry[j]){
+                            forecastHigArry[j] = INF_P ;
+                            forecastLowArry[j] = INF_P ;
+                        }
+                        if(lowArry[i] <= forecastLowArry[j]){
+                            forecastLowArry[j] = INF_P ;
+                        }
+                    }
+
+                    if(i-dur+1<i && i-dur+1>0){
+                        forecastLowArry[i-dur+1] = INF_P ;
+                    }
+                }
+            }
+            return 0 ;
+        }
+
+        END{
+            strategy_2(originCont, lowArry, higArry, forecastLowArry, forecastLowCntArry, forecastHigArry, forecastHigCntArry, dateArry, cnt, dur, selFix, buyFix, stockNum, money) ;
+#            # do buy and sell demonstration
+#            for(i=1; i<cnt-dur; i++){
+#                from = i - dur ;
+#                to   = i - 1 ;
+#                if(from < 0) from = 0 ;
+#                if(to < 0) to = 0 ;
+#
+#                # before open
+#                {
+#                    if(stockNum){
+#                        getMaxMin(forecastHigArry, from, to, a) ;
+#                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
+#                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
+#                    }else{
+#                        getMaxMin(forecastLowArry, from, to, a) ;
+#                        buyV = (forecastLowArry[a["minIdx"]] == INF_P) ? INF_N : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+#                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
+#                    }
+#                }
+#
+#                # after close
+#                {
+#                    if(stockNum){
+#                        if(selV < higArry[i]){
+#                            if(selV < lowArry[i]) selV = lowArry[i] ;
+#                            money += stockNum * selV ;
+#                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+#                            stockNum = 0 ;
+#                        }
+#                    }else{
+#                        if(buyV > lowArry[i]){
+#                            if(buyV > higArry[i]) buyV = higArry[i] ;
+#                            stockNum = around(money/buyV) ;
+#                            money -= buyV * stockNum ;
+#                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+#                        }
+#                    }
+#
+#                    for(j=from; j<=to; j++){
+#                        if(higArry[i] >= forecastHigArry[j]){
+#                            forecastHigArry[j] = INF_P ;
+#                            forecastLowArry[j] = INF_P ;
+#                        }
+#                        if(lowArry[i] <= forecastLowArry[j]){
+#                            forecastLowArry[j] = INF_P ;
+#                        }
+#                    }
+#
+#                    if(i-dur+1<i && i-dur+1>0){
+#                        forecastLowArry[i-dur+1] = INF_P ;
+#                    }
+#                }
+#            }
+        }
+
         '
 fi
 #endif
