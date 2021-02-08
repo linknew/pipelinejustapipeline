@@ -1049,4 +1049,84 @@ awkFunction_getSum=$(cat - <<-'EOF'
 EOF
 )
 #============================================================================
+#
+awkFunction_tabOprSets=$(cat - <<-'EOF'
+function tabInit(               \
+                                \
+    tabName,
+    rows,
+    cols,
+    segNames,
+                                \
+    i,j)
+{
+    if(tabList[tabName]) return -1 ;
 
+    tabList[tabName] = 1 ;
+
+    tabList["rows"] = rows ;
+    tab["cols"] = cols ;
+    tab["segNames"] = segNames ;
+
+    return 0 ;
+}
+#
+function getMinMaxElmInTab(     \
+                                \
+    tab,
+    fromRow,    #base on 0
+    fromCol,    #base on 0
+    toRow,      #base on 0
+    toCol,      #base on 0
+    returnA,
+                                \
+    _rows,_cols,_max,_min,_maxRow,_maxCol,_minRow,_minCol)
+{
+    if(!("rows" in tab) || !("cols" in tab)) return -1 ;
+    fromRow = fromRow + 0 ;
+    fromCol = fromCol + 0 ;
+    toRow = toRow + 0 ;
+    toCol = toCol + 0 ;
+    _rows = tab["rows"] + 0 ;
+    _cols = tab["cols"] + 0 ;
+
+    if(fromRow >= _rows || fromCol >= _cols || fromRow < 0 || fromCol < 0 ||
+       toRow   >= _rows || toCol   >= _cols || toRow   < 0 || toCol   < 0  )    return -1 ;
+
+    _maxRow = fromRow ;
+    _maxCol = fromCol ;
+    _minRow = fromRow ;
+    _minCol = fromCol ;
+    _max = tab[_maxRow,_maxCol] ;
+    _min = tab[_minRow,_minCol] ;
+
+    for(i=fromRow; i<=toRow; i++){
+        for(j=fromCol; j<=toCol; j++){
+            if(tab[i,j]+0 > _max){
+                _max = tab[i,j]+0 ;
+                _maxRow = i ;
+                _maxCol = j ;
+            }
+
+            if(tab[i,j]+0 < _min){
+                _min = tab[i,j]+0 ;
+                _minRow = i ;
+                _minCol = j ;
+            }
+        }
+    }
+
+    returnA["max"] = _max ;
+    returnA["min"] = _min ;
+    returnA["maxRow"] = _maxRow ;
+    returnA["maxCol"] = _maxCol ;
+    returnA["minRow"] = _minRow ;
+    returnA["minCol"] = _minCol ;
+
+    return 0 ;
+}
+
+
+EOF
+)
+#============================================================================
