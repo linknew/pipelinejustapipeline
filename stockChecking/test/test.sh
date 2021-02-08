@@ -307,7 +307,7 @@ if [[ $verify -eq 1 ]] ; then
                         print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
                     }else{
                         getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = (forecastLowArry[a["minIdx"]] == INF_P) ? INF_N : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
+                        buyV = (forecastLowArry[a["minIdx"]] == INF_NUM) ? -INF_NUM : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
                         print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
                     }
                 }
@@ -332,16 +332,16 @@ if [[ $verify -eq 1 ]] ; then
 
                     for(j=from; j<=to; j++){
                         if(higArry[i] >= forecastHigArry[j]){
-                            forecastHigArry[j] = INF_P ;
-                            forecastLowArry[j] = INF_P ;
+                            forecastHigArry[j] = INF_NUM ;
+                            forecastLowArry[j] = INF_NUM ;
                         }
                         if(lowArry[i] <= forecastLowArry[j]){
-                            forecastLowArry[j] = INF_P ;
+                            forecastLowArry[j] = INF_NUM ;
                         }
                     }
 
                     if(i-dur+1<i && i-dur+1>0){
-                        forecastLowArry[i-dur+1] = INF_P ;
+                        forecastLowArry[i-dur+1] = INF_NUM ;
                     }
                 }
             }
@@ -390,7 +390,7 @@ if [[ $verify -eq 1 ]] ; then
                                 idx = j ;
                             }
                         }
-                        buyV = (idx == -1 || INF_P == forecastLowArry[idx]) ? INF_N : around(forecastLowArry[idx]*100)/100+buyFix ;
+                        buyV = (idx == -1 || INF_NUM == forecastLowArry[idx]) ? -INF_NUM : around(forecastLowArry[idx]*100)/100+buyFix ;
                         print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
                     }
                 }
@@ -415,16 +415,16 @@ if [[ $verify -eq 1 ]] ; then
 
                     for(j=from; j<=to; j++){
                         if(higArry[i] >= forecastHigArry[j]){
-                            forecastHigArry[j] = INF_P ;
-                            forecastLowArry[j] = INF_P ;
+                            forecastHigArry[j] = INF_NUM ;
+                            forecastLowArry[j] = INF_NUM ;
                         }
                         if(lowArry[i] <= forecastLowArry[j]){
-                            forecastLowArry[j] = INF_P ;
+                            forecastLowArry[j] = INF_NUM ;
                         }
                     }
 
                     if(i-dur+1<i && i-dur+1>0){
-                        forecastLowArry[i-dur+1] = INF_P ;
+                        forecastLowArry[i-dur+1] = INF_NUM ;
                     }
                 }
             }
@@ -432,13 +432,13 @@ if [[ $verify -eq 1 ]] ; then
         }
 
         BEGIN{
+
+            '"$awkCommDigDef"'
+
             print "#input:"
             print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)upCnt/unCnt (8)date (9)code (10)seed"
             print "#note:"
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
-
-            INF_P = 9999.99 ;
-            INF_N = -9999.99
 
             money = 20000 ;
             stockNum = 0 ;
@@ -449,38 +449,39 @@ if [[ $verify -eq 1 ]] ; then
             segForecastLowCnt = 3 ;
             segForecastHig = 4 ;
             segForecastHigCnt = 5 ;
-            segDate = 6 ;
-            segContent = 7 ;
-            segCnt = 8 ;
+            segUpRate = 6 ;
+            segDate = 7 ;
+            segContent = 8 ;
+            segCnt = 9 ;
 
             rows = 0 ;
             tab["rows"] = rows ;
             tab["cols"] = segCnt ;
-            tab["segNames"] = "segLow,segHit,segForecastLow,segForecastLowCnt,segForecastHig,segForecastHigCnt,segDate,segContent" ;
+            tab["segNames"] = "Low,Hit,FcstLow,FcstLowCnt,FcstHig,FcstHigCnt,upRate,Date,Content" ;
         }
 
         ($1 !~ "#"){
             # generate processing table: forecastLowPrice forecastHigPrice low hig 
 
             tab[rows,segContent] = $0 ; #originCont[rows] = $0 ;
-            low   = $1+0 ;
-            hig   = $2+0 ;
-            fcstL = $5+0 ;
+            tab[rows,segLow] = $1+0 ;   #low   = $1+0 ;
+            tab[rows,segHit] = $2+0 ;   #hig   = $2+0 ;
+            tab[rows,segForecastLow] = $5+0 ;   #fcstL = $5+0 ;
             sub(/.*\(/,"",$5) ;
-            fcstLCnt = $5+0 ;
-            fcstH = $6+0 ;
+            tab[rows,segForecastLowCnt] = $5+0 ;    #fcstLCnt = $5+0 ;
+            tab[rows,segForecastHig] = $6+0 ;       #fcstH = $6+0 ;
             sub(/.*\(/,"",$6) ;
-            fcstHCnt = $6+0 ;
-            upRate = $7+0 ;
+            tab[rows,segForecastHigCnt] = $6+0 ;    #fcstHCnt = $6+0 ;
+            tab[rows,segUpRate] = $7+0 ;            #upRate = $7+0 ;
 
-            lowArry[rows] = low ;
-            higArry[rows] = hig ;
-            forecastLowArry[rows] = fcstL ;
-            forecastLowCntArry[rows] = fcstLCnt ;
-            forecastHigArry[rows] = fcstH ;
-            forecastHigCntArry[rows] = fcstHCnt ;
-            forecastUPC_DIV_UNC[rows] = upRate ;
-            dateArry[rows] = $8 ;
+#            lowArry[rows] = low ;
+#            higArry[rows] = hig ;
+#            forecastLowArry[rows] = fcstL ;
+#            forecastLowCntArry[rows] = fcstLCnt ;
+#            forecastHigArry[rows] = fcstH ;
+#            forecastHigCntArry[rows] = fcstHCnt ;
+#            forecastUPC_DIV_UNC[rows] = upRate ;
+            tab[rows,segContent] = $8 ;             #dateArry[rows] = $8 ;
 
             rows ++ ;
         }
