@@ -387,8 +387,37 @@ function doExit()
     exit $1 ;
 }
 #============================================================================
+#
+# in many times, we make a multiple function inclusion in using awk functions
+# we can use this routine to create a singnoten awk function list
+# "$@" are the awk functions
+#
+function includeAwkFunctions
+{
+    local   i
+#
+    for i in "$@"
+    do
+        echo "$i"
+    done            |
+    awk '
+        {
+            if("function" == $1){
+                skipThisFunc = (1 == definedFunc[$2]) ? 1 : 0 ;
+                definedFunc[$2] = 1 ;
+            }
+#
+            if(!skipThisFunc){
+                print ;
+            }
+        }
+        '
+}
+#
+#============================================================================
 
-#commonly used digital defines
+#
+#commonly used digital defines in awk script
 #
 awkCommDigDef=$(cat - <<-'EOF'
     INF_NUM = 9223372036854775807 ;
