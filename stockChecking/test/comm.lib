@@ -390,7 +390,7 @@ function doExit()
 #
 # in many times, we make a multiple function inclusion in using awk functions
 # we can use this routine to create a singnoten awk function list
-# "$@" are the awk functions
+# "$@" are the awk function names
 #
 function includeAwkFunctions
 {
@@ -1065,6 +1065,7 @@ awkFunction_getAvrgSet=$(cat - <<-'EOF'
 EOF
 )
 #============================================================================
+
 #
 awkFunction_getSum=$(cat - <<-'EOF'
     function getSum(     \
@@ -1088,6 +1089,7 @@ awkFunction_getSum=$(cat - <<-'EOF'
 EOF
 )
 #============================================================================
+
 #
 awkFunction_tabOprSets=$(cat - <<-'EOF'
 function tabInit(               \
@@ -1099,15 +1101,6 @@ function tabInit(               \
                                 \
     i,j)
 {
-    if(tabList[tabName]) return -1 ;
-
-    tabList[tabName] = 1 ;
-
-    tabList["rows"] = rows ;
-    tab["cols"] = cols ;
-    tab["segNames"] = segNames ;
-
-    return 0 ;
 }
 #
 function getMinMaxElmInTab(     \
@@ -1118,65 +1111,52 @@ function getMinMaxElmInTab(     \
     toRow,      #base on 0
     toCol,      #base on 0
     returnA,
+    invalid_notation,
                                 \
-    infNum,                     #specify up/low limites, treat as a dec NUMBER. default: -9223372036854775807 and 9223372036854775807
-    invNum,                     #specify invalid number, treat as a string. default: "tHiSiSiNvAlIdNuM"
-                                \
-    _rows,_cols,_max,_min,_maxRowIdx,_maxColIdx,_minRowIdx,_minColIdx)
+    i,j,_noMinMax,_max,_min,_maxRowIdx,_maxColIdx,_minRowIdx,_minColIdx)
 {
-    if(!("rows" in tab) || !("cols" in tab)) return -1 ;
-    if(infNum+0 == 0) infNum = 9223372036854775807 ;
-    if(invNum == "") invNum = "iNvAlIdNuM" ;
-    infNum = infNum+0 ;
-
-    fromRow = fromRow + 0 ;
-    fromCol = fromCol + 0 ;
-    toRow = toRow + 0 ;
-    toCol = toCol + 0 ;
-    _rows = tab["rows"] + 0 ;
-    _cols = tab["cols"] + 0 ;
-
-    if(fromRow >= _rows || fromCol >= _cols || fromRow < 0 || fromCol < 0 ||
-       toRow   >= _rows || toCol   >= _cols || toRow   < 0 || toCol   < 0  )    return -1 ;
-
-    _maxRowIdx = -1 ;
-    _maxColIdx = -1 ;
-    _minRowIdx = -1 ;
-    _minColIdx = -1 ;
-    _max = -infNum ;
-    _min = infNum ;
-
+    if(!("rows" in tab) || !("cols" in tab) ||
+       fromRow >= tab["rows"] || fromCol >= tab["cols"] || fromRow < 0 || fromCol < 0 ||
+       toRow   >= tab["rows"] || toCol   >= tab["cols"] || toRow   < 0 || toCol   < 0  )    return -1 ;
+#
+    _noMinMax = 1 ;
+#
     for(i=fromRow; i<=toRow; i++){
         for(j=fromCol; j<=toCol; j++){
-            if(tab[i,j]+0 > _max){
-                if(tab[i,j] != invNum){
-                    _max = tab[i,j]+0 ;
-                    _maxRowIdx = i ;
-                    _maxColIdx = j ;
-                }
+#
+            if(tab[i,j] == invalid_notation) continue ;
+#
+            if(_noMinMax){
+                _maxRowIdx = _minRowIdx = i ;
+                _maxColIdx = _minColIdx = j ;
+                _max = _min = tab[i,j] ;
+                _noMinMax = 0 ;
+                continue ;
+            }
+#
+            if(tab[i,j] > _max){
+                _max = tab[i,j] ;
+                _maxRowIdx = i ;
+                _maxColIdx = j ;
             }
 
-            if(tab[i,j]+0 < _min){
-                if(tab[i,j] != invNum){
-                    _min = tab[i,j]+0 ;
-                    _minRowIdx = i ;
-                    _minColIdx = j ;
-                }
+            if(tab[i,j] < _min){
+                _min = tab[i,j] ;
+                _minRowIdx = i ;
+                _minColIdx = j ;
             }
         }
     }
-
+#
     returnA["max"] = _max ;
     returnA["min"] = _min ;
     returnA["maxRowIdx"] = _maxRowIdx ;
     returnA["maxColIdx"] = _maxColIdx ;
     returnA["minRowIdx"] = _minRowIdx ;
     returnA["minColIdx"] = _minColIdx ;
-
-    return 0 ;
+#
+    return (_noMinMax ? -1 : 0) ;
 }
-
-
 EOF
 )
 #============================================================================

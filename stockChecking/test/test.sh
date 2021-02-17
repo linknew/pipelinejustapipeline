@@ -109,7 +109,7 @@ done
 if [[ $genCounting -eq 1 ]]; then
     echo "*NOTE, only the item which in the code list will be procceed in counting" >&2
     echo "#start=$start end=$end" > "$cntgData"
-    echo $codes     | 
+    echo $codes     |
         awk ${start:+ -v start=$start}  \
             ${end:+ -v end=$end}        \
             '
@@ -350,14 +350,7 @@ if [[ $verify -eq 1 ]] ; then
 
 
         function strategy_2(                \
-                    tab,                    \
-                                            \
-                    higArry,
-                    forecastLowArry,
-                    forecastLowCntArry,
-                    forecastHigArry,
-                    forecastHigCntArry,
-                    dateArry,
+                    tab,
                     cnt,
                     dur,
                     selFix,
@@ -365,8 +358,16 @@ if [[ $verify -eq 1 ]] ; then
                     stockNum,
                     money,
                                             \
-                    idx,rate,selV,buyV,a,from,to,i,j )
+                    higArry,
+                    forecastLowArry,
+                    forecastLowCntArry,
+                    forecastHigArry,
+                    forecastHigCntArry,
+                    dateArry,
+                                            \
+                    idx,rate,selV,buyV,a,from,to,i,j,INVLID )
         {
+            INVLID = "InVaLiD_NuM" ;
             # do buy and sell demonstration
             for(i=1; i<cnt-dur; i++){
                 getForecastRange(i, dur, fcstRng) ;
@@ -376,55 +377,56 @@ if [[ $verify -eq 1 ]] ; then
                 # before open
                 {
                     if(stockNum){
-                        getMinMaxElmInTab(tab, segHig, 0, segHig, tab["cols"]-1, a) ;
-                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
-                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", tab[i,segContent] ;
+                        selV = (-1 == getMinMaxElmInTab(tab, segHig, from, segHig, to, a, INVLID)) ?    \
+                               9999 :                                                                           \
+                               around(a["min"]*100)/100+selFix ;
+                        print tab[segDate,i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", tab[segContent,i] ;
                     }else{
                         idx = -1 ;
                         rate = 0 ;
                         for(j=from; j<=to; j++){
-                            if(forecastHigCntArry[j] <300) continue ;
-                            if(forecastUPC_DIV_UNC[j] < 12.33) continue ;
-                            if(rate < forecastUPC_DIV_UNC[j]){
-                                rate = forecastUPC_DIV_UNC[j] ;
+                            if(tab[segForecastHigCnt,j] <300) continue ;
+                            if(tab[segUpRate,j] < 12.33) continue ;
+                            if(rate < tab[segUpRate,j]){
+                                rate = tab[segUpRate,j] ;
                                 idx = j ;
                             }
                         }
-                        buyV = (idx == -1 || INF_NUM == tab[idx,segForecastLow]) ? -INF_NUM : around(tab[idx,segForecastLow]*100)/100+buyFix ;
-                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", tab[i,segContent] ;
+                        buyV = (idx == -1) ? 0 : around(tab[segForecastLow,idx]*100)/100+buyFix ;
+                        print tab[segDate,i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", tab[segContent,i] ;
                     }
                 }
 
                 # after close
                 {
                     if(stockNum){
-                        if(selV < tab[i,segHig]){
-                            if(selV < tab[i,segLow]) selV = tab[i,segLow] ;
+                        if(selV < tab[segHig,i]){
+                            if(selV < tab[segLow,i]) selV = tab[segLow,i] ;
                             money += stockNum * selV ;
-                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
-                        if(buyV > tab[i,segLow]){
-                            if(buyV > tab[i,segHig]) buyV = tab[i,segHig] ;
+                        if(buyV > tab[segLow,i]){
+                            if(buyV > tab[segHig,i]) buyV = tab[segHig,i] ;
                             stockNum = around(money/buyV) ;
                             money -= buyV * stockNum ;
-                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+                            print tab[segDate,i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
                         }
                     }
 
                     for(j=from; j<=to; j++){
-                        if(tab[i,segHig] >= forecastHigArry[j]){
-                            forecastHigArry[j] = INF_NUM ;
-                            tab[j,segForecastLow] = INF_NUM ;
+                        if(tab[segHig,i] >= tab[segForecastHig,j]){
+                            tab[segForecastHig,j] = INVLID ;
+                            tab[segForecastLow,j] = INVLID ;
                         }
-                        if(tab[i,segLow] <= tab[j,segForecastLow]){
-                            tab[j,segForecastLow] = INF_NUM ;
+                        if(tab[segLow,i] <= tab[segForecastLow,j]){
+                            tab[segForecastLow,j] = INVLID ;
                         }
                     }
 
                     if(i-dur+1<i && i-dur+1>0){
-                        tab[i-dur+1,segForecastLow] = INF_NUM ;
+                        tab[segForecastLow,i-dur+1] = INVLID ;
                     }
                 }
             }
@@ -482,7 +484,7 @@ if [[ $verify -eq 1 ]] ; then
         }
 
         END{
-            strategy_2(tab) ;
+            strategy_2(tab, tabExtend, dur, selFix, buyFix, stockNum, money) ;
         }
 
         '
