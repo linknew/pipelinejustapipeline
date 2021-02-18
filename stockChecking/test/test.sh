@@ -284,23 +284,29 @@ if [[ $verify -eq 1 ]] ; then
                     stockNum,
                     money,
                                             \
-                    idx,rate,selV,buyV,a,from,to,i,j,INVLID )
+                    idx,rate,_selV,_buyV,a,from,to,i,j,INVLID,_buyVOrg,_selVOrg,_buyFixInfo,_selFixInfo )
         {
+            # do buy and sell demonstration
+
             INVLID = "InVaLiD_NuM" ;
 
-            # do buy and sell demonstration
             for(i=1; i<cnt-dur; i++){
                 getForecastRange(i, dur, fcstRng) ;
                 from = fcstRng["from"] ;
                 to = fcstRng["to"] ;
 
-                # before open
+                # before open, set buy/sel
                 {
                     if(stockNum){
-                        selV = (-1 == getMinMaxElmInTab(tab, segForecastHig, from, segForecastHig, to, a, INVLID)) ?    \
-                               9999 :                                                                           \
-                               around(a["min"]*(1+selFix),2) ;
-                        print tab[segDate,i],"set *SELL value to:" selV "(" a["min"] "fixBy" selFix ")", "\t@", tab[segContent,i] ;
+
+                        if(-1 == getMinMaxElmInTab(tab, segForecastHig, from, segForecastHig, to, a, INVLID)){
+                            _selVOrg = 9999 ;
+                            _selV = 9999 ;
+                        }else{
+                           _selVOrg = a["min"] ;
+                           _selV = around(_selVOrg*(1+selFix),2) ;
+                        }
+                        print tab[segDate,i],"set *SELL value " _selV "(" _selVOrg "fixBy" selFix ")", "\t@", tab[segContent,i] ;
                     }else{
                         idx = -1 ;
                         rate = 0 ;
@@ -312,26 +318,47 @@ if [[ $verify -eq 1 ]] ; then
                                 idx = j ;
                             }
                         }
-                        buyV = (idx == -1) ? 0 : around(tab[segForecastLow,idx]*(1+buyFix),2) ;
-                        print tab[segDate,i],"set *BUY  value to:" buyV "(" tab[segForecastLow,idx] "fixBy" buyFix ")", "\t@", tab[segContent,i] ;
+                        if(-1 == idx){
+                            _buyVOrg = 0 ;
+                            _buyV = 0 ;
+                        }else{
+                            _buyVOrg = tab[segForecastLow,idx] ;
+                            _buyV = around(_buyVOrg*(1+buyFix),2) ;
+                        }
+                        print tab[segDate,i],"set *BUY  value " _buyV "(" _buyVOrg "fixBy" buyFix ")", "\t@", tab[segContent,i] ;
                     }
                 }
 
-                # after close
+                # after close, check buy/sel and adjust forecast list
                 {
                     if(stockNum){
-                        if(selV < tab[segHig,i]){
-                            if(selV < tab[segLow,i]) selV = tab[segLow,i] ;
-                            money += stockNum * selV ;
-                            print tab[segDate,i],"sold  ",stockNum,"*",selV "(" selV-selFix "fixBy" selFix ") And now, we have", money ;
+                        if(_selV <= tab[segOpn,i]){
+                            _selV = tab[segOpn,i] ;
+                            money += stockNum * _selV ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",_selV "(" _selVOrg "fixByOpen) . Now, we have", money ;
+                            stockNum = 0 ;
+                        }else if(_buyV*0.8 >= tab[segOpn,i]){
+                            _selV = tab[segOpn,i] ;
+                            money += stockNum * _selV ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",_selV "(" _selVOrg "fixByOpen) . Now, we have", money ;
+                            stockNum = 0 ;
+                        }else if(_buyV*0.8 >= tab[segLow,i]){
+                            _selV = _buyV*0.8 ;
+                            money += stockNum * _selV ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",_selV "(" _selVOrg "fixBy0.8_buyV) . Now, we have", money ;
+                            stockNum = 0 ;
+                        }else if(_selV < tab[segHig,i]){
+                            if(_selV < tab[segLow,i]) _selV = tab[segLow,i] ;
+                            money += stockNum * _selV ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",_selV "(" _selVOrg "fixBy" selFix ") . Now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
-                        if(buyV > tab[segLow,i]){
-                            if(buyV > tab[segHig,i]) buyV = tab[segHig,i] ;
-                            stockNum = int(money/buyV) ;
-                            money -= buyV * stockNum ;
-                            print tab[segDate,i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "fixBy" buyFix ") And now, we have", money ;
+                        if(_buyV > tab[segLow,i]){
+                            if(_buyV > tab[segHig,i]) _buyV = tab[segHig,i] ;
+                            stockNum = int(money/_buyV) ;
+                            money -= _buyV * stockNum ;
+                            print tab[segDate,i],"bought",stockNum,"*",_buyV "(" _buyVOrg "fixBy" buyFix ") . Now, we have", money ;
                         }
                     }
 
@@ -350,6 +377,7 @@ if [[ $verify -eq 1 ]] ; then
                     }
                 }
             }
+
             return 0 ;
         }
 
@@ -363,17 +391,19 @@ if [[ $verify -eq 1 ]] ; then
             print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
 
             #note, we use segement name as the rows, that is easy way for multiple dimension arry operate.
-            segLow = 0 ;
-            segHig = 1 ;
-            segForecastLow = 2 ;
-            segForecastLowCnt = 3 ;
-            segForecastHig = 4 ;
-            segForecastHigCnt = 5 ;
-            segUpRate = 6 ;
-            segDate = 7 ;
-            segContent = 8 ;
-            segCnt = 9 ;
-            tab["segNames"] = "Low,Hit,FcstLow,FcstLowCnt,FcstHig,FcstHigCnt,upRate,Date,Content" ;
+            segCnt = 0 ;
+            segLow = segCnt++ ;
+            segHig = segCnt++ ;
+            segOpn = segCnt++ ;
+            segCls = segCnt++ ;
+            segForecastLow = segCnt++ ;
+            segForecastLowCnt = segCnt++ ;
+            segForecastHig = segCnt++ ;
+            segForecastHigCnt = segCnt++ ;
+            segUpRate = segCnt++ ;
+            segDate = segCnt++ ;
+            segContent = segCnt++ ;
+            tab["segNames"] = "Low,Hig,Opn,Cls,FcstLow,FcstLowCnt,FcstHig,FcstHigCnt,upRate,Date,Content" ;
 
             tabExtend = 0 ;
             tab["rows"] = segCnt ;
@@ -390,6 +420,8 @@ if [[ $verify -eq 1 ]] ; then
             tab[segContent ,tabExtend] = $0 ;
             tab[segLow ,tabExtend] = $1+0 ;
             tab[segHig ,tabExtend] = $2+0 ;
+            tab[segOpn ,tabExtend] = $3+0 ;
+            tab[segCls ,tabExtend] = $4+0 ;
             tab[segForecastLow ,tabExtend] = $5+0 ;
             sub(/.*\(/,"",$5) ;
             tab[segForecastLowCnt ,tabExtend] = $5+0 ;
