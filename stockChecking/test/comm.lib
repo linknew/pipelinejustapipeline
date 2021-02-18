@@ -560,11 +560,18 @@ AWK_FUNCTION_ASORTSET_EOF
 )
 #
 awkFunction_around=$(cat - <<-AWK_FUNCTION_AROUND_EOF
-function around(seed,       ret)
+function around(        \
+    seed,
+    precision,          # significant figures after decimal point
+                        \
+    _convfmt)
 {
-    ret = int(seed) ;
-    if(seed < 0 && seed != ret) ret = ret - 1 ;
-    return ret ;
+    _convfmt = CONVFMT ;
+    CONVFMT  = "%." precision "f" ;
+    seed     = seed"" ;
+    CONVFMT  = _convfmt ;
+
+    return seed+0 ;
 }
 AWK_FUNCTION_AROUND_EOF
 )

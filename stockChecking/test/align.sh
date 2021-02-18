@@ -9,7 +9,7 @@ function Help
     Descript:
         -
 
-    Usage: ${0} [regExp] [--help] textFile
+    Usage: ${0} [[!]/regExp/] [--help] textFile
 
         --help,
 

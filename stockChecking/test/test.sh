@@ -275,80 +275,6 @@ if [[ $verify -eq 1 ]] ; then
             return 0 ;
         }
 
-        function strategy_1(            \
-                    originCont,
-                    lowArry,
-                    higArry,
-                    forecastLowArry,
-                    forecastLowCntArry,
-                    forecastHigArry,
-                    forecastHigCntArry,
-                    dateArry,
-                    cnt,
-                    dur,
-                    selFix,
-                    buyFix,
-                    stockNum,
-                    money,
-                                        \
-                    selV,buyV,a,from,to,i,j )
-        {
-            # do buy and sell demonstration
-            for(i=1; i<cnt-dur; i++){
-                getForecastRange(i, dur, fcstRng) ;
-                from = fcstRng["from"] ;
-                to = fcstRng["to"] ;
-
-                # before open
-                {
-                    if(stockNum){
-                        getMaxMin(forecastHigArry, from, to, a) ;
-                        selV = around(forecastHigArry[a["minIdx"]]*100)/100+selFix ;
-                        print dateArry[i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", originCont[i] ;
-                    }else{
-                        getMaxMin(forecastLowArry, from, to, a) ;
-                        buyV = (forecastLowArry[a["minIdx"]] == INF_NUM) ? -INF_NUM : around(forecastLowArry[a["minIdx"]]*100)/100+buyFix ;
-                        print dateArry[i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", originCont[i] ;
-                    }
-                }
-
-                # after close
-                {
-                    if(stockNum){
-                        if(selV < higArry[i]){
-                            if(selV < lowArry[i]) selV = lowArry[i] ;
-                            money += stockNum * selV ;
-                            print dateArry[i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
-                            stockNum = 0 ;
-                        }
-                    }else{
-                        if(buyV > lowArry[i]){
-                            if(buyV > higArry[i]) buyV = higArry[i] ;
-                            stockNum = around(money/buyV) ;
-                            money -= buyV * stockNum ;
-                            print dateArry[i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
-                        }
-                    }
-
-                    for(j=from; j<=to; j++){
-                        if(higArry[i] >= forecastHigArry[j]){
-                            forecastHigArry[j] = INF_NUM ;
-                            forecastLowArry[j] = INF_NUM ;
-                        }
-                        if(lowArry[i] <= forecastLowArry[j]){
-                            forecastLowArry[j] = INF_NUM ;
-                        }
-                    }
-
-                    if(i-dur+1<i && i-dur+1>0){
-                        forecastLowArry[i-dur+1] = INF_NUM ;
-                    }
-                }
-            }
-            return 0 ;
-        }
-
-
         function strategy_2(                \
                     tab,
                     cnt,
@@ -358,16 +284,10 @@ if [[ $verify -eq 1 ]] ; then
                     stockNum,
                     money,
                                             \
-                    higArry,
-                    forecastLowArry,
-                    forecastLowCntArry,
-                    forecastHigArry,
-                    forecastHigCntArry,
-                    dateArry,
-                                            \
                     idx,rate,selV,buyV,a,from,to,i,j,INVLID )
         {
             INVLID = "InVaLiD_NuM" ;
+
             # do buy and sell demonstration
             for(i=1; i<cnt-dur; i++){
                 getForecastRange(i, dur, fcstRng) ;
@@ -377,10 +297,10 @@ if [[ $verify -eq 1 ]] ; then
                 # before open
                 {
                     if(stockNum){
-                        selV = (-1 == getMinMaxElmInTab(tab, segHig, from, segHig, to, a, INVLID)) ?    \
+                        selV = (-1 == getMinMaxElmInTab(tab, segForecastHig, from, segForecastHig, to, a, INVLID)) ?    \
                                9999 :                                                                           \
-                               around(a["min"]*100)/100+selFix ;
-                        print tab[segDate,i],"set *SELL value to:", selV "(" selV-selFix "plus" selFix ")", "\t@", tab[segContent,i] ;
+                               around(a["min"]*(1+selFix),2) ;
+                        print tab[segDate,i],"set *SELL value to:" selV "(" a["min"] "fixBy" selFix ")", "\t@", tab[segContent,i] ;
                     }else{
                         idx = -1 ;
                         rate = 0 ;
@@ -392,8 +312,8 @@ if [[ $verify -eq 1 ]] ; then
                                 idx = j ;
                             }
                         }
-                        buyV = (idx == -1) ? 0 : around(tab[segForecastLow,idx]*100)/100+buyFix ;
-                        print tab[segDate,i],"set *BUY  value to:", buyV "(" buyV-buyFix "plus" buyFix ")", "\t@", tab[segContent,i] ;
+                        buyV = (idx == -1) ? 0 : around(tab[segForecastLow,idx]*(1+buyFix),2) ;
+                        print tab[segDate,i],"set *BUY  value to:" buyV "(" tab[segForecastLow,idx] "fixBy" buyFix ")", "\t@", tab[segContent,i] ;
                     }
                 }
 
@@ -403,15 +323,15 @@ if [[ $verify -eq 1 ]] ; then
                         if(selV < tab[segHig,i]){
                             if(selV < tab[segLow,i]) selV = tab[segLow,i] ;
                             money += stockNum * selV ;
-                            print tab[segDate,i],"sold  ",stockNum,"*",selV "(" selV-selFix "plus" selFix "). And now, we have", money ;
+                            print tab[segDate,i],"sold  ",stockNum,"*",selV "(" selV-selFix "fixBy" selFix ") And now, we have", money ;
                             stockNum = 0 ;
                         }
                     }else{
                         if(buyV > tab[segLow,i]){
                             if(buyV > tab[segHig,i]) buyV = tab[segHig,i] ;
-                            stockNum = around(money/buyV) ;
+                            stockNum = int(money/buyV) ;
                             money -= buyV * stockNum ;
-                            print tab[segDate,i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "plus" buyFix "). And now, we have", money ;
+                            print tab[segDate,i],"bought",stockNum,"*",buyV+0 "(" buyV-buyFix "fixBy" buyFix ") And now, we have", money ;
                         }
                     }
 
