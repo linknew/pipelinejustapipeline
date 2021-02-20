@@ -1,9 +1,107 @@
-
 #! /bin/bash
+
+# counting the result of each seed
 
 . comm.lib
 
 doStart
+
+
+verbose=$1 ;
+skipNewBorn=60 ;
+orgFunds=20000 ;
+
+
+
+
+
+# in .t3.segData, the data list by stocks, but we want:
+#   * the data sorting by date
+# if the dates are same, we want:
+#   * list these data by stock number
+
+#before arrange
+#   (1)sorting (2)upAMPCeiling (3)upAMPFloor (4)dnAMPCeiling (5)dnAMPFloor (6)durAmp (7)dateStart (8)dateEnd (9)curDate (10)open (11)close (12)hig (13)low (14)srcFile
+#after arrange
+#   (1)srcFile (2)sorting (3)upAMPCeiling (4)upAMPFloor (5)dnAMPCeiling (6)dnAMPFloor (7)durAmp (8)dateStart (9)dateEnd (10)curDate (11)open (12)close (13)hig (14)low
+
+./segSort.sh '!/#/' -14 --mv2Head --noSorting .t3.segData |
+
+    ./segSort.sh -10    |
+
+    awk -v verbose=$verbose         \
+        -v skipNewBorn=$skipNewBorn \
+        -v orgFunds=$orgFunds       \
+        '
+
+        BEGIN{
+            stockNum = 0 ;
+            orgFunds = orgFunds+0 ;
+            taxRatPrt = 0.001 ;
+            taxRatHandFee = 0.00035 ;
+        }
+
+        !/#/{
+            seed = $2 ;
+            ampDur = $7/100 ;
+            start = $8 ;
+            end = $9 ;
+            cur = $10 ;
+            code = substr($1,13,6) ;
+            clsP = $12 ;
+            cnt[code]++ ;
+
+            if(cnt[code] <= skipNewBorn){
+                if(verbose) print "#",seed,": on " cur ", found that the road to",code,"is still under construction, so, went home and continued to sleep","\t@",$0 ;
+                next ;
+            }
+
+            if(start == "NONE"){
+                if(verbose) print "#",seed,": on " cur ", no plan in next few days","\t@",$0 ;
+                next ;
+            }
+
+            if(seed in aFunds){
+                if(cur < aEnd[seed]){
+                    if(verbose) print "#",seed,": on " cur ", [" aCur[seed] "~" aEnd[seed] "), he is on the journey, cannot go to",code,"\t@",$0 ;
+                    next ;
+                }
+                if(verbose) print "#",seed,": on " cur ", [" aCur[seed] "~" aEnd[seed] "), he is free, go and start the journey to",code,"\t@",$0 ;
+                
+            }else{
+                aFunds[seed] = orgFunds ;
+                if(verbose) print "#",seed,": on " cur ", the rode to",code,"is clear, he bring",orgFunds,"Yuan and started his trip\t@",$0 ;
+            }
+            
+            aCur[seed] = cur ;
+            aStart[seed] = start ;
+            aEnd[seed] = end ;
+            stockNum = int(aFunds[seed]/((1+taxRatHandFee)*clsP)) ;
+            aFunds[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
+            aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "#",seed,": on " cur ", he bought",stockNum,"stocks with",clsP,"and left",aFunds[seed],"in his pocket \t@",$0 ;
+            aFunds[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
+            aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "#",seed,": on " aEnd[seed] ", he sold his all stocks with rate",ampDur*100 "%, so far, he has earned",aFunds[seed],"\t@",$0 ;
+        }
+
+        END{
+            for(i in aFunds){
+                print aFunds[i],i ;
+            }
+        }
+
+        '
+
+
+doExit 0 
+
+
+
+
+
+
+
 
 #grep 600966 .t3.segData |
 #cat .t3.segData |

@@ -381,7 +381,7 @@ function doExit()
 #$3, post information
 {
     bash <<< "$2"
-    [[ $1 -eq 0 ]] && echo "*complete $0($$)" >&2 || echo "*break executing $0($$)" >&2
+    [[ $1 -eq 0 ]] && echo -ne "\n*complete  $0($$)\n" >&2 || echo -ne "\n*break     executing $0($$)\n" >&2
     [[ $3 ]] && echo "$3" >&2
     [[ -n $BKD ]] && cd "$BKD"
     exit $1 ;
