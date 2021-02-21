@@ -8,10 +8,12 @@ doStart
 
 
 verbose=$1 ;
+start=$2 ;
+end=$3 ;
 skipNewBorn=60 ;
 orgFunds=20000 ;
-
-
+taxRatPrt=0.001 ;
+taxRatHandFee=0.00035 ;
 
 
 
@@ -25,64 +27,83 @@ orgFunds=20000 ;
 #after arrange
 #   (1)srcFile (2)sorting (3)upAMPCeiling (4)upAMPFloor (5)dnAMPCeiling (6)dnAMPFloor (7)durAmp (8)dateStart (9)dateEnd (10)curDate (11)open (12)close (13)hig (14)low
 
-./segSort.sh '!/#/' -14 --mv2Head --noSorting .t3.segData |
+# do arrange, 
+#   skip new brone stock, 
+#   skip the data not included in specified date, 
+#   ignore "NONE"
+#   move code to the head
+# sort by curDate
+# do demonstration
 
-    ./segSort.sh -10    |
+awk -v skipNewBorn=$skipNewBorn     \
+    -v startDate=$start             \
+    -v endDate=$end                 \
+    '
 
-    awk -v verbose=$verbose         \
-        -v skipNewBorn=$skipNewBorn \
-        -v orgFunds=$orgFunds       \
+    !/#/{
+        fcstStart = $7 ;
+        fcstEnd = $8 ;
+        cur = $9 ;
+        code = substr($14,13,6) ;
+        cnt[code]++ ;
+
+        if(cnt[code] <= skipNewBorn) next ;
+        if(startDate && cur < startDate) next ;
+        if(endDate && cur > endDate) next ;
+        if(fcstStart == "NONE") next ;
+
+        $14 = "" ;
+        print code, $0 ;
+    }
+
+    '   .t3.segData     | ./segSort.sh -10    |
+
+    awk -v verbose=$verbose             \
+        -v orgFunds=$orgFunds           \
+        -v taxRatPrt=$taxRatPrt         \
+        -v taxRatHandFee=$taxRatHandFee \
         '
 
         BEGIN{
+            OFMT="%.2f" ;
             stockNum = 0 ;
             orgFunds = orgFunds+0 ;
-            taxRatPrt = 0.001 ;
-            taxRatHandFee = 0.00035 ;
+            taxRatPrt = taxRatPrt+0 ;
+            taxRatHandFee = taxRatHandFee+0 ;
         }
 
         !/#/{
             seed = $2 ;
             ampDur = $7/100 ;
-            start = $8 ;
-            end = $9 ;
+            fcstStart = $8 ;
+            fcstEnd = $9 ;
             cur = $10 ;
-            code = substr($1,13,6) ;
+            code = $1 ;
             clsP = $12 ;
             cnt[code]++ ;
 
-            if(cnt[code] <= skipNewBorn){
-                if(verbose) print "#",seed,": on " cur ", found that the road to",code,"is still under construction, so, went home and continued to sleep","\t@",$0 ;
-                next ;
-            }
-
-            if(start == "NONE"){
-                if(verbose) print "#",seed,": on " cur ", no plan in next few days","\t@",$0 ;
-                next ;
-            }
-
             if(seed in aFunds){
                 if(cur < aEnd[seed]){
-                    if(verbose) print "#",seed,": on " cur ", [" aCur[seed] "~" aEnd[seed] "), he is on the journey, cannot go to",code,"\t@",$0 ;
+                    if(verbose) print "#",cur,seed,"IGNORE, in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
                     next ;
                 }
-                if(verbose) print "#",seed,": on " cur ", [" aCur[seed] "~" aEnd[seed] "), he is free, go and start the journey to",code,"\t@",$0 ;
-                
             }else{
                 aFunds[seed] = orgFunds ;
-                if(verbose) print "#",seed,": on " cur ", the rode to",code,"is clear, he bring",orgFunds,"Yuan and started his trip\t@",$0 ;
             }
             
             aCur[seed] = cur ;
-            aStart[seed] = start ;
-            aEnd[seed] = end ;
+            aStart[seed] = fcstStart ;
+            aEnd[seed] = fcstEnd ;
+            if(verbose) print "#",cur,seed,"DEAL, [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
+
             stockNum = int(aFunds[seed]/((1+taxRatHandFee)*clsP)) ;
             aFunds[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",seed,": on " cur ", he bought",stockNum,"stocks with",clsP,"and left",aFunds[seed],"in his pocket \t@",$0 ;
+            if(verbose) print "#",cur,seed,"BOUGHT",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
+
             aFunds[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",seed,": on " aEnd[seed] ", he sold his all stocks with rate",ampDur*100 "%, so far, he has earned",aFunds[seed],"\t@",$0 ;
+            if(verbose) print "#",cur,seed,"SOLD",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
         }
 
         END{
