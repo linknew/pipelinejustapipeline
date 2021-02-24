@@ -298,7 +298,7 @@ do
     # show stock
     if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then       
         let _winOrder+=1
-        _showCmd="./showStock.sh > $_pipe4Ana --classFile=$_classFile"
+        _showCmd="showStock.sh > $_pipe4Ana --classFile=$_classFile"
         ((_cmdCode & _cmdCodeShowDaily)) && _showCmd="$_showCmd --showDaily"
         ((_cmdCode & _cmdCodeSilent)) && _showCmd="$_showCmd --silent"
         ((_cmdCode & _cmdCodeOrder )) && _showCmd="$_showCmd --winOrder=$_winOrder"
@@ -314,8 +314,8 @@ do
 
     # print stock info
     if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then       
-        ((_cmdCode & _cmdCodePrint)) && ./showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
-        ((_cmdCode & _cmdCodePrintLastOne)) && ./showStock.sh --printLastOne ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
+        ((_cmdCode & _cmdCodePrint)) && showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
+        ((_cmdCode & _cmdCodePrintLastOne)) && showStock.sh --printLastOne ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
     fi
 
     # do analize
@@ -327,7 +327,7 @@ do
         [[ -f .$_code.st ]] && _anaOpt+=" --searchingTab=.$_code.st" || _anaOpt+=" --printSearchingTab=.$_code.st"
         [[ -f .$_code.ct ]] && _anaOpt+=" --coefficientTab=.$_code.ct --checkHitRate" || _anaOpt+=" --printCoefficientTab=.$_code.ct"
 
-        ./showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code | ./bestBugTraning.sh $_anaOpt 
+        showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code | ./bestBugTraning.sh $_anaOpt 
     fi
 
     # package daily data
@@ -340,7 +340,7 @@ do
         ./getStockData.$$.sh --update --dateEnd=$_dateEnd $_code
         showHi "*[$_code]update data to $_stockDataPackage\n" >&2
         sed -i "" "/^${_code}/d"  $_stockDataPackage 2>/dev/null
-        ./showStock.sh --print $_code >> $_stockDataPackage
+        showStock.sh --print $_code >> $_stockDataPackage
     fi
 
     #do real time work

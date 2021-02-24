@@ -46,14 +46,17 @@ awk -v skipNewBorn=$skipNewBorn     \
         cur = $9 ;
         code = substr($14,13,6) ;
         cnt[code]++ ;
+        seed = lastSeed "_" $1 ;
+        lastSeed = $1 ;             # this will check by lastTime_thisTime
 
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
         if(endDate && cur > endDate) next ;
         if(fcstStart == "NONE") next ;
 
+        $1 = "" ;
         $14 = "" ;
-        print code, $0 ;
+        print code,seed,$0 ;
     }
 
     '   .t3.segData     | ./segSort.sh -10    |
