@@ -46,8 +46,8 @@ awk -v skipNewBorn=$skipNewBorn     \
         cur = $9 ;
         code = substr($14,13,6) ;
         cnt[code]++ ;
-        seed = lastSeed "_" $1 ;
-        lastSeed = $1 ;             # this will check by lastTime_thisTime
+        seed = lastSeed $1 ;
+        #lastSeed = $1 "_" ;             # this will check by lastTime_thisTime
 
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
@@ -115,13 +115,38 @@ awk -v skipNewBorn=$skipNewBorn     \
             }
         }
 
+        '           |
+
+
+#doExit 0 
+
+
+    awk         \
         '
 
+        /SOLD/{
+            if(date[cnt] != $2){
+                date[++cnt] = $2 ;
+            }
+            earn[$3,cnt] = $NF ; 
+            seedList[$3] = 20000 ;
+        }
+
+        END{
+            for(j=1; j<=cnt; j++){
+                printf("%s ", date[j]) ;
+                for(i in seedList){
+                    idx = i SUBSEP j ;
+                    if(idx in earn) seedList[i] = earn[idx] ;
+                    printf("%9.2f ", seedList[i]) ; 
+                }
+                print "" ;
+            }
+        }
+
+        '
 
 doExit 0 
-
-
-
 
 
 
