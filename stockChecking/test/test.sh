@@ -15,6 +15,7 @@ orgFunds=20000 ;
 taxRatPrt=0.001 ;
 taxRatHandFee=0.00035 ;
 
+filter=$(echo $(<.t.5year) )
 
 
 # in .t3.segData, the data list by stocks, but we want:
@@ -38,9 +39,17 @@ taxRatHandFee=0.00035 ;
 awk -v skipNewBorn=$skipNewBorn     \
     -v startDate=$start             \
     -v endDate=$end                 \
+    -v filter="$filter"             \
     '
 
-    !/#/{
+    BEGIN{
+        $0 = filter ;
+        filterNum = NF ;
+        for(i=1; i<=filterNum; i++) aFilter[$i] = 1 ;
+        $0 = "" ;
+    }
+
+    !($1~/#/){
         fcstStart = $7 ;
         fcstEnd = $8 ;
         cur = $9 ;
@@ -49,6 +58,7 @@ awk -v skipNewBorn=$skipNewBorn     \
         seed = lastSeed $1 ;
         #lastSeed = $1 "_" ;             # this will check by lastTime_thisTime
 
+        if(filterNum && (!(seed in aFilter)) ) next ;
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
         if(endDate && cur > endDate) next ;
@@ -59,7 +69,7 @@ awk -v skipNewBorn=$skipNewBorn     \
         print code,seed,$0 ;
     }
 
-    '   .t3.segData     | ./segSort.sh -10    |
+    '   .t3.segData     |   ./segSort.sh -10    |
 
     awk -v verbose=$verbose             \
         -v orgFunds=$orgFunds           \
@@ -115,13 +125,9 @@ awk -v skipNewBorn=$skipNewBorn     \
             }
         }
 
-        '           |
+        '   |   #cat - ; doExit 0 
 
-
-#doExit 0 
-
-
-    awk         \
+    awk     \
         '
 
         /SOLD/{
