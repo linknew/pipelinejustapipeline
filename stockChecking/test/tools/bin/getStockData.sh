@@ -114,7 +114,7 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2
         echo "$_dataRcvd" >> StockData/$_stockCode.html.org 2>/dev/null
         echo "*[$_stockCode]packing StockData/$_stockCode.html.org to StockData/${_stockCode:0:6}-.package.html.org" >&2
-        sed -i '' "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
+        sed -i "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
         cat StockData/$_stockCode.html.org >> StockData/${_stockCode:0:6}-.package.html.org
     fi
 fi
@@ -135,7 +135,7 @@ if ((_cmdCode & _cmdCodeHotData)); then
         echo "*[$_stockCode]copy hot data to StockData/$_stockCode.html.org.hot" >&2
 
     #before start a task to get hot data, we need set a trap to receive the message from the task.
-    trap "doExit 0" SIGINFO 
+    trap "doExit 0" SIGUSR2 
 
     #start the task
     _dataRcvdLast=$(tail -1 StockData/$_stockCode.html.org.hot 2>/dev/null)
@@ -165,10 +165,10 @@ if ((_cmdCode & _cmdCodeHotData)); then
             touch StockData/$_stockCode.html.org.hot
         fi
 
-        [[ $_keepRefresh == true ]] && (kill -s SIGINFO $$ ; sleep 15) || break
+        [[ $_keepRefresh == true ]] && (kill -s SIGUSR2 $$ ; sleep 15) || break
     done&
 
-    #stay here, wait child processed quit (if $_keepRefresh is "true", wait child proecss send out the message:SIGINFO)
+    #stay here, wait child processed quit (if $_keepRefresh is "true", wait child proecss send out the message:SIGUSR2)
     wait && doExit 1
 
 fi

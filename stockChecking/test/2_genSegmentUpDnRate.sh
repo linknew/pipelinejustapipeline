@@ -231,10 +231,10 @@ awk                             \
     ' $sortingRaw   |
 
 
-./serialize.sh --seed=1 \
-               --describtion="$describtion"    \
-               --format='"%-27s %6.2f%% %6.2f%% %6.2f%% %6.2f%% %6.2f%% %10s %10s %10s %7.2f %7.2f %7.2f %7.2f %s\n",$1,$18,$19,$20,$21,$22,$23,$24,$3,$7,$4,$5,$6,$30'
-#                        (1)sorting (2)upP (3)upN  (4)dnP (5)dnN (6)durAMP (7)dateS (8)dateE (9)DateC (10)opn (11)cls (12)hig (13)low (14)srcFile"
+serialize.sh --seed=1 \
+             --describtion="$describtion"    \
+             --format='"%-27s %6.2f%% %6.2f%% %6.2f%% %6.2f%% %6.2f%% %10s %10s %10s %7.2f %7.2f %7.2f %7.2f %s\n",$1,$18,$19,$20,$21,$22,$23,$24,$3,$7,$4,$5,$6,$30'
+#                       (1)sorting (2)upP (3)upN  (4)dnP (5)dnN (6)durAMP (7)dateS (8)dateE (9)DateC (10)opn (11)cls (12)hig (13)low (14)srcFile
 
 doExit 0 
 

@@ -179,6 +179,7 @@ showHelp()
 \n"
 }
 
+pwd=$(dirname $0)
 
 for i in "$@"
 do
@@ -215,7 +216,7 @@ trap "wait
       killHotDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
-cp ./getStockData.sh ./getStockData.$$.sh
+cp "$pwd/getStockData.sh" ./getStockData.$$.sh
 
 ((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
@@ -314,8 +315,8 @@ do
 
     # print stock info
     if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then       
-        ((_cmdCode & _cmdCodePrint)) && showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
-        ((_cmdCode & _cmdCodePrintLastOne)) && showStock.sh --printLastOne ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
+        ((_cmdCode & _cmdCodePrint)) && "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
+        ((_cmdCode & _cmdCodePrintLastOne)) && "showStock.sh" --printLastOne ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
     fi
 
     # do analize
@@ -327,7 +328,7 @@ do
         [[ -f .$_code.st ]] && _anaOpt+=" --searchingTab=.$_code.st" || _anaOpt+=" --printSearchingTab=.$_code.st"
         [[ -f .$_code.ct ]] && _anaOpt+=" --coefficientTab=.$_code.ct --checkHitRate" || _anaOpt+=" --printCoefficientTab=.$_code.ct"
 
-        showStock.sh --print ${_fixType:+--fixType=$_fixType} $_code | ./bestBugTraning.sh $_anaOpt 
+        "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code | ./bestBugTraning.sh $_anaOpt 
     fi
 
     # package daily data
@@ -339,8 +340,8 @@ do
     if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
         ./getStockData.$$.sh --update --dateEnd=$_dateEnd $_code
         showHi "*[$_code]update data to $_stockDataPackage\n" >&2
-        sed -i "" "/^${_code}/d"  $_stockDataPackage 2>/dev/null
-        showStock.sh --print $_code >> $_stockDataPackage
+        sed -i "/^${_code}/d"  $_stockDataPackage 2>/dev/null
+        "showStock.sh" --print $_code >> $_stockDataPackage
     fi
 
     #do real time work

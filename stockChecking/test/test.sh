@@ -7,18 +7,68 @@
 doStart
 
 
-verbose=$1 ;
-start=$2 ;
-end=$3 ;
-skipNewBorn=60 ;
+seedSerialLvlDef=1 ;
+skipNewBornDef=60 ;
+taxRatPrtDef=0.001 ;
+taxRatHandFeeDef=0.00035 ;
+fnCodeFltDef=.t.filter.code
+fnSeedFltDef=.t.filter.seed
+
+verbose=0 ;
 orgFunds=20000 ;
-taxRatPrt=0.001 ;
-taxRatHandFee=0.00035 ;
 
-filter=$(echo $(<.t.5year) )
+function Help
+{
+    echo -ne "
+    Usage: ${0} [--serialLvl=N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--verbose] [--fltCode=S] [--fltSeed=S] [--help] segFile
 
+        --serialLvl, serial level of seed
+        --skipNewBorn, skip number of new datas
+        --verbose, print details of transaction
+        --taxRatPrt, rate of print_fllower, is a float with unit %
+        --taxRatHandFee, rate of handing fee, is a float with unit %
+        --fltCode, specifiy a file for code_filter
+        --fltSeed, specifiy a file for seed_filter
+        --start
+        --end
+        --help
 
-# in .t3.segData, the data list by stocks, but we want:
+    Note:
+        -
+
+    Default: 
+        --serialLvl=$seedSerialLvlDef --skipNewBorn=$skipNewBornDef --taxRatPrt=$taxRatPrtDef --taxRatHandFee=$taxRatHandFeeDef --fltCode=$fnCodeFltDef --fltSeed=$fnSeedFltDef
+\n"
+}
+
+for i in "${@}"
+do
+    [[ ${i} == "--help" ]] && Help && doExit 0
+    [[ ${i%%=*} == "--serialLvl" ]] && seedSerialLvl=${i##*=} && continue
+    [[ ${i%%=*} == "--skipNewBorn" ]] && skipNewBorn=${i##*=} && continue
+    [[ ${i%%=*} == "--taxRatPrt" ]] && taxRatPrt=${i##*=} && continue
+    [[ ${i%%=*} == "--taxRatHandFee" ]] && taxRatHandFee=${i##*=} && continue
+    [[ ${i%%=*} == "--verbose" ]] && verbose=1 && continue
+    [[ ${i%%=*} == "--fltCode" ]] && fnCodeFlt=${i##*=} && continue
+    [[ ${i%%=*} == "--fltSeed" ]] && fnSeedFlt=${i##*=} && continue
+    [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
+    [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
+    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1
+    [[ -n $segFile ]] && echo "*! Multipule segFile specified">&2 && doExit -1
+    segFile=$i
+done
+
+taxRatPrt=${taxRatPrt:-$taxRatPrtDef}
+fnCodeFlt=${fnCodeFlt:-$fnCodeFltDef}
+fnSeedFlt=${fnSeedFlt:-$fnSeedFltDef}
+skipNewBorn=${skipNewBorn:-$skipNewBornDef}
+taxRatHandFee=${taxRatHandFee:-$taxRatHandFeeDef}
+seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
+
+listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
+listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
+
+# in $segFile, the data list by stocks, but we want:
 #   * the data sorting by date
 # if the dates are same, we want:
 #   * list these data by stock number
@@ -36,29 +86,82 @@ filter=$(echo $(<.t.5year) )
 # sort by curDate
 # do demonstration
 
+
 awk -v skipNewBorn=$skipNewBorn     \
     -v startDate=$start             \
     -v endDate=$end                 \
-    -v filter="$filter"             \
+    -v listFltCode="$listFltCode"   \
+    -v listFltSeed="$listFltSeed"   \
+    -v seedSerialLvl=$seedSerialLvl \
     '
 
+    # stack for saving serial seed
+
+    function cleanSeedStack()
+    {
+        seedSerialStackDeep=0 ;
+        seedSerialStackIdx = 0 ;
+        return ;
+    }
+
+    function pushSeedStack(seed)
+    {
+        seedSerialStack [seedSerialStackIdx] = seed ;
+        seedSerialStackIdx ++ ;
+        if(seedSerialStackIdx >= seedSerialLvl) seedSerialStackIdx = 0 ;
+        if(seedSerialStackDeep < seedSerialLvl) seedSerialStackDeep ++ ;
+
+        return ;
+    }
+
+    function getSerialSeed(i,s,ret)
+    {
+        ret = "" ;
+        
+        s = seedSerialStackIdx-seedSerialStackDeep ;    #e+1 == seedSerialStackIdx  #e-s+1 == seedSerialStackDeep ;
+        if(s<0) s += seedSerialLvl ;
+
+        for(i=0; i<seedSerialStackDeep; i++){
+            ret = ret seedSerialStack[s] ;
+            if(i<seedSerialStackDeep-1) ret = ret "_" ;
+            s++ ;
+            if(s>=seedSerialLvl) s=0 ;
+        }
+
+        return ret ;
+    }
+
     BEGIN{
-        $0 = filter ;
-        filterNum = NF ;
-        for(i=1; i<=filterNum; i++) aFilter[$i] = 1 ;
+        seedSerialLvl = seedSerialLvl+0 ;
+        cleanSeedStack() ;
+
+        $0 = listFltCode ;
+        filterNumCode = NF ;
+        for(i=1; i<=filterNumCode; i++) aFilterCode[$i] = 1 ;
+
+        $0 = listFltSeed ;
+        filterNumSeed = NF ;
+        for(i=1; i<=filterNumSeed; i++) aFilterSeed[$i] = 1 ;
+
         $0 = "" ;
     }
 
     !($1~/#/){
+        code = substr($14,13,6) ;
+        if(code != codeLast) cleanSeedStack() ;
+        codeLast = code ;
+        pushSeedStack($1) ;
+        #print "*",$1 > "dev/stderr";
+        seed = getSerialSeed() ;
+        #print "*",seed > "/dev/stderr" ;
+
         fcstStart = $7 ;
         fcstEnd = $8 ;
         cur = $9 ;
-        code = substr($14,13,6) ;
         cnt[code]++ ;
-        seed = lastSeed $1 ;
-        #lastSeed = $1 "_" ;             # this will check by lastTime_thisTime
 
-        if(filterNum && (!(seed in aFilter)) ) next ;
+        if(filterNumCode && (!(code in aFilterCode)) ) next ;
+        if(filterNumSeed && (!(seed in aFilterSeed)) ) next ;
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
         if(endDate && cur > endDate) next ;
@@ -69,7 +172,7 @@ awk -v skipNewBorn=$skipNewBorn     \
         print code,seed,$0 ;
     }
 
-    '   .t3.segData     |   ./segSort.sh -10    |
+    '   $segFile     |   segSort.sh -10    | 
 
     awk -v verbose=$verbose             \
         -v orgFunds=$orgFunds           \
@@ -93,7 +196,8 @@ awk -v skipNewBorn=$skipNewBorn     \
             cur = $10 ;
             code = $1 ;
             clsP = $12 ;
-            cnt[code]++ ;
+            cntCode[code]++ ;
+            cntSeed[seed]++ ;
 
             if(seed in aFunds){
                 if(cur < aEnd[seed]){
@@ -104,6 +208,7 @@ awk -v skipNewBorn=$skipNewBorn     \
                 aFunds[seed] = orgFunds ;
             }
             
+            cntSeedDeal[seed] ++ ;
             aCur[seed] = cur ;
             aStart[seed] = fcstStart ;
             aEnd[seed] = fcstEnd ;
@@ -121,30 +226,53 @@ awk -v skipNewBorn=$skipNewBorn     \
 
         END{
             for(i in aFunds){
-                print aFunds[i],i ;
+                print aFunds[i],i,cntSeedDeal[i] "/" cntSeed[i] ;
             }
         }
 
-        '   |   #cat - ; doExit 0 
+        '   |   cat - ; doExit 0 
 
     awk     \
         '
 
+        BEGIN{
+            cntDate = 0 ;
+            cntSeed = 0 ;
+            fundsInit = 20000 ;
+            #listDate[date]=(cntDate++) ;
+            #listSeed[seed]=(cntSeed++) ;
+            #funds[listSeed[seedIdx],listDate[dateIdx]]=... ;
+        }
+
         /SOLD/{
-            if(date[cnt] != $2){
-                date[++cnt] = $2 ;
+
+            # SOLD entries arranged by date
+
+            date = $2 ;
+            seed = $3 ;
+
+            if(!(date in listDate)){
+                listDate[date] = cntDate ;
+                cntDate++ ;
             }
-            earn[$3,cnt] = $NF ; 
-            seedList[$3] = 20000 ;
+
+            if(!(seed in listSeed)){
+                listSeed[seed] = cntSeed ;
+                cntSeed++ ;
+            }
+
+            funds[listSeed[seed],listDate[date]] = $NF ;
         }
 
         END{
-            for(j=1; j<=cnt; j++){
-                printf("%s ", date[j]) ;
-                for(i in seedList){
-                    idx = i SUBSEP j ;
-                    if(idx in earn) seedList[i] = earn[idx] ;
-                    printf("%9.2f ", seedList[i]) ; 
+            for(seedIdx=0; seedIdx<cntSeed; seedIdx++){
+                if(!(seedIdx SUBSEP 0 in funds)) funds[seedIdx,0] = fundsInit ;
+            }
+
+            for(idxDate=0; idxDate<cntDate; idxDate++){
+                for(idxSeed=0; idxSeed<cntSeed; idxSeed++){
+                    if(!(idxSeed SUBSEP idxDate in funds)) funds[idxSeed,idxDate] = funds[idxSeed,idxDate-1] ;
+                    printf("%9.2f ",funds[idxSeed,idxDate]) ;
                 }
                 print "" ;
             }
@@ -158,215 +286,59 @@ doExit 0
 
 
 
-#grep 600966 .t3.segData |
-#cat .t3.segData |
-
-awk '
-    function fClean()
-    {
-        delete cnt ;
-        delete funds ;
-        delete dirs ;
-        return 0 ;
-    }
-
-    function fPrt(      \
-                        \
-        i)
-    {
-        for(i in cnt){
-            print funds[i], dirs[i], cnt[i], code, i ;
-        }
-        return 0 ;
-    }
-
-    BEGIN{
-        OFMT="%.2f" ;
-        fundsOrg = 1 ;  #original funds
-        code = "" ;
-        codeCur = "" ;
-    }
-
-    !/#/{
+#grep 300017 $segFile | 
+#
+#awk '
+#    function fClean()
+#    {
+#        delete cnt ;
+#        delete funds ;
+#        delete dirs ;
+#        return 0 ;
+#    }
+#
+#    function fPrt(      \
+#                        \
+#        i)
+#    {
+#        for(i in cnt){
+#            print funds[i], dirs[i]/cnt[i], dirs[i], cnt[i], codeLast, i ;
+#        }
+#        return 0 ;
+#    }
+#
+#    BEGIN{
+#        OFMT="%.2f" ;
+#        fundsOrg = 1 ;  #original funds
+#        codeLast = "" ;
+#        codeCur = "" ;
+#    }
+#
+#    !/#/{
+#        seedCur = seedLast $1 ;
+#        #seedLast = $1 ;
 #        codeCur = substr($NF, 13, 6) ;
-        if(codeCur != code){
-            fPrt() ;
-            fClean() ;
-            code = codeCur ;
-        }
-        cnt[$1] ++ ;
-        if(!($1 in funds)) funds[$1] = fundsOrg ;
-        funds[$1] = funds[$1] * (100+$6) / 100 ;
-        dirs[$1] = ($6 > 0) ? dirs[$1]+1 : dirs[$1]-1 ;
-        fPrt() ;
-    }
-
-    END{
-        fPrt() ;
-    }
-
-    '
-
-doExit
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-durDef=3
-oprtB4Exit="cd $BKD"
-
-function Help
-{
-    echo -ne "
-    Usage: ${0} [--dur=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--build] [--genRaw] [--genSegment] [--genCounting] [--doForecast=N] [--verify [--buyFix=N] [--selFix=N]] [--help] list
-
-        --dur, duration for segment data
-        --start, limited the range when generate segment
-        --end, limited the range when generate segment
-        --help
-
-    Note:
-        If only one codeNum in the list file, generate the output filename according the codeNum.
-
-    Default: --dur=$durDef --doForecast=$doForecastDef
-\n"
-}
-
-for i in "${@}"
-do
-    [[ ${i} == "--help" ]] && Help && doExit 0 "$oprtB4Exit"
-    [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
-    [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
-    [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
-    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$oprtB4Exit"
-    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$oprtB4Exit"
-    list=$i
-done
-
-[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1 "$oprtB4Exit"
-codes=$( awk '($1 !~ "#"){print $1}' $list )
-codeNum=$(echo "$codes" | wc -w)
-[[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$oprtB4Exit"
-[[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
-dur=${dur:-$durDef}
-segData=.t$dur.segData
-cntgData=.t$dur.counting
-forecastData=.t$dur.forecast$postFilename${start:+.from.$start}${end:+.to.$end}
-
-echo     *dur="$dur" >&2
-echo     *start="$start" >&2
-echo     *end="$end" >&2
-
-#if 1
-
-#generate processing table
-
-echo $codes | 
-awk ${start:+ -v start=$start}  \
-    ${end:+ -v end=$end}        \
-    '
-    '"$awkFunction_split2"'
-
-    BEGIN{
-        print "#output:"
-        print "#\t(1)low (2)hig (3)opn (4)cls (5)forecastLowPrice(forecastLowCnt) (6)forecastHig(forecastHigCnt) (7)upCnt/unCnt (8)date (9)code (10)seed"
-        print "#note:"
-        print "#\tforecastHigCnt and forecastLowPrice are referrence values base on current close price, NOT for current day!!"
-    }
-
-    {
-        if("'"$segData"'" == FILENAME){
-
-            # (1)sorting  (2)upP  (3)upN  (4)dnP  (5)dnN  (6)durAMP  (7)dateS  (8)dateE  (9)DateC  (10)opn  (11)cls  (12)hig  (13)low  (14)srcFile"
-
-            if($1 ~ "#") next ;
-            if(start && $9<start) next ;
-            if(end && $9>end) next ;
-
-            if($NF in files){
-                opn = $10+0 ;
-                cls = $11+0 ;
-                low = $13+0 ;
-                hig = $12+0 ;
-                date = $9 ;
-                code = substr($NF,13,6) ;
-                seed = $1 ;
-                $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp upCnt/unCnt
-                upCnt = $1 ;
-                upAmp = $2 ;
-                upPrice = (100+upAmp)*cls/100 ;
-                dnCnt = $3 ;
-                dnAmp = $4 ;
-                dnPrice = (100+dnAmp)*cls/100 ;
-                upRate = $5 ;
-                print low, hig, opn, cls, dnPrice "(" dnCnt "," dnAmp "%)", upPrice "(" upCnt "," upAmp "%)", upRate, date, code, seed ;
-            }
-
-        }else if("'"$cntgData"'" == FILENAME){
-
-            #    1..........................................................................................................................................................NF
-            #00002  UP/UN=  inf  UP=0002( 5.29%)  UN=0000(  5.29%)  DP=0001( 1.43%)  DN=0001(-3.82%)  AP/AN= 1.00  AP=0001( 2.63%)  AN=0001(-3.76%)  [22k<5k<264k<1k<66k<132k]
-            if($1 ~ "#") next ;
-
-            seed = $NF ;
-
-            gsub(/(UP)|(UN)|(DP)|(DN)|(AP)|(AN)|=|\(|\)|\/|%/," ") ;
-            #now, we get :
-            #(1)cnt  (2)UPC/UNC (3)UPC (4)UPA (5)UNC (6)UNA (7)DPC (8)DPA (9)DNC (10)DNA (11)AP/AN (12) APC (13)APA (14)ANC (15)ANA ... (NF)seed
-
-            forecastCont[seed] = $3 " " $4 " " $9 " " $10 " " $2 ;      #upCnt upAmp dnCnt dnAmp upCnt/unCnt
-
-        }else if("-" == FILENAME){
-
-            codeNum = split2($0,a," ") ;
-            for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
-
-        }
-    }
-
-    ' - "$cntgData" "$segData"
-
-#endif
-
-doExit 0 "$oprtB4Exit"
+#        durAmp = $6+0 ;
+#
+#        if(codeCur != codeLast){
+#            fPrt() ;
+#            fClean() ;
+#            codeLast = codeCur ;
+#        }
+#
+#        cnt[seedCur] ++ ;
+#        if(!(seedCur in funds)) funds[seedCur] = fundsOrg ;
+#        funds[seedCur] = funds[seedCur] * (100+durAmp) / 100 ;
+#        dirs[seedCur] = (durAmp > 0) ? dirs[seedCur]+1 : dirs[seedCur]-1 ;
+#    }
+#
+#    END{
+#        fPrt() ;
+#    }
+#
+#    '
+#
+#doExit
+#
+#
+#

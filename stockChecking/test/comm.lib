@@ -366,9 +366,9 @@ function doStart()
 #$1, pre information
 #$2, do something when start
 {
-    WKD=$(dirname $0)   #working directory
-    BKD=$(pwd)          #back directory
-    cd $WKD
+#    WKD=$(dirname $0)   #working directory
+#    BKD=$(pwd)          #back directory
+#    cd $WKD
 
     [[ -z $1 ]] && echo -ne "\n*executing $0($$)\n" >&2
     [[ -n $2 ]] && bash <<< "$2"
@@ -383,7 +383,7 @@ function doExit()
     bash <<< "$2"
     [[ $1 -eq 0 ]] && echo -ne "\n*complete  $0($$)\n" >&2 || echo -ne "\n*break     executing $0($$)\n" >&2
     [[ $3 ]] && echo "$3" >&2
-    [[ -n $BKD ]] && cd "$BKD"
+#    [[ -n $BKD ]] && cd "$BKD"
     exit $1 ;
 }
 #============================================================================
