@@ -150,7 +150,7 @@ showHelp()
     Usage: ${0} [[--update] [--download] [--hotData [--keepRefresh]] [--resetDatabase] \\
                               [--show|--showNext|--monit [--showDaily] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
                               [--analize=filename [--analizeOptions='...']] \\
-                              [--packDailyData] [--genRelationshipData] [--checkHitRate] [[--print] [--printLastOne]][--classFile=filename] listFile
+                              [--packDailyData] [--genRelationshipData] [--checkHitRate] [(--print | --printLastOne) [--output=PREFIX{}SUFFIX]] [--classFile=filename] listFile
 
         --download, download stock data
         --update, update stock data
@@ -158,6 +158,7 @@ showHelp()
         --keepRefresh, after program complete, keep refresh current data (does not stop data-retrieve job), this option must use under --hotData.
         --print, print stock infos(date,amplitude,power,etc.)
         --printLastOne, print the last item of stock infos(date,amplitude,power,etc.)
+        --output, output to specified file, for example: --output="a/b/{}.data" will save result to a/b/code_6.data
         --monit, group of --show --showDaily --silent --order --bg
         --show, show stock info listed in the listFile
         --showNext, continue to show stock info listed in the listFile(continue the last showing operation)
@@ -190,6 +191,7 @@ do
     [[ $i == --keepRefresh ]] && ((_cmdCode |=_cmdCodeKeepRefresh)) && continue
     [[ $i == --print ]]    && ((_cmdCode |=_cmdCodePrint)) && continue
     [[ $i == --printLastOne ]] && ((_cmdCode |=_cmdCodePrintLastOne)) && continue
+    [[ ${i%%=*} == --output ]] && _output=${i#*=} && continue
     [[ $i == --show ]]     && ((_cmdCode |=_cmdCodeShow)) && continue
     [[ $i == --showNext ]] && ((_cmdCode |=_cmdCodeShowNext)) && continue
     [[ $i == --monit ]] && ((_cmdCode |= (_cmdCodeShow|_cmdCodeSilent|_cmdCodeShowDaily|_cmdCodeOrder|_cmdCodeBG) )) && continue
@@ -248,6 +250,11 @@ fi
 
 if (( (_cmdCode & (_cmdCodeFixType | _cmdCodeDoDailyHomework) ) == (_cmdCodeFixType | _cmdCodeDoDailyHomework) )) ; then
     showErr "option --fixType exclude with --doDailyHomework\n">&2
+    doExit 0
+fi
+
+if [[ $((_cmdCode & (_cmdCodePrint | _cmdCodePrintLastOne) )) -eq 0 && -n $_output ]] ; then
+    showErr "option --output must combin with --print or --printLastOne \n">&2
     doExit 0
 fi
 
@@ -315,8 +322,11 @@ do
 
     # print stock info
     if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then       
-        ((_cmdCode & _cmdCodePrint)) && "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
-        ((_cmdCode & _cmdCodePrintLastOne)) && "showStock.sh" --printLastOne ${_fixType:+--fixType=$_fixType} $_code > $_pipe4Ana
+        _tmpName=""
+        [[ -n $_output ]] && _tmpName=${_output/'{}'/${_code:1}}
+        ((_cmdCode & _cmdCodePrint)) && "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
+        ((_cmdCode & _cmdCodePrintLastOne)) && "showStock.sh" --printLastOne ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
+        [[ -n $_tmpName ]] && cat $_tmpName > $_pipe4Ana ;
     fi
 
     # do analize

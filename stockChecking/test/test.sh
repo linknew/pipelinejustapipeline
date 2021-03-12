@@ -20,7 +20,7 @@ orgFunds=20000 ;
 function Help
 {
     echo -ne "
-    Usage: ${0} [--serialLvl=N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--verbose] [--fltCode=S] [--fltSeed=S] [--help] segFile
+    Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--verbose] [--fltCode=S] [--fltSeed=S] [--help] segFile
 
         --serialLvl, serial level of seed
         --skipNewBorn, skip number of new datas
@@ -36,7 +36,7 @@ function Help
     Note:
         -
 
-    Default: 
+    Default:
         --serialLvl=$seedSerialLvlDef --skipNewBorn=$skipNewBornDef --taxRatPrt=$taxRatPrtDef --taxRatHandFee=$taxRatHandFeeDef --fltCode=$fnCodeFltDef --fltSeed=$fnSeedFltDef
 \n"
 }
@@ -53,6 +53,8 @@ do
     [[ ${i%%=*} == "--fltSeed" ]] && fnSeedFlt=${i##*=} && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
+    [[ ${i:0:2} == "--" ]] && echo "*! Unknown option:$i">&2 && doExit -1
+    [[ ${i:0:1} == "-" && (${i:1:1} > "0" && ${i:1:1} < ":") ]] && seedSerialLvl=${i:1} && continue     # < ':' means <='9'
     [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1
     [[ -n $segFile ]] && echo "*! Multipule segFile specified">&2 && doExit -1
     segFile=$i
@@ -78,9 +80,9 @@ listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 #after arrange
 #   (1)srcFile (2)sorting (3)upAMPCeiling (4)upAMPFloor (5)dnAMPCeiling (6)dnAMPFloor (7)durAmp (8)dateStart (9)dateEnd (10)curDate (11)open (12)close (13)hig (14)low
 
-# do arrange, 
-#   skip new brone stock, 
-#   skip the data not included in specified date, 
+# do arrange,
+#   skip new brone stock,
+#   skip the data not included in specified date,
 #   ignore "NONE"
 #   move code to the head
 # sort by curDate
@@ -117,7 +119,7 @@ awk -v skipNewBorn=$skipNewBorn     \
     function getSerialSeed(i,s,ret)
     {
         ret = "" ;
-        
+
         s = seedSerialStackIdx-seedSerialStackDeep ;    #e+1 == seedSerialStackIdx  #e-s+1 == seedSerialStackDeep ;
         if(s<0) s += seedSerialLvl ;
 
@@ -135,22 +137,47 @@ awk -v skipNewBorn=$skipNewBorn     \
         seedSerialLvl = seedSerialLvl+0 ;
         cleanSeedStack() ;
 
-        $0 = listFltCode ;
-        filterNumCode = NF ;
-        for(i=1; i<=filterNumCode; i++) aFilterCode[$i] = 1 ;
+        #load code filter table
+        {
+            $0 = listFltCode ;
+            filterNumCode = NF ;
+            for(i=1; i<=filterNumCode; i++) aFilterCode[$i] = 1 ;
+        }
 
-        $0 = listFltSeed ;
-        filterNumSeed = NF ;
-        for(i=1; i<=filterNumSeed; i++) aFilterSeed[$i] = 1 ;
+        #load serial_seed filter table
+        {
+            $0 = listFltSeed ;
+            filterNumSeed = NF ;
+
+            for(i=1; i<=filterNumSeed; i++){
+                num = split($i, aTmpArry, "_") ;
+
+                #use serial_seed filter list to update seed abbrevation table
+                for(j=1; j<=num; j++){
+                    seed = aTmpArry[j] ;
+                    if(!(seed in seedAbbs)) seedAbbs[seed] = (seedAbbIdx++) ;
+                    aTmpArry[j] = seedAbbs[seed] ;
+                }
+
+                #use seed abbrevation table to create serial_seed filter table
+                seedAbb = "" ;
+                for(j=1; j<=num; j++){
+                    seedAbb = seedAbb aTmpArry[j] ;
+                    if(j<num) seedAbb = seedAbb "_" ;
+                }
+                aFilterSeedAbb[seedAbb] = 1 ;
+            }
+        }
 
         $0 = "" ;
     }
 
     !($1~/#/){
+        if(!($1 in seedAbbs)) seedAbbs[$1]=(seedAbbIdx++) ;     # update seed abbrevation table
         code = substr($14,13,6) ;
         if(code != codeLast) cleanSeedStack() ;
         codeLast = code ;
-        pushSeedStack($1) ;
+        pushSeedStack(seedAbbs[$1]) ;
         #print "*",$1 > "dev/stderr";
         seed = getSerialSeed() ;
         #print "*",seed > "/dev/stderr" ;
@@ -161,7 +188,7 @@ awk -v skipNewBorn=$skipNewBorn     \
         cnt[code]++ ;
 
         if(filterNumCode && (!(code in aFilterCode)) ) next ;
-        if(filterNumSeed && (!(seed in aFilterSeed)) ) next ;
+        if(filterNumSeed && (!(seed in aFilterSeedAbb)) ) next ;
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
         if(endDate && cur > endDate) next ;
@@ -172,13 +199,33 @@ awk -v skipNewBorn=$skipNewBorn     \
         print code,seed,$0 ;
     }
 
-    '   $segFile     |   segSort.sh -10    | 
+    END{
+        #print seed abbrevation table, Processing into a shape that easily for segSort.sh
+        for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i],0 ,0 ,0 ,0 ,0 ,0 ,0 ;
+    }
 
-    awk -v verbose=$verbose             \
-        -v orgFunds=$orgFunds           \
-        -v taxRatPrt=$taxRatPrt         \
-        -v taxRatHandFee=$taxRatHandFee \
+    '   $segFile        |   
+#cat - ; doExit ;
+    segSort.sh -10      |
+
+    awk -v verbose=$verbose                 \
+        -v orgFunds=$orgFunds               \
+        -v taxRatPrt=$taxRatPrt             \
+        -v taxRatHandFee=$taxRatHandFee     \
         '
+
+        function getOrgSeed(seedAbb,
+                                            \
+                            num, seedAbbList, ret, i)
+        {
+            num = split(seedAbb, seedAbbList, "_") ;
+            for(i=1; i<num; i++){
+                ret = ret seedAbbsRvt[seedAbbList[i]] "_" ;
+            }
+            if(num>0) ret = ret seedAbbsRvt[seedAbbList[num]] ;
+
+            return ret ;
+        }
 
         BEGIN{
             OFMT="%.2f" ;
@@ -186,6 +233,12 @@ awk -v skipNewBorn=$skipNewBorn     \
             orgFunds = orgFunds+0 ;
             taxRatPrt = taxRatPrt+0 ;
             taxRatHandFee = taxRatHandFee+0 ;
+        }
+
+        /^#seekAbbs/{
+            #load seed abbrevation table
+            seedAbbsRvt[$3] = $2 ;
+            next ;
         }
 
         !/#/{
@@ -201,36 +254,36 @@ awk -v skipNewBorn=$skipNewBorn     \
 
             if(seed in aFunds){
                 if(cur < aEnd[seed]){
-                    if(verbose) print "#",cur,seed,"IGNORE, in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
+                    if(verbose) print "#",cur,getOrgSeed(seed),"IGNORE, in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
                     next ;
                 }
             }else{
                 aFunds[seed] = orgFunds ;
             }
-            
+
             cntSeedDeal[seed] ++ ;
             aCur[seed] = cur ;
             aStart[seed] = fcstStart ;
             aEnd[seed] = fcstEnd ;
-            if(verbose) print "#",cur,seed,"DEAL, [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
+            if(verbose) print "#",cur,getOrgSeed(seed),"DEAL, [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
 
             stockNum = int(aFunds[seed]/((1+taxRatHandFee)*clsP)) ;
             aFunds[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,seed,"BOUGHT",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
+            if(verbose) print "#",cur,getOrgSeed(seed),"BOUGHT",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
 
             aFunds[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,seed,"SOLD",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
+            if(verbose) print "#",cur,getOrgSeed(seed),"SOLD",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
         }
 
         END{
             for(i in aFunds){
-                print aFunds[i],i,cntSeedDeal[i] "/" cntSeed[i] ;
+                print aFunds[i],getOrgSeed(i),cntSeedDeal[i] "/" cntSeed[i] ;
             }
         }
 
-        '   |   cat - ; doExit 0 
+        '   |   cat - ; doExit 0
 
     awk     \
         '
@@ -280,13 +333,13 @@ awk -v skipNewBorn=$skipNewBorn     \
 
         '
 
-doExit 0 
+doExit 0
 
 
 
 
 
-#grep 300017 $segFile | 
+#grep 300017 $segFile |
 #
 #awk '
 #    function fClean()
