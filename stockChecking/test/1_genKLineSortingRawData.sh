@@ -53,8 +53,9 @@ rawData=$(
             printf "[" ;
             for(i=0;i<idxs;i++){
                 if(i==0) printf names[b[i]] ;
-                else if(a[b[i]]+0>a[b[i-1]]+0) printf "<"names[b[i]] ;
-                else printf "="names[b[i]] ;
+                else printf "<"names[b[i]] ;
+                #else if(a[b[i]]+0>a[b[i-1]]+0) printf "<"names[b[i]] ;
+                #else printf "="names[b[i]] ;
             }
             print "]",$4,$18,$2,$25,$26,$24,$4,$14,$15,$16,$33,$28,$29,$30,$31,$32 ;
         }
