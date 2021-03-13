@@ -13,6 +13,10 @@ taxRatPrtDef=0.001 ;
 taxRatHandFeeDef=0.00035 ;
 fnCodeFltDef=.t.filter.code
 fnSeedFltDef=.t.filter.seed
+pruneOrgDataDef=1
+countingProfitDef=0
+verboseDef=0
+genSyncProfitDef=0
 
 verbose=0 ;
 orgFunds=20000 ;
@@ -20,17 +24,26 @@ orgFunds=20000 ;
 function Help
 {
     echo -ne "
-    Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--verbose] [--fltCode=S] [--fltSeed=S] [--help] segFile
+    Description:
+        -
 
-        --serialLvl, serial level of seed
+    Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--fltCode=S] [--fltSeed=S] 
+                     [[--dispPruneData] | [--dispProfit [--verbose]] | [--dispSyncProfit]]
+                     [--help] 
+                     segFile
+
+        --serialLvl, serial level of seed (-N is short cut to --serialLvl)
         --skipNewBorn, skip number of new datas
-        --verbose, print details of transaction
         --taxRatPrt, rate of print_fllower, is a float with unit %
         --taxRatHandFee, rate of handing fee, is a float with unit %
         --fltCode, specifiy a file for code_filter
         --fltSeed, specifiy a file for seed_filter
         --start
         --end
+        --dispPruneData, display pruned data (with sorting)
+        --dispProfit, display counting profit
+        --verbose, print details of counint profit
+        --dispSyncProfit, display synchronoused profit, sync by date
         --help
 
     Note:
@@ -38,6 +51,7 @@ function Help
 
     Default:
         --serialLvl=$seedSerialLvlDef --skipNewBorn=$skipNewBornDef --taxRatPrt=$taxRatPrtDef --taxRatHandFee=$taxRatHandFeeDef --fltCode=$fnCodeFltDef --fltSeed=$fnSeedFltDef
+        --dispProfit
 \n"
 }
 
@@ -48,7 +62,10 @@ do
     [[ ${i%%=*} == "--skipNewBorn" ]] && skipNewBorn=${i##*=} && continue
     [[ ${i%%=*} == "--taxRatPrt" ]] && taxRatPrt=${i##*=} && continue
     [[ ${i%%=*} == "--taxRatHandFee" ]] && taxRatHandFee=${i##*=} && continue
+    [[ ${i%%=*} == "--dispPruneData" ]] &&dispPruneData=1 && continue
+    [[ ${i%%=*} == "--dispProfit" ]] && dispProfit=1 && continue
     [[ ${i%%=*} == "--verbose" ]] && verbose=1 && continue
+    [[ ${i%%=*} == "--dispSyncProfit" ]] && dispSyncProfit=1 && continue
     [[ ${i%%=*} == "--fltCode" ]] && fnCodeFlt=${i##*=} && continue
     [[ ${i%%=*} == "--fltSeed" ]] && fnSeedFlt=${i##*=} && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
@@ -60,12 +77,25 @@ do
     segFile=$i
 done
 
+[[ $verbose -eq 1 && $dispProfit -eq 0 ]] && showErr "--verbose must bind with --dispProfit\n" >&2 && doExit -1
+[[ $((dispPruneData + dispProfit + dispSyncProfit)) -ge 2 ]] && showErr "only one of --dispPruneData/--dispProfit/--dispSyncProfit exist\n" >&2 && exit -1 
+
+[[ $((dispPruneData + dispProfit + dispSyncProfit)) -eq 0 ]] && dispProfit=1 && showWarn "*no display contnet, set --dispProfit as default\n" >&2
+
+[[ $dispPruneData ]] && pruneOrgData=1
+[[ $dispProfit ]] && pruneOrgData=1 && countingProfit=1
+[[ $dispSyncProfit ]] && pruneOrgData=1 && countingProfit=1 && genSyncProfit=1
+
 taxRatPrt=${taxRatPrt:-$taxRatPrtDef}
 fnCodeFlt=${fnCodeFlt:-$fnCodeFltDef}
 fnSeedFlt=${fnSeedFlt:-$fnSeedFltDef}
 skipNewBorn=${skipNewBorn:-$skipNewBornDef}
 taxRatHandFee=${taxRatHandFee:-$taxRatHandFeeDef}
 seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
+pruneOrgData=${pruneOrgData:-$pruneOrgDataDef}
+countingProfit=${countingProfit:-countingProfitDef}
+verbose=${verbose:-verboseDef}
+genSyncProfit=${genSyncProfit:-genSyncProfitDef}
 
 listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
 listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
@@ -89,6 +119,8 @@ listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 # do demonstration
 
 
+#if pruneOrgData
+if [[ $pruneOrgData -eq 1 ]]; then
 awk -v skipNewBorn=$skipNewBorn     \
     -v startDate=$start             \
     -v endDate=$end                 \
@@ -204,10 +236,14 @@ awk -v skipNewBorn=$skipNewBorn     \
         for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i],0 ,0 ,0 ,0 ,0 ,0 ,0 ;
     }
 
-    '   $segFile        |   
-#cat - ; doExit ;
-    segSort.sh -10      |
+    '   $segFile    |   segSort.sh -10
+fi      |
+#endif  /*pruneOrgData*/
 
+#if countingProfit
+if [[ $countingProfit -eq 0 ]] ; then
+    cat -
+else
     awk -v verbose=$verbose                 \
         -v orgFunds=$orgFunds               \
         -v taxRatPrt=$taxRatPrt             \
@@ -283,8 +319,14 @@ awk -v skipNewBorn=$skipNewBorn     \
             }
         }
 
-        '   |   cat - ; doExit 0
+        '
+fi          |
+#endif  /*countingProfit*/
 
+#if genSyncProfit
+if [[ $genSyncProfit -eq 0 ]] ; then
+    cat -
+else
     awk     \
         '
 
@@ -332,6 +374,10 @@ awk -v skipNewBorn=$skipNewBorn     \
         }
 
         '
+fi
+#endif /*genSyncProfit*/
+
+
 
 doExit 0
 
