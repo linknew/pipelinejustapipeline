@@ -17,9 +17,12 @@ pruneOrgDataDef=1
 countingProfitDef=0
 verboseDef=0
 genSyncProfitDef=0
-
-verbose=0 ;
-orgFunds=20000 ;
+orgFundsDef=20000 ;
+segFileDef=""
+startDef="" ;
+endDef="" ;
+#no need listFltCodeDef as listFltCode will be load from $fnCodeFlt
+#no need listFltSeedDef as listFltSeed will be load from $fnSeedFlt
 
 function Help
 {
@@ -93,10 +96,13 @@ skipNewBorn=${skipNewBorn:-$skipNewBornDef}
 taxRatHandFee=${taxRatHandFee:-$taxRatHandFeeDef}
 seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
 pruneOrgData=${pruneOrgData:-$pruneOrgDataDef}
-countingProfit=${countingProfit:-countingProfitDef}
-verbose=${verbose:-verboseDef}
-genSyncProfit=${genSyncProfit:-genSyncProfitDef}
-
+countingProfit=${countingProfit:-$countingProfitDef}
+verbose=${verbose:-$verboseDef}
+genSyncProfit=${genSyncProfit:-$genSyncProfitDef}
+orgFunds=${orgFunds:-$orgFundsDef}
+segFile=${segFile:-$segFileDef}
+start=${start:-$startDef}
+end=${end:-$endDef}
 listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
 listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 
