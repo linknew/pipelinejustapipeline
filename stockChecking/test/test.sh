@@ -13,10 +13,12 @@ taxRatPrtDef=0.001 ;
 taxRatHandFeeDef=0.00035 ;
 fnCodeFltDef=.t.filter.code
 fnSeedFltDef=.t.filter.seed
-pruneOrgDataDef=1
-countingProfitDef=0
-verboseDef=0
-genSyncProfitDef=0
+pruneOrgDataDef=1 ;
+noAbbDef=0 ;
+keepNoneItemDef=0 ;
+countingProfitDef=0 ;
+verboseDef=0 ;
+genSyncProfitDef=0 ;
 orgFundsDef=20000 ;
 segFileDef=""
 startDef="" ;
@@ -31,7 +33,7 @@ function Help
         -
 
     Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--fltCode=S] [--fltSeed=S] 
-                     [[--dispPruneData] | [--dispProfit [--verbose]] | [--dispSyncProfit]]
+                     [ [--dispPruneData [--noAbb] [--keepNoneItem] ] | [--dispProfit [--verbose]] | [--dispSyncProfit] ]
                      [--help] 
                      segFile
 
@@ -44,6 +46,8 @@ function Help
         --start
         --end
         --dispPruneData, display pruned data (with sorting)
+        --noAbb, do not use abbrevation of seed
+        --keepNoneItem, do not ignore NONE items
         --dispProfit, display counting profit
         --verbose, print details of counint profit
         --dispSyncProfit, display synchronoused profit, sync by date
@@ -60,12 +64,14 @@ function Help
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help && doExit 0
+    [[ ${i} == "--help" ]] && Help >&2 && doExit 0
     [[ ${i%%=*} == "--serialLvl" ]] && seedSerialLvl=${i##*=} && continue
     [[ ${i%%=*} == "--skipNewBorn" ]] && skipNewBorn=${i##*=} && continue
     [[ ${i%%=*} == "--taxRatPrt" ]] && taxRatPrt=${i##*=} && continue
     [[ ${i%%=*} == "--taxRatHandFee" ]] && taxRatHandFee=${i##*=} && continue
     [[ ${i%%=*} == "--dispPruneData" ]] &&dispPruneData=1 && continue
+    [[ ${i%%=*} == "--noAbb" ]] &&noAbb=1 && continue
+    [[ ${i%%=*} == "--keepNoneItem" ]] &&keepNoneItem=1 && continue
     [[ ${i%%=*} == "--dispProfit" ]] && dispProfit=1 && continue
     [[ ${i%%=*} == "--verbose" ]] && verbose=1 && continue
     [[ ${i%%=*} == "--dispSyncProfit" ]] && dispSyncProfit=1 && continue
@@ -81,9 +87,12 @@ do
 done
 
 [[ $verbose -eq 1 && $dispProfit -eq 0 ]] && showErr "--verbose must bind with --dispProfit\n" >&2 && doExit -1
+[[ $noAbb -eq 1 && $dispPruneData -eq 0 ]] && showErr "--noAbb must bind with --dispPruneData\n" >&2 && doExit -1
+[[ $keepNoneItem -eq 1 && $dispPruneData -eq 0 ]] && showErr "--keepNoneItem must bind with --dispPruneData\n" >&2 && doExit -1
+[[ $((dispPruneData + dispProfit + dispSyncProfit)) -eq 0 ]] && dispProfit=1 && showWarn "*no display contnet, set --dispProfit as default\n" >&2
+
 [[ $((dispPruneData + dispProfit + dispSyncProfit)) -ge 2 ]] && showErr "only one of --dispPruneData/--dispProfit/--dispSyncProfit exist\n" >&2 && exit -1 
 
-[[ $((dispPruneData + dispProfit + dispSyncProfit)) -eq 0 ]] && dispProfit=1 && showWarn "*no display contnet, set --dispProfit as default\n" >&2
 
 [[ $dispPruneData ]] && pruneOrgData=1
 [[ $dispProfit ]] && pruneOrgData=1 && countingProfit=1
@@ -96,6 +105,8 @@ skipNewBorn=${skipNewBorn:-$skipNewBornDef}
 taxRatHandFee=${taxRatHandFee:-$taxRatHandFeeDef}
 seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
 pruneOrgData=${pruneOrgData:-$pruneOrgDataDef}
+noAbb=${noAbb:-$noAbbDef}
+keepNoneItem=${keepNoneItem:-$keepNoneItemDef}
 countingProfit=${countingProfit:-$countingProfitDef}
 verbose=${verbose:-$verboseDef}
 genSyncProfit=${genSyncProfit:-$genSyncProfitDef}
@@ -133,6 +144,8 @@ awk -v skipNewBorn=$skipNewBorn     \
     -v listFltCode="$listFltCode"   \
     -v listFltSeed="$listFltSeed"   \
     -v seedSerialLvl=$seedSerialLvl \
+    -v noAbb=$noAbb                 \
+    -v keepNoneItem=$keepNoneItem   \
     '
 
     # stack for saving serial seed
@@ -188,22 +201,26 @@ awk -v skipNewBorn=$skipNewBorn     \
             filterNumSeed = NF ;
 
             for(i=1; i<=filterNumSeed; i++){
-                num = split($i, aTmpArry, "_") ;
+                if(noAbb){
+                    aFilterSeed[$i] = 1 ;
+                }else{
+                    num = split($i, aTmpArry, "_") ;
 
-                #use serial_seed filter list to update seed abbrevation table
-                for(j=1; j<=num; j++){
-                    seed = aTmpArry[j] ;
-                    if(!(seed in seedAbbs)) seedAbbs[seed] = (seedAbbIdx++) ;
-                    aTmpArry[j] = seedAbbs[seed] ;
-                }
+                    #use serial_seed filter list to update seed abbrevation table
+                    for(j=1; j<=num; j++){
+                        seed = aTmpArry[j] ;
+                        if(!(seed in seedAbbs)) seedAbbs[seed] = (seedAbbIdx++) ;
+                        aTmpArry[j] = seedAbbs[seed] ;
+                    }
 
-                #use seed abbrevation table to create serial_seed filter table
-                seedAbb = "" ;
-                for(j=1; j<=num; j++){
-                    seedAbb = seedAbb aTmpArry[j] ;
-                    if(j<num) seedAbb = seedAbb "_" ;
+                    #use seed abbrevation table to create serial_seed filter table
+                    seedAbb = "" ;
+                    for(j=1; j<=num; j++){
+                        seedAbb = seedAbb aTmpArry[j] ;
+                        if(j<num) seedAbb = seedAbb "_" ;
+                    }
+                    aFilterSeed[seedAbb] = 1 ;
                 }
-                aFilterSeedAbb[seedAbb] = 1 ;
             }
         }
 
@@ -211,11 +228,11 @@ awk -v skipNewBorn=$skipNewBorn     \
     }
 
     !($1~/#/){
-        if(!($1 in seedAbbs)) seedAbbs[$1]=(seedAbbIdx++) ;     # update seed abbrevation table
+        if(!noAbb && !($1 in seedAbbs)) seedAbbs[$1]=(seedAbbIdx++) ;     # update seed abbrevation table
         code = substr($14,13,6) ;
         if(code != codeLast) cleanSeedStack() ;
         codeLast = code ;
-        pushSeedStack(seedAbbs[$1]) ;
+        pushSeedStack((noAbb) ? $1 : seedAbbs[$1]) ;
         #print "*",$1 > "dev/stderr";
         seed = getSerialSeed() ;
         #print "*",seed > "/dev/stderr" ;
@@ -226,11 +243,11 @@ awk -v skipNewBorn=$skipNewBorn     \
         cnt[code]++ ;
 
         if(filterNumCode && (!(code in aFilterCode)) ) next ;
-        if(filterNumSeed && (!(seed in aFilterSeedAbb)) ) next ;
+        if(filterNumSeed && (!(seed in aFilterSeed)) ) next ;
         if(cnt[code] <= skipNewBorn) next ;
         if(startDate && cur < startDate) next ;
         if(endDate && cur > endDate) next ;
-        if(fcstStart == "NONE") next ;
+        if(!keepNoneItem && fcstStart == "NONE") next ;
 
         $1 = "" ;
         $14 = "" ;
@@ -239,7 +256,9 @@ awk -v skipNewBorn=$skipNewBorn     \
 
     END{
         #print seed abbrevation table, Processing into a shape that easily for segSort.sh
-        for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i],0 ,0 ,0 ,0 ,0 ,0 ,0 ;
+        if(!noAbb){
+            for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i],0 ,0 ,0 ,0 ,0 ,0 ,0 ;
+        }
     }
 
     '   $segFile    |   segSort.sh -10
