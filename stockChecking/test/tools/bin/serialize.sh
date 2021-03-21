@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. $(dirname $0)/comm.lib
+. ~/tools/lib/comm.lib
 
 
 echo -ne "*executing $0($$)\n" >&2
