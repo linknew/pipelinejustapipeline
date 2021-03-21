@@ -65,7 +65,7 @@ sed -n -E "$regex"${ignore:+d;}p\; $list |
         }
 
         {
-            _cont = $segSort ;
+            _cont = (segSort > NF && orgSegOpr != '"$ORG_SEG_OPR_CP"' && orgSegOpr != '"$ORG_SEG_OPR_MV"') ? _cont = "_" : $segSort ;
             if('"$ORG_SEG_OPR_MV"' == orgSegOpr) $segSort = "" ;
             $0 = _cont " " $0 ;
 

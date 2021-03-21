@@ -6,6 +6,9 @@ pwd=$(dirname $0)
 doStart
 
 optExit=""
+leftAlignDef=1
+rightAlignDef=0
+widthLimitDef=1000
 
 function Help
 {
@@ -14,7 +17,7 @@ function Help
         -
 
     Usage: 
-        $(basename ${0}) [[!]/regExp/] [--gaps=LIST [--gapsOnly]] [--help] textFile
+        $(basename ${0}) [[!]/regExp/] [--gaps=LIST [--gapsOnly]] [--widthLimit=N] [--leftAlign | --rightAlign] [--help] textFile
 
     Options:
         --gaps, do alignment according GAPS and SPACE [need take a notice]
@@ -24,6 +27,9 @@ function Help
                 will align according '@' '#' 'JKLM' and ' '
             --gaps="@,#,JKLM" --gapsOnly
                 will align according '@' '#' and 'JKLM'
+        --leftAlign, set alignment type to left-alignment
+        --rightAlign, set alignment type to right-alignment
+        --widthLimit, set filed width limitation
         --help,
 
     Note:
@@ -36,7 +42,7 @@ function Help
            is a GaP and the second '@' is not.
 
     Default:
-        -
+        $0 --leftAlign --widthLimit=$widthLimitDef
 \n"
 }
 
@@ -45,6 +51,9 @@ do
     [[ ${i} == "--help" ]] && Help && doExit 0 "$optExit"
     [[ ${i%%=*} == "--gaps" ]] && gaps=${i#*=} && continue ;
     [[ ${i} == "--gapsOnly" ]] && gapsOnly=1 && continue ;
+    [[ ${i} == "--leftAlign" ]] && leftAlign=1 && continue ;
+    [[ ${i} == "--rightAlign" ]] && rightAlign=1 && continue ;
+    [[ ${i%%=*} == "--widthLimit" ]] && widthLimit=${i#*=} && continue ;
     [[ ${i:0:1} == "/" ]]  && regex=$i && continue ;
     [[ ${i:0:2} == "!/" ]] && regex=${i:1} && ignore=1 && continue ;
     [[ ${i:0:1} == "-" ]]  && echo "*! Unknown option:$i">&2 && doExit -1 "$optExit"
@@ -52,10 +61,19 @@ do
     textFile=$i
 done
 
+[[ $leftAlign -eq 1 ]] && rightAlign=0
+[[ $rightAlign -eq 1 ]] && leftAlign=0
+
+leftAlign=${leftAlign:-$leftAlignDef}
+rightAlign=${rightAlign:-$rightAlignDef}
+widthLimit=${widthLimit:-$widthLimitDef}
+
 sed -n -E "$regex"${ignore:+d;}p\; $textFile |
 
-awk -v gaps="$gaps"         \
-    -v gapsOnly=$gapsOnly   \
+awk -v gaps="$gaps"             \
+    -v gapsOnly=$gapsOnly       \
+    -v leftAlign=$leftAlign     \
+    -v widthLimit=$widthLimit   \
     '
 
     BEGIN{
@@ -65,7 +83,7 @@ awk -v gaps="$gaps"         \
         if(!gapsOnly){
             sp = "[ \t\n]*" ;
         }else{
-            sp = "SP" ;
+            sp = "TiLpS_LaCiGaM_Si_sIhT" ;
             for(i=1; i<=gapNum; i++) s = s "^("aGapList[i]")[ \t]|[ \t]("aGapList[i]")[ \t]|[ \t]("aGapList[i]")$|" ;
             s = s "^$" ;
             r = sp"&"sp ;
@@ -76,21 +94,30 @@ awk -v gaps="$gaps"         \
     {
         if(gapsOnly){
             gsub(s, r) ;
-            gsub("^"sp"[ \t]*|[ \t]*"sp"$", "") ;
+            gsub("^"sp"[ \t]?|[ \t]?"sp"$", "") ;
         }
-        #print "[*]",$0 > "/dev/stderr" ;
-        itemNum = split($0, aItem, "[ \t]*"sp"[ \t]*") ;
+        #print "[*]\047" $0 "\047" > "/dev/stderr" ;
+        itemNum = split($0, aItem, sp) ;
+        #for(i=1;i<=itemNum;i++) print "[" aItem[i] "]" ;
 
         gapIdx = 0 ;
         j = 0 ;
 
         for(i=1; i<=itemNum; i++){
-            len = length(aItem[i]) ;
-            if(aItem[i] in aGapIdx){
+
+            tmpS = aItem[i] ;
+            gsub(/^[ \t]*|[ \t]*$/, "", tmpS) ;
+            if(tmpS in aGapIdx){
+                aItem[i] = tmpS ;
                 gapIdx = aGapIdx[aItem[i]] ;
                 j = 0 ;
+                #print "!![" aItem[i] "]" ;
             }
-            if(aaWidth[gapIdx,j]+0 < len) aaWidth[gapIdx,j] = len ;
+
+            len = length(aItem[i]) ;
+            if(aaWidth[gapIdx,j]+0 < len){
+                aaWidth[gapIdx,j] = (len > widthLimit ? widthLimit : len) ;
+            }
             if(aCol[gapIdx]+0 < j+1) aCol[gapIdx] = j+1 ;
             aaaCont[FNR,gapIdx,j] = aItem[i] ;
             j++ ;
@@ -108,7 +135,9 @@ awk -v gaps="$gaps"         \
         for(i=1; i<=NR; i++){
             for(j=0; j<=gapNum; j++){
                 for(k=0; k<aCol[j]; k++){
-                    printf("%"aaWidth[j,k]"s ", aaaCont[i,j,k]) ;
+                    if(leftAlign) _fmt = "%-" aaWidth[j,k] "s " ;
+                    else          _fmt = "%"  aaWidth[j,k] "s " ;
+                    printf(_fmt, aaaCont[i,j,k]) ;
                 }
             }
             print "" ;
