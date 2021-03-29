@@ -7,15 +7,16 @@
 doStart
 
 
-seedSerialLvlDef=1 ;
+seedSerialLvlDef=3 ;
 skipNewBornDef=60 ;
 taxRatPrtDef=0.001 ;
 taxRatHandFeeDef=0.00035 ;
-fnCodeFltDef=.t.filter.code
-fnSeedFltDef=.t.filter.seed
+fnCodeFltDef=""
+fnSeedFltDef=""
 pruneOrgDataDef=1 ;
 noAbbDef=0 ;
 keepNoneItemDef=0 ;
+noSortingDef=0 ;
 countingProfitDef=0 ;
 verboseDef=0 ;
 genSyncProfitDef=0 ;
@@ -33,7 +34,7 @@ function Help
         -
 
     Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--fltCode=S] [--fltSeed=S] 
-                     [ [--dispPruneData [--noAbb] [--keepNoneItem] ] | [--dispProfit [--verbose]] | [--dispSyncProfit] ]
+                     [ ( ( (--dispPruneData [--noAbb] [--keepNoneItem]) | --dispPD) [--noSorting]) | ( (--dispProfit | --dispSyncProfit) [--verbose] ) ]         
                      [--help] 
                      segFile
 
@@ -48,9 +49,11 @@ function Help
         --dispPruneData, display pruned data (with sorting)
         --noAbb, do not use abbrevation of seed
         --keepNoneItem, do not ignore NONE items
+        --noSorting, do not sorting original data by date
+        --dispPD, abberavation of --dispPruneData --noAbb --keepNoneItem
         --dispProfit, display counting profit
         --verbose, print details of counint profit
-        --dispSyncProfit, display synchronoused profit, sync by date
+        --dispSyncProfit, display synchronoused profit, this option will auto enable --verbose
         --help
 
     Note:
@@ -72,9 +75,11 @@ do
     [[ ${i%%=*} == "--dispPruneData" ]] &&dispPruneData=1 && continue
     [[ ${i%%=*} == "--noAbb" ]] &&noAbb=1 && continue
     [[ ${i%%=*} == "--keepNoneItem" ]] &&keepNoneItem=1 && continue
+    [[ ${i%%=*} == "--dispPD" ]] && dispPruneData=1 && noAbb=1 && keepNoneItem=1 && continue
+    [[ ${i%%=*} == "--noSorting" ]] && noSorting=1 && continue
     [[ ${i%%=*} == "--dispProfit" ]] && dispProfit=1 && continue
     [[ ${i%%=*} == "--verbose" ]] && verbose=1 && continue
-    [[ ${i%%=*} == "--dispSyncProfit" ]] && dispSyncProfit=1 && continue
+    [[ ${i%%=*} == "--dispSyncProfit" ]] && dispSyncProfit=1 && verbose=1 && continue
     [[ ${i%%=*} == "--fltCode" ]] && fnCodeFlt=${i##*=} && continue
     [[ ${i%%=*} == "--fltSeed" ]] && fnSeedFlt=${i##*=} && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
@@ -86,9 +91,10 @@ do
     segFile=$i
 done
 
-[[ $verbose -eq 1 && $dispProfit -eq 0 ]] && showErr "--verbose must bind with --dispProfit\n" >&2 && doExit -1
+[[ $verbose -eq 1 && $dispProfit -eq 0 && $dispSyncProfit -eq 0 ]] && showErr "--verbose must bind with --dispProfit or --dispSyncProfit\n" >&2 && doExit -1
 [[ $noAbb -eq 1 && $dispPruneData -eq 0 ]] && showErr "--noAbb must bind with --dispPruneData\n" >&2 && doExit -1
 [[ $keepNoneItem -eq 1 && $dispPruneData -eq 0 ]] && showErr "--keepNoneItem must bind with --dispPruneData\n" >&2 && doExit -1
+[[ $noSorting -eq 1 && $dispPruneData -eq 0 ]] && showErr "--noSorting must bind with --dispPruneData\n" >&2 && doExit -1
 [[ $((dispPruneData + dispProfit + dispSyncProfit)) -eq 0 ]] && dispProfit=1 && showWarn "*no display contnet, set --dispProfit as default\n" >&2
 
 [[ $((dispPruneData + dispProfit + dispSyncProfit)) -ge 2 ]] && showErr "only one of --dispPruneData/--dispProfit/--dispSyncProfit exist\n" >&2 && exit -1 
@@ -107,6 +113,7 @@ seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
 pruneOrgData=${pruneOrgData:-$pruneOrgDataDef}
 noAbb=${noAbb:-$noAbbDef}
 keepNoneItem=${keepNoneItem:-$keepNoneItemDef}
+noSorting=${noSorting:-$noSortingDef}
 countingProfit=${countingProfit:-$countingProfitDef}
 verbose=${verbose:-$verboseDef}
 genSyncProfit=${genSyncProfit:-$genSyncProfitDef}
@@ -114,8 +121,8 @@ orgFunds=${orgFunds:-$orgFundsDef}
 segFile=${segFile:-$segFileDef}
 start=${start:-$startDef}
 end=${end:-$endDef}
-listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
-listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
+[[ -n $fnCodeFlt ]] && listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
+[[ -n $fnSeedFlt ]] && listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 
 # in $segFile, the data list by stocks, but we want:
 #   * the data sorting by date
@@ -135,6 +142,26 @@ listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 # sort by curDate
 # do demonstration
 
+#print parameter info
+echo -ne "#
+#PARAMETER_INFO: pruneOrgData=$pruneOrgData
+#PARAMETER_INFO: countingProfit=$countingProfit
+#PARAMETER_INFO: genSyncProfit=$genSyncProfit
+#PARAMETER_INFO: start=$start
+#PARAMETER_INFO: end=$end
+#PARAMETER_INFO: segFile=$segFile
+#PARAMETER_INFO: verbose=$verbose
+#PARAMETER_INFO: noAbb=$noAbb
+#PARAMETER_INFO: keepNoneItem=$keepNoneItem
+#PARAMETER_INFO: noSorting=$noSorting
+#PARAMETER_INFO: fnCodeFlt=$fnCodeFlt
+#PARAMETER_INFO: fnSeedFlt=$fnSeedFlt
+#PARAMETER_INFO: seedSerialLvl=$seedSerialLvl
+#PARAMETER_INFO: skipNewBorn=$skipNewBorn
+#PARAMETER_INFO: taxRatPrt=$taxRatPrt
+#PARAMETER_INFO: taxRatHandFee=$taxRatHandFee
+#PARAMETER_INFO: orgFunds=$orgFunds
+#\n"
 
 #if pruneOrgData
 if [[ $pruneOrgData -eq 1 ]]; then
@@ -255,13 +282,12 @@ awk -v skipNewBorn=$skipNewBorn     \
     }
 
     END{
-        #print seed abbrevation table, Processing into a shape that easily for segSort.sh
         if(!noAbb){
-            for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i],0 ,0 ,0 ,0 ,0 ,0 ,0 ;
+            for(i in seedAbbs) print "#seekAbbs",i ,seedAbbs[i] ;
         }
     }
 
-    '   $segFile    |   segSort.sh -10
+    '   $segFile    |   ( [[ $noSorting -eq 1 ]] && cat - || segSort.sh -10 )
 fi      |
 #endif  /*pruneOrgData*/
 
@@ -315,32 +341,35 @@ else
 
             if(seed in aFunds){
                 if(cur < aEnd[seed]){
-                    if(verbose) print "#",cur,getOrgSeed(seed),"IGNORE, in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
+                    if(verbose) print "#",cur,code,getOrgSeed(seed),"IGNR("ampDur*100"%) in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
                     next ;
                 }
             }else{
                 aFunds[seed] = orgFunds ;
+                lose[seed] = 0 ;
             }
 
             cntSeedDeal[seed] ++ ;
             aCur[seed] = cur ;
             aStart[seed] = fcstStart ;
             aEnd[seed] = fcstEnd ;
-            if(verbose) print "#",cur,getOrgSeed(seed),"DEAL, [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
+            if(verbose) print "#",cur,code,getOrgSeed(seed),"DEAL("ampDur*100"%), [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
 
             stockNum = int(aFunds[seed]/((1+taxRatHandFee)*clsP)) ;
             aFunds[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,getOrgSeed(seed),"BOUGHT",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
+            if(verbose) print "#",cur,code,getOrgSeed(seed),"BOUT("ampDur*100"%)",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
 
             aFunds[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
             aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,getOrgSeed(seed),"SOLD",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
+            if(verbose) print "#",cur,code,getOrgSeed(seed),"SOLD("ampDur*100"%)",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
+
+            if(aFunds[seed]+0 < 20000) lose[seed]++ ;
         }
 
         END{
             for(i in aFunds){
-                print aFunds[i],getOrgSeed(i),cntSeedDeal[i] "/" cntSeed[i] ;
+                print getOrgSeed(i), aFunds[i], cntSeedDeal[i] "/" cntSeed[i], ((lose[i]==0) ? "NeverLose" : lose[i]) ;
             }
         }
 
@@ -369,15 +398,17 @@ else
             # SOLD entries arranged by date
 
             date = $2 ;
-            seed = $3 ;
+            seed = $4 ;
 
             if(!(date in listDate)){
                 listDate[date] = cntDate ;
+                aDate[cntDate] = substr(date,3,2) substr(date,6,2) substr(date,9,2) ;
                 cntDate++ ;
             }
 
             if(!(seed in listSeed)){
                 listSeed[seed] = cntSeed ;
+                aSeed[cntSeed] = seed ;
                 cntSeed++ ;
             }
 
@@ -385,17 +416,32 @@ else
         }
 
         END{
+            # print map info: seed line-number seg-number,  line-1 is the date
+            for(idxSeed=0; idxSeed<cntSeed; idxSeed++){
+                print "#", aSeed[idxSeed], "line-" idxSeed+2, "seg-" idxSeed+2 ;
+            }
+
+            # fill init funds
             for(seedIdx=0; seedIdx<cntSeed; seedIdx++){
                 if(!(seedIdx SUBSEP 0 in funds)) funds[seedIdx,0] = fundsInit ;
             }
 
+            # fill whole funds table
             for(idxDate=0; idxDate<cntDate; idxDate++){
                 for(idxSeed=0; idxSeed<cntSeed; idxSeed++){
                     if(!(idxSeed SUBSEP idxDate in funds)) funds[idxSeed,idxDate] = funds[idxSeed,idxDate-1] ;
+                }
+            }
+
+            # print funds table
+            for(idxDate=0; idxDate<cntDate; idxDate++){
+                printf aDate[idxDate] " ";
+                for(idxSeed=0; idxSeed<cntSeed; idxSeed++){
                     printf("%9.2f ",funds[idxSeed,idxDate]) ;
                 }
                 print "" ;
             }
+            print "*seg=" cntSeed+1, "rec=" cntDate > "/dev/stderr" ;   # information for drawLine.sh
         }
 
         '

@@ -22,6 +22,7 @@ let _cmdCodeShowDaily=$((1<<17))
 let _cmdCodePackDailyData=$((1<<18))
 let _cmdCodeGenRelationshipData=$((1<<19))
 let _cmdCodeFixType=$((1<<20))
+let _cmdCodeFirstLooking=$((1<<21))
 let _cmdCode=0
 
 _classFile="stock.list.class.tmp"
@@ -148,7 +149,7 @@ showHelp()
 {
     showMsg "
     Usage: ${0} [[--update] [--download] [--hotData [--keepRefresh]] [--resetDatabase] \\
-                              [--show|--showNext|--monit [--showDaily] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
+                              [--show|--showNext|--monit [--showDaily | --firstLooking=yyyy-mm-dd] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
                               [--analize=filename [--analizeOptions='...']] \\
                               [--packDailyData] [--genRelationshipData] [--checkHitRate] [(--print | --printLastOne) [--output=PREFIX{}SUFFIX]] [--classFile=filename] listFile
 
@@ -163,6 +164,7 @@ showHelp()
         --show, show stock info listed in the listFile
         --showNext, continue to show stock info listed in the listFile(continue the last showing operation)
         --showDaily, this option combind with --show or --showNext. show stock_daily instead of stock_history 
+        --firstLooking, when first show, the specified date should visiable
         --silent, this option combind with --show or --showNext. no interactivition after showing stock
         --order, this option combind with --show or --showNext. set windows order for dailyWindow(the first stock's dilayWindow order is 1)
         --bg, this option combind with --show or --showNext. show stock at background. --bg will force to enable --silent option
@@ -202,6 +204,7 @@ do
     [[ $i == --packDailyData ]] && ((_cmdCode |=_cmdCodePackDailyData)) && continue
     [[ ${i%%=*} == --checkHitRate ]] && ((_cmdCode |=_cmdCodeCheckHitRate)) && continue
     [[ ${i%%=*} == --fixType ]] && ((_cmdCode |=_cmdCodeFixType)) && _fixType=${i##*=} && continue
+    [[ ${i%%=*} == --firstLooking ]] && ((_cmdCode |=_cmdCodeFirstLooking)) && _firstLooking=${i##*=} && continue
     [[ ${i%%=*} == --analize ]] && ((_cmdCode |=_cmdCodeAnalize)) && _anaProg=${i##*=} && continue
     [[ ${i%%=*} == --analizeOptions ]] && _anaOpt=${i#*=} && continue
     [[ ${i%%=*} == --classFile ]] && _classFile=${i##*=} && continue
@@ -220,7 +223,7 @@ trap "wait
 
 cp "$pwd/getStockData.sh" ./getStockData.$$.sh
 
-((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -1 $_classFile | sed 's/ .*//') || _firstCode='.'
+((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -n 1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
 
 if ((_cmdCode & _cmdCodeRestDatabase)) ; then
@@ -311,6 +314,7 @@ do
         ((_cmdCode & _cmdCodeSilent)) && _showCmd="$_showCmd --silent"
         ((_cmdCode & _cmdCodeOrder )) && _showCmd="$_showCmd --winOrder=$_winOrder"
         ((_cmdCode & _cmdCodeFixType )) && _showCmd="$_showCmd --fixType=$_fixType"
+        ((_cmdCode & _cmdCodeFirstLooking)) && _showCmd="$_showCmd --firstLooking=$_firstLooking"
         # following cmds must be put at the end of the cmds !!!
         _showCmd="$_showCmd $_code"
         if ((_cmdCode & _cmdCodeBG)) ; then 

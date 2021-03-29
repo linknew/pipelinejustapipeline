@@ -138,7 +138,7 @@ if ((_cmdCode & _cmdCodeHotData)); then
     trap "doExit 0" SIGUSR2 
 
     #start the task
-    _dataRcvdLast=$(tail -1 StockData/$_stockCode.html.org.hot 2>/dev/null)
+    _dataRcvdLast=$(tail -n 1 StockData/$_stockCode.html.org.hot 2>/dev/null)
     while (true)
     do
         # set a trap for this sub-shell
