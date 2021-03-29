@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source comm.lib
+source ~/tools/lib/comm.lib
 
 let _cmdCodeUpdate=$((1<<1))
 let _cmdCodeDownload=$((1<<2))
@@ -54,7 +54,7 @@ doPacking()
         _code=${_i##*/};  _code=${_code%%.*}
         _packFile=StockData/${_code:0:6}-.package.$_ext
 
-        if [[ $_ext == "data" ]] ; then 
+        if [[ $_ext == "data" ]] ; then
             sed -i '' /^$_code/d $_packFile 2>/dev/null
         elif [[ $_ext == "html.org" ]] ; then
             sed -i '' "/'${_code:1}/d" $_packFile 2>/dev/null
@@ -88,10 +88,10 @@ doUpdateBKAmpInfo()
 
     awk '
         BEGIN{
-            cmd = "./hotdegree.sh - --showBlockHotdegree | head -6 " ;
+            cmd = "hotdegree.sh - --showBlockHotdegree | head -6 " ;
         }
 
-        (!/#/){ 
+        (!/#/){
             if(!last){
                 last=$1;
                 cnt=$2;
@@ -101,9 +101,9 @@ doUpdateBKAmpInfo()
                 print "#",last ;
                 print cnt | cmd ;
                 close(cmd) ;
-                last=$1; 
+                last=$1;
                 cnt=$2;
-            } 
+            }
         }
 
         END{
@@ -163,7 +163,7 @@ showHelp()
         --monit, group of --show --showDaily --silent --order --bg
         --show, show stock info listed in the listFile
         --showNext, continue to show stock info listed in the listFile(continue the last showing operation)
-        --showDaily, this option combind with --show or --showNext. show stock_daily instead of stock_history 
+        --showDaily, this option combind with --show or --showNext. show stock_daily instead of stock_history
         --firstLooking, when first show, the specified date should visiable
         --silent, this option combind with --show or --showNext. no interactivition after showing stock
         --order, this option combind with --show or --showNext. set windows order for dailyWindow(the first stock's dilayWindow order is 1)
@@ -176,13 +176,12 @@ showHelp()
         --packDailyData, package daily data.
         --genRelationshipData, generate relationship data.
         --doDailyHomework.  use --update to refresh stock data, find stocks in UP state, find out the possible stock which RSI-6 & PWRI-12 <= 15.
-        --justDoIt. monitor stocks which RSI-6 & PWRI-12 <=15, monitor stocks which in UP state. 
+        --justDoIt. monitor stocks which RSI-6 & PWRI-12 <=15, monitor stocks which in UP state.
 
     Default: --show --classFile=stock.list.class.tmp
 \n"
 }
 
-pwd=$(dirname $0)
 
 for i in "$@"
 do
@@ -221,13 +220,13 @@ trap "wait
       killHotDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
-cp "$pwd/getStockData.sh" ./getStockData.$$.sh
+cp "~/tools/bin/getStockData.sh" ./getStockData.$$.sh
 
 ((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -n 1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
 
 if ((_cmdCode & _cmdCodeRestDatabase)) ; then
-    ./resetStockDatabase.sh ${_list:+--stockList=$_list} 
+    resetStockDatabase.sh ${_list:+--stockList=$_list}
     doExit 0
 fi
 
@@ -261,13 +260,13 @@ if [[ $((_cmdCode & (_cmdCodePrint | _cmdCodePrintLastOne) )) -eq 0 && -n $_outp
     doExit 0
 fi
 
-if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then 
+if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
     rm -rf stock.list.{11DaysUp,bestBuy} 2>/dev/null
 fi
 
 if ((_cmdCode & _cmdCodeJustDoit)) ; then
     ((_cmdCode|=(_cmdCodeHotData|_cmdCodePrintLastOne|_cmdCodeAnalize) ))
-    _anaProg=./analizeBestBuy.sh
+    _anaProg=analizeBestBuy.sh
     _pipe4Ana=.out.$$.ana
 fi
 
@@ -307,7 +306,7 @@ do
     ((_cmdCode & (_cmdCodeDownload|_cmdCodeUpdate|_cmdCodeHotData) )) && ./getStockData.$$.sh $_opt $_code >&2
 
     # show stock
-    if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then       
+    if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then
         let _winOrder+=1
         _showCmd="showStock.sh > $_pipe4Ana --classFile=$_classFile"
         ((_cmdCode & _cmdCodeShowDaily)) && _showCmd="$_showCmd --showDaily"
@@ -317,15 +316,15 @@ do
         ((_cmdCode & _cmdCodeFirstLooking)) && _showCmd="$_showCmd --firstLooking=$_firstLooking"
         # following cmds must be put at the end of the cmds !!!
         _showCmd="$_showCmd $_code"
-        if ((_cmdCode & _cmdCodeBG)) ; then 
+        if ((_cmdCode & _cmdCodeBG)) ; then
             $_showCmd &
-        else 
+        else
             $_showCmd
         fi
     fi
 
     # print stock info
-    if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then       
+    if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then
         _tmpName=""
         [[ -n $_output ]] && _tmpName=${_output/'{}'/${_code:1}}
         ((_cmdCode & _cmdCodePrint)) && "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
@@ -342,7 +341,7 @@ do
         [[ -f .$_code.st ]] && _anaOpt+=" --searchingTab=.$_code.st" || _anaOpt+=" --printSearchingTab=.$_code.st"
         [[ -f .$_code.ct ]] && _anaOpt+=" --coefficientTab=.$_code.ct --checkHitRate" || _anaOpt+=" --printCoefficientTab=.$_code.ct"
 
-        "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code | ./bestBugTraning.sh $_anaOpt 
+        "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code | bestBugTraning.sh $_anaOpt
     fi
 
     # package daily data
@@ -354,7 +353,7 @@ do
     if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
         ./getStockData.$$.sh --update --dateEnd=$_dateEnd $_code
         showHi "*[$_code]update data to $_stockDataPackage\n" >&2
-        sed -i "/^${_code}/d"  $_stockDataPackage 2>/dev/null
+        sed -i "" "/^${_code}/d"  $_stockDataPackage 2>/dev/null
         "showStock.sh" --print $_code >> $_stockDataPackage
     fi
 
@@ -365,7 +364,7 @@ do
     killHotDataTask
     showMsg "*[$_code] DONE\n" >&2
 
-done 
+done
 
 #postpare
 if ((_cmdCode & (_cmdCodeDoDailyHomework|_cmdCodePackDailyData) )) ; then
@@ -380,12 +379,12 @@ if ((_cmdCode & _cmdCodeGenRelationshipData)) ; then
    #cp 2016_01_01_ampLE-9.6_countGE5.info{,.bak}    2>/dev/null
     cp ampGE9.6_countGE5.info{,.bak}    2>/dev/null
     cp ampLE-9.6_countGE5.info{,.bak}   2>/dev/null
-   #./_genRelationShip.sh --genAmpInfo --ampLimit=4 --countLimit=80 --save
-   #./_genRelationShip.sh --genAmpInfo --ampLimit=-4 --countLimit=80 --save
-   #./_genRelationShip.sh --genAmpInfo --ampLimit=9.6 --countLimit=5 --start=2016-01-01 --save=2016_01_01_ampGE9.6_countGE5.info
-   #./_genRelationShip.sh --genAmpInfo --ampLimit=-9.6 --countLimit=5 --start=2016-01-01 --save=2016_01_01_ampLE-9.6_countGE5.info
-    ./_genRelationShip.sh --genAmpInfo --ampLimit=9.6 --countLimit=5 --save
-    ./_genRelationShip.sh --genAmpInfo --ampLimit=-9.6 --countLimit=5 --save
+   #_genRelationShip.sh --genAmpInfo --ampLimit=4 --countLimit=80 --save
+   #_genRelationShip.sh --genAmpInfo --ampLimit=-4 --countLimit=80 --save
+   #_genRelationShip.sh --genAmpInfo --ampLimit=9.6 --countLimit=5 --start=2016-01-01 --save=2016_01_01_ampGE9.6_countGE5.info
+   #_genRelationShip.sh --genAmpInfo --ampLimit=-9.6 --countLimit=5 --start=2016-01-01 --save=2016_01_01_ampLE-9.6_countGE5.info
+    _genRelationShip.sh --genAmpInfo --ampLimit=9.6 --countLimit=5 --save
+    _genRelationShip.sh --genAmpInfo --ampLimit=-9.6 --countLimit=5 --save
 
     #update .BKAmpGE.info and .BKAmpLE.info
     showHi "*update .BKAmpGE.info from ampGE9.6_countGE5.info\n" >&2

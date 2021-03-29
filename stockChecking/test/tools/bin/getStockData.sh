@@ -114,7 +114,7 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2
         echo "$_dataRcvd" >> StockData/$_stockCode.html.org 2>/dev/null
         echo "*[$_stockCode]packing StockData/$_stockCode.html.org to StockData/${_stockCode:0:6}-.package.html.org" >&2
-        sed -i "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
+        sed -i '' "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
         cat StockData/$_stockCode.html.org >> StockData/${_stockCode:0:6}-.package.html.org
     fi
 fi
