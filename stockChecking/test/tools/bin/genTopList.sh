@@ -17,15 +17,15 @@ shiftDef=0
 toplist=.t.toplist.$(date "+%Y-%m-%d").shift$shiftDef
 
 
-#1. find out stock which age great than 3-year
-echo "generate stock_ist which great than 3_year ..."
-cp $agedOrg{,.bak} 2>/dev/null
-./_generateStockList2.sh  --age=1320 --days=792 --match=1 --checkingConditions='1' $stockList |tee $agedOrg
-echo "save the result to $agedOrg"
+#1. find out stock which age great than 5-year
+echo "*generate stock_ist which age great than 5" >&2
+cp $agedOrg{,.bak}
+_generateStockList2.sh  --age=1320 --days=792 --match=1 --checkingConditions='1' $stockList |tee $agedOrg
+echo "*save the result to $agedOrg" >&2
 
 #1.1. sort $aged according stockType(first 4 digital, such as 1300)
-echo "sortting by liveValue, the first 1/3 will be alive"
-cp $aged{,.bak} 2>/dev/null
+echo "*sortting by liveValue, the first 1/3 will be alive" >&2
+cp $aged{,.bak}
 awk '
     {
         code=$1 ;
@@ -59,20 +59,20 @@ awk '
     }
     ' |
 tee $aged
-echo "save the result to $aged"
+echo "*save the result to $aged" >&2
     
 #exit
 
-#2. find out the first 1/3 highAMP stocks
-echo "genertae stock_list, use the first 1/3 highAMPs ..."
-cp $ampped{,.bak} 2>/dev/null
-./analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --seed='$4' --ge=2 --le=100 --gap=0.3 $aged |
+#2. get rid of 2/3 lower AMPs
+echo "*genertae stock list, get rid of 2/3 lower AMPs ..." >&2
+cp $ampped{,.bak}
+analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --seed='$4' --ge=2 --le=100 --gap=0.3 $aged |
 awk '
     !/#/{
         print $2,$1,$3
     }
     ' |
-sort -n | nl | tail -r |
+sort -n | nl | tac |
 awk '
     (NR == 1){
         totalRec = $1 ;
@@ -82,18 +82,18 @@ awk '
     }
     ' |
 tee $ampped
-echo "save the result to $ampped"
+echo "*save the result to $ampped" >&2
 
-#3.1. find out the first 1/3 higExchange stocks
-echo "generate stock_list, use the first 1/3 highExchanges..."
-cp $xchged{,.bak} 2>/dev/null
-./analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --seed='$14' --ge=1.2 --le=100  --gap=0.3 $aged |
+#3.1. get rid of 2/3 lower EXGs
+echo "*generate stock_list, get rid of lower 2/3 Exchanges..." >&2
+cp $xchged{,.bak}
+analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --seed='$14' --ge=1.2 --le=100  --gap=0.3 $aged |
 awk '
     !/#/{
         print $2,$1,$3
     }
     ' |
-sort -n | nl | tail -r |
+sort -n | nl | tac |
 awk '
     (NR == 1){
         totalRec = $1 ;
@@ -103,18 +103,18 @@ awk '
     }
     ' |
 tee $xchged
-echo "save the result to $xchged"
+echo "*save the result to $xchged" >&2
 
-#3.2. find out the first 1/3 highZhenFu!! stocks
-echo "generate stock_list, use the first 1/3 highZhenFu!!..."
-cp $zhenfu{,.bak} 2>/dev/null
-./analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --ge=4 --le=100 --gap=0.3 $aged | 
+#3.2. get rid of 2/3 lower ZhenFus
+echo "*generate stock_list, get rid of 2/3 lower ZhenFus..." >&2
+cp $zhenfu{,.bak}
+analizeAmpStatus.sh --days=$daysDef --shift=$shiftDef --ge=4 --le=100 --gap=0.3 $aged | 
 awk '
     !/#/{
         print $2,$1,$3
     }
     ' |
-sort -n | nl | tail -r |
+sort -n | nl | tac |
 awk '
     (NR == 1){
         totalRec = $1 ;
@@ -124,7 +124,7 @@ awk '
     }
     ' |
 tee $zhenfu
-echo "save the result to $zhenfu"
+echo "*save the result to $zhenfu" >&2
 
 
 #4. generate top list by xchged*ampped*zhenfu
@@ -152,7 +152,7 @@ awk '
     '   | 
 awk '{ print $5,$2"(amp)",$3"(xchg)",$4"(zhenfu)","in 792 samples"; }' |
 tee $toplist
-echo "save the result to $toplist"
+echo "*save the result to $toplist" >&2
 
 exit
 

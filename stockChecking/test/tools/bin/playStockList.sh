@@ -55,9 +55,9 @@ doPacking()
         _packFile=StockData/${_code:0:6}-.package.$_ext
 
         if [[ $_ext == "data" ]] ; then
-            sed -i '' /^$_code/d $_packFile 2>/dev/null
+            sed -i'' /^$_code/d $_packFile 2>/dev/null
         elif [[ $_ext == "html.org" ]] ; then
-            sed -i '' "/'${_code:1}/d" $_packFile 2>/dev/null
+            sed -i'' "/'${_code:1}/d" $_packFile 2>/dev/null
         else
             : do nothing
         fi
@@ -353,7 +353,7 @@ do
     if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
         ./getStockData.$$.sh --update --dateEnd=$_dateEnd $_code
         showHi "*[$_code]update data to $_stockDataPackage\n" >&2
-        sed -i "" "/^${_code}/d"  $_stockDataPackage 2>/dev/null
+        sed -i'' "/^${_code}/d"  $_stockDataPackage 2>/dev/null
         "showStock.sh" --print $_code >> $_stockDataPackage
     fi
 

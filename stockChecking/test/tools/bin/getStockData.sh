@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. comm.lib
+. ~/tools/lib/comm.lib
 
 #set -x 
 declare -ri _cmdCodeDownload=$((1<<0))
@@ -108,13 +108,13 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
             iconv -f GBK -t utf8 |
             sed -n '$d; 2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' | 
             awk '($4>0){print}' |
-            sed -n '1{x;n;};${G;p;q};G;x'   # tail -r is not supported in many scenarios, use sed to instead of
+            tac
         )
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2
         echo "$_dataRcvd" >> StockData/$_stockCode.html.org 2>/dev/null
         echo "*[$_stockCode]packing StockData/$_stockCode.html.org to StockData/${_stockCode:0:6}-.package.html.org" >&2
-        sed -i '' "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
+        sed -i'' "/'${_stockCode:1}/d" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null
         cat StockData/$_stockCode.html.org >> StockData/${_stockCode:0:6}-.package.html.org
     fi
 fi

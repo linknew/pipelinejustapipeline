@@ -1,7 +1,7 @@
 
 #! /bin/bash
 
-. comm.lib
+. ~/tools/lib/comm.lib
 
 doStart
 

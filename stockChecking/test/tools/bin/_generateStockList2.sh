@@ -1,6 +1,6 @@
 #! /bin/bash 
 
-. comm.lib
+. ~/tools/lib/comm.lib
 
 _age=264            # the stock must present more than one year
 _days=264          # checking in last 264 days
@@ -51,7 +51,7 @@ do
         For example:
             $0 --days=3 --match=3 --checkingConditions='\$2>=10.1 && \$4<=3.5 && \$14<3.2' stock.list.valid
 
-        " && exit 0 ; > /dev/tty
+        " && exit 0 ; >&2
 
     [[ ${i%%=*} == '--days' ]] && _days=${i##*=} && continue ;
     [[ ${i%%=*} == '--match' ]] && _match=${i##*=} && continue ;
@@ -63,7 +63,7 @@ do
     _list=$i
 done
 
-[[ $_days -lt 0 ]] && showErr "--days must be great than 0\n" >/dev/tty && exit
+[[ $_days -lt 0 ]] && showErr "!!--days must be great than 0\n" >&2 && exit
 
 if [[ -z $_checkingConditions ]] ; then
     _checkingConditions=1
@@ -89,7 +89,7 @@ checking In $_days Days
 should be matched more than $_match times
 checkingConditions:$_checkingConditions
 checkingLiveValue:${_checkingLiveValue:-"-"}
-\n" >/dev/tty
+\n" >&2
 
 while read x y z;
 do
@@ -102,7 +102,7 @@ do
 
     # get data for checking
     if [[ $_hotData -eq 1 ]] ; then 
-        checkingData=$(echo $x | ./playStockList.sh --hotData --print 2>/dev/null)
+        checkingData=$(echo $x | playStockList.sh --hotData --print 2>/dev/null)
     else
         checkingData=$(grep "^$x" StockData/${x:0:6}-.package.data 2>/dev/null)
     fi
@@ -111,7 +111,7 @@ do
     # do checking
     if [[ -n $_checkingLiveValue ]] ; then
         echo "$checkingData" | 
-        tail -$_days  |
+        tail -n $_days  |
         awk -v _code=$x '
             (NR==1){lv1=$17;} 
             END{
@@ -121,7 +121,8 @@ do
             }'
     else
         echo "$checkingData" |
-        tail -r -$_days  |
+        tail -n $_days  |
+        tac   |
         awk -v _code="$x"     \
             -v _awkCheckingTimes="$_match"  \
             '

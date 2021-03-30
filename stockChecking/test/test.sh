@@ -2,7 +2,7 @@
 
 # counting the result of each seed
 
-. comm.lib
+. ~/tools/lib/comm.lib
 
 doStart
 

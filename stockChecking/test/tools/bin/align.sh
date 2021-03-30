@@ -1,7 +1,6 @@
 #! /bin/bash
 
-pwd=$(dirname $0)
-. ${pwd%bin}/lib/comm.lib
+. ~/tools/lib/comm.lib
 
 doStart
 
