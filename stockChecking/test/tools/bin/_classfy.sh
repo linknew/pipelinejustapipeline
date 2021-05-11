@@ -54,7 +54,7 @@ awk -v _awkGap=$_gap            \
         # why 1000? because we want keep 3digital behind dot.
 
         _val = ('"$_seed"') ;
-        _idx = around((_val-_awkBase)*1000/_awkGap/1000)*_awkGap+_awkBase ;
+        _idx = around((_val-_awkBase)*1000/_awkGap/1000, 0)*_awkGap+_awkBase ;
         #print "-->",_val,_idx
         _arry[_idx] += ('"$_weight"') ;
         if(_awkVerbose) print _val," @ ",$0 ;

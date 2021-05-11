@@ -1,5 +1,15 @@
 #! /bin/bash
 
+
+echo | tac >/dev/null 2>&1 ; _tac=$?
+echo | tail -r >/dev/null 2>&1 ; _tail_r=$?
+if [[ $_tail_r -eq 0 ]] ; then
+    alias   tac='tail -r'
+elif [[ $_tac -ne 0 ]] ; then
+    alias   tac='sed -n '\''{G;h;};${x;s/\n$//;p;q}'\'
+fi
+
+
 ####格式: echo -e "\033[字背景颜色;字体颜色m字符串\033[0m"
 ####
 ####例如:
@@ -370,7 +380,7 @@ function doStart()
 #    BKD=$(pwd)          #back directory
 #    cd $WKD
 
-    [[ -z $1 ]] && echo -ne "\n*executing $0($$)\n" >&2
+    #[[ -z $1 ]] && echo -ne "\n*executing $0($$)\n\n" >&2
     [[ -n $2 ]] && bash <<< "$2"
 }
 #============================================================================
@@ -381,10 +391,10 @@ function doExit()
 #$3, post information
 {
     bash <<< "$2"
-    [[ $1 -eq 0 ]] && echo -ne "\n*complete  $0($$)\n" >&2 || echo -ne "\n*break     executing $0($$)\n" >&2
-    [[ $3 ]] && echo "$3" >&2
+    #[[ $1 -eq 0 ]] && echo -ne "\n*complete  $0($$)\n\n" >&2 || echo -ne "\n*break     executing $0($$)\n" >&2
+    [[ -n $3 ]] && echo "$3" >&2
 #    [[ -n $BKD ]] && cd "$BKD"
-    exit $1 ;
+    exit ${1:-0} ;
 }
 #============================================================================
 #
@@ -425,48 +435,42 @@ awkCommDigDef=$(cat - <<-'EOF'
     INVALID_NUM = "tHiSiSiNvAlIdNuM" ;
 EOF
 )
+#
+
 #============================================================================
 #
-#function for awk script
 awkFunction_asortSet=$(cat - <<-AWK_FUNCTION_ASORTSET_EOF
-function _asort(    \
+#
+# !! _asortMult is a interal function for asort and asortMult, do NOT invoke it outside
+#
+function _asortMult(    \
     src,            # array for sorting. this parameter must be presented
                     # this array must be 1 dimension arry. multiple field will be handeled in this function internel.
     dest,           # array for saving result. this parameter must be presented
-    numeric,        # this parameter is optional, default is false(sorting by literal)
-    revert,         # this parameter is optional, default is false(sorting from SMALL to BIG)
-    keyFields,      # the key fields for sorting, is an digital number less then 100 or 2 dimensions arry, each item has 3 values: "prio", "numeric", "revert"
-                    # keyFields[N,"prio"] is the sorting priorty and keyFields[0,"prio"] is the highest
+    keyFields,      # 2_dimension arry, the key fields for sorting, each item has 3 values: "seg", "numeric", "revert"
+                    # keyFields[N,"seg"] is the segment number for sorting and keyFields[0,"seg"] is the highest priority
+                    # segment number 1 means sorting by segment_1 and 0 means sorting by whole item(line).
                     # keyFields[N,"numeric"] indicat that sorting with numeric or non_numeric, its value will override the option numric.
                     # keyFields[N,"revert"] indicat that sorting with revertion or non_revertion, its value will override the option revert.
-                    # this parameter is optional, default is keyFields[0,"prio"]=1, keyFields[0,"numeric"]=option_numeric, keyFields[0,"revert"]=option_revert
-    start,          # this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
+    fieldNum,       # the filed number for sorting
+#
+    start,          # int, this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
                     # only do sort on the part(star~end) the first position is indexed by 0. this parameter is optional, default is 0.
-    end,            # this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
+    end,            # int, this option have effecient ONLY when src is a C_LIKE array(numeric subscript and the first index is 0)
                     # only do sort on the part(star~end) the first position is indexed by 0. this parameter is optional, default is 0.
                     #
                     # above are paramters, below are local various
-                    #
-    i,j,k,l,_keyField,_cnt,_seed,_cmpr,_tmp,_idxs,_dest)
+#
+    i,j,k,l,_keyField,_cnt,_seed,_cmpr,_tmp,_numeric,_revert,_idxs,_dest)
 {
-#
-    if(length(dest)==0){
-        print "_asort funtion need at least 2 parameters: src and dest" > "/dev/stderr" ;
-        return -1 ;
-    }
-#
     _cnt = 0 ;
-    if(!numeric) numeric = 0 ;
-    if(!revert) revert = 0 ;
-    if(length(keyFields)==0){
-        keyFields[0,"prio"]=1 ;
-        keyFields[0,"numeric"]=numeric ;
-        keyFields[0,"revert"]=revert ;
-    }
 #
     if(length(start) || length(end)){
         #src subscript must be numeric
-        for(i=0; i<length(src); i++) _idxs[_cnt++] = i ;
+        for(i in src){
+            _idxs[i] = i ;
+            _cnt++ ;
+        }
     }else{
         for(i in src) _idxs[_cnt++] = i ;
     }
@@ -477,10 +481,10 @@ function _asort(    \
     #so, we will sort with the lowest priority, then the higher.
     #be care for, keyFields is a 2 dimensions arry, each item has 3 values, so its length is 3*N
 #
-    for(l=length(keyFields)/3-1; l>=0; l--){
-        _keyField = keyFields[l,"prio"]+0 ;
-        numeric = keyFields[l,"numeric"] ;
-        revert = keyFields[l,"revert"] ;
+    for(l=fieldNum-1; l>=0; l--){
+        _keyField = keyFields[l,"seg"]+0 ;
+        _numeric = keyFields[l,"numeric"] ;
+        _revert = keyFields[l,"revert"] ;
 #
         #insert sortting is ok
         for(i=start+1; i<= end; i++){
@@ -489,7 +493,7 @@ function _asort(    \
                 split(_seed, _fileds) ;
                 _seed = _fileds[_keyField] ;
             }
-            _seed = numeric ? _seed+0 : _seed"" ;
+            _seed = _numeric ? _seed+0 : _seed"" ;
 #
             for(j=start; j<i; j++){
                 _cmpr = src[_idxs[j]] ;
@@ -497,9 +501,9 @@ function _asort(    \
                     split(_cmpr, _fileds) ;
                     _cmpr = _fileds[_keyField] ;
                 }
-                _cmpr = numeric ? _cmpr+0 : _cmpr"" ;
+                _cmpr = _numeric ? _cmpr+0 : _cmpr"" ;
 #
-                if( (revert && _seed > _cmpr) || (!revert && _seed < _cmpr) ){
+                if( (_revert && _seed > _cmpr) || (!_revert && _seed < _cmpr) ){
                     _tmp = _idxs[i] ;
                     for(k=i; k>j; k--){
                         _idxs[k] = _idxs[k-1] ;
@@ -523,23 +527,22 @@ function _asort(    \
 }
 #
 function asort(         \
-    src,
-    dest,
-    numeric,
-    revert,
-    keyField,
-    start,
-    end,
+    src,                # array
+    dest,               # array
+#
+    numeric,            # bool
+    revert,             # bool
+    keyField,           # int
+    start,              # int
+    end,                # int
 #
     _keyFields)
 {
-    if(length(keyField)){
-        _keyFields[0,"prio"]=keyField ;
-        _keyFields[0,"numeric"]=numeric ;
-        _keyFields[0,"revert"]=revert ;
-    }
+    _keyFields[0,"seg"]=keyField ;
+    _keyFields[0,"numeric"]=numeric ;
+    _keyFields[0,"revert"]=revert ;
 #
-    _asort(src,dest,numeric,revert,_keyFields,start,end) ;
+    _asortMult(src,dest,_keyFields,1,start,end) ;
 #
     return 0 ;
 }
@@ -547,13 +550,12 @@ function asort(         \
 function asortMult(     \
     src,
     dest,
-    numeric,
-    revert,
     keyFields,
+    fieldNum,
     start,
     end)
 {
-    return _asort(src,dest,numeric,revert,keyFields,start,end) ;
+    return _asortMult(src,dest,keyFields,fieldNum,start,end) ;
 }
 #
 AWK_FUNCTION_ASORTSET_EOF
@@ -570,7 +572,7 @@ function around(        \
     CONVFMT  = "%." precision "f" ;
     seed     = seed"" ;
     CONVFMT  = _convfmt ;
-
+#
     return seed+0 ;
 }
 AWK_FUNCTION_AROUND_EOF
@@ -821,6 +823,87 @@ function split2( \
     return len ;
 }
 AWK_FUNCTION_SPLIT2_EOF
+)
+#============================================================================
+#
+#
+#
+awkFunction_truncateIntoLines=$(cat - <<-AWK_FUNCTION_TRUNCATEINTOLINES_EOF
+function _truncateIntoLines(\
+    str,
+    outlines,
+    offsetOfOutlines,
+    widthLimit,
+    linesLimit,             #0, no limitation
+                            \
+    pos, tmpStr, lineNum)
+{
+    if(widthLimit < 1) return -1 ;
+
+    lineNum = 0 ;
+
+    while(length(str) > widthLimit+0){
+
+        if(linesLimit>0 && lineNum+1 >= linesLimit) break ;
+
+        tmpStr = substr(str, 1, widthLimit+1) ;
+        pos = match(tmpStr, /( |\t)[^ \t]*$/) ;
+
+        if(pos > 0){
+            outlines[lineNum+1+offsetOfOutlines] = substr(str,1,pos-1) ;
+            str = substr(str,pos+1) ;
+
+        }else{
+            pos = match(str, / |\t/) ;
+            if(pos > 0){
+                outlines[lineNum+1+offsetOfOutlines] = substr(str,1,pos-1) ;
+                str = substr(str,pos+1) ;
+            }else{
+                outlines[lineNum+1+offsetOfOutlines] = str ;
+                str = "" ;
+            }
+        }
+
+        ++ lineNum ;
+    }
+
+    if(str) outlines[(++lineNum)+offsetOfOutlines] = str ;
+    return lineNum ;
+}
+#
+#
+function truncateIntoLines( \
+    str,
+    outlines,
+    newlinePrefix,
+    widthLimit,
+                            \
+    linesLimit,             # optional parameter, 0 is omitted. 0 means no limitation
+                            \
+    i, offset, lineNum)
+{
+    if(linesLimit+0 == 1){
+        outlines[1] = str ;
+        return 1 ;
+    }
+
+    offset = 0 ;
+    delete outlines[1] ;
+    delete outlines[2] ;
+    if( (lineNum = _truncateIntoLines(str, outlines, offset, widthLimit, 2)) < 2 ) return lineNum ;
+
+    offset = 1 ;
+    str = outlines[2] ;
+    widthLimit -= length(newlinePrefix) ;
+    lineNum = _truncateIntoLines(str, outlines, offset, widthLimit, (linesLimit+0 != 0) ? linesLimit-1 : 0) ;
+
+    for(i=1; i<=lineNum; i++){
+        outlines[i+offset] = newlinePrefix outlines[i+offset] ;
+    }
+
+    return lineNum+1;
+}
+AWK_FUNCTION_TRUNCATEINTOLINES_EOF
 )
 #============================================================================
 #

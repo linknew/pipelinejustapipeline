@@ -1,10 +1,5 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
-
-doStart
-
-optExit=""
 leftAlignDef=1
 rightAlignDef=0
 widthLimitDef=1000
@@ -47,7 +42,7 @@ function Help
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help && doExit 0 "$optExit"
+    [[ ${i} == "--help" ]] && Help && exit 0
     [[ ${i%%=*} == "--gaps" ]] && gaps=${i#*=} && continue ;
     [[ ${i} == "--gapsOnly" ]] && gapsOnly=1 && continue ;
     [[ ${i} == "--leftAlign" ]] && leftAlign=1 && continue ;
@@ -55,8 +50,8 @@ do
     [[ ${i%%=*} == "--widthLimit" ]] && widthLimit=${i#*=} && continue ;
     [[ ${i:0:1} == "/" ]]  && regex=$i && continue ;
     [[ ${i:0:2} == "!/" ]] && regex=${i:1} && ignore=1 && continue ;
-    [[ ${i:0:1} == "-" ]]  && echo "*! Unknown option:$i">&2 && doExit -1 "$optExit"
-    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$optExit"
+    [[ ${i:0:1} == "-" ]]  && echo "*! Unknown option:$i">&2 && exit -1
+    [[ -n $list ]] && echo "*! Multipule list specified">&2 && exit -1
     textFile=$i
 done
 
@@ -144,6 +139,6 @@ awk -v gaps="$gaps"             \
 
     }
 
-    '  
+    '   | sed -E 's/\s+$//'
 
-doExit 0 "$optExit"
+exit 0

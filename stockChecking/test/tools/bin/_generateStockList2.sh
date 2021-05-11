@@ -2,6 +2,8 @@
 
 . ~/tools/lib/comm.lib
 
+doStart
+
 _age=264            # the stock must present more than one year
 _days=264          # checking in last 264 days
 _match=1            # at least match 1 times
@@ -18,10 +20,6 @@ rsi24='$8'
 pwr6='$9'
 pwr12='$10'
 pwr24='$11'
-
-
-
-
 
 #set -- $1
 for i in "$@"
@@ -51,7 +49,7 @@ do
         For example:
             $0 --days=3 --match=3 --checkingConditions='\$2>=10.1 && \$4<=3.5 && \$14<3.2' stock.list.valid
 
-        " && exit 0 ; >&2
+        " && doExit 0 >&2
 
     [[ ${i%%=*} == '--days' ]] && _days=${i##*=} && continue ;
     [[ ${i%%=*} == '--match' ]] && _match=${i##*=} && continue ;
@@ -59,11 +57,11 @@ do
     [[ $i == '--hotData' ]] && _hotData=1 && continue ;
     [[ $i == '--checkingLiveValue' ]] && _checkingLiveValue=1 && continue ;
     [[ ${i%%=*} == '--checkingConditions' ]] && _checkingConditions=${i#*=} && continue ;
-    [[ ${i:0:1} == '-' ]] && showErr "unknown option $i\n" && exit 1 ;
+    [[ ${i:0:1} == '-' ]] && showErr "unknown option $i\n" && doExit 1 ;
     _list=$i
 done
 
-[[ $_days -lt 0 ]] && showErr "!!--days must be great than 0\n" >&2 && exit
+[[ $_days -lt 0 ]] && showErr "!!--days must be great than 0\n" >&2 && doExit
 
 if [[ -z $_checkingConditions ]] ; then
     _checkingConditions=1
@@ -91,10 +89,10 @@ checkingConditions:$_checkingConditions
 checkingLiveValue:${_checkingLiveValue:-"-"}
 \n" >&2
 
+#set -x
 while read x y z;
 do
     # convert 6digital id to 7digital id
-    [[ ${x:0:1} == '#' ]] && continue
     if [[ ${#x} -eq 6 ]] ; then
         [[ ${x:0:1} == 6 ]] && x=0$x || x=1$x  
     fi
@@ -102,9 +100,9 @@ do
 
     # get data for checking
     if [[ $_hotData -eq 1 ]] ; then 
-        checkingData=$(echo $x | playStockList.sh --hotData --print 2>/dev/null)
+        checkingData=$(echo $x | playStockList.sh --hotData --print)
     else
-        checkingData=$(grep "^$x" StockData/${x:0:6}-.package.data 2>/dev/null)
+        checkingData=$(cat StockData/${x:1}.data || grep "^$i" StockData/${x:0:6}-.package.data)
     fi
     [[ $(echo "$checkingData" | wc -l | awk '{print $1}') -lt $_age ]] && continue ;
 
@@ -122,7 +120,7 @@ do
     else
         echo "$checkingData" |
         tail -n $_days  |
-        tac   |
+        tac |
         awk -v _code="$x"     \
             -v _awkCheckingTimes="$_match"  \
             '
@@ -134,5 +132,7 @@ do
                 }
             }'
     fi
-done <<< "$(awk '{print $1}' $_list)"
+done <<< "$(awk '($1 !~ /^#/){print $1}' $_list)"
+#set +x
+doExit 0
 

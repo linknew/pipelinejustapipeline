@@ -1,5 +1,10 @@
 #! /bin/bash
 
+
+. ~/tools/lib/comm.lib
+
+doStart
+
 stockList=stock.list.valid
 #aged=stock.list.ageGE3Year
 #ampped=stock.list.ageGE3Year.ampGE2.0with22.36Percent
@@ -10,58 +15,58 @@ aged=.t.aged
 ampped=.t.ampped
 xchged=.t.xchged
 zhenfu=.t.zhenfu
-daysDef=-792
+#daysDef=-792
 #shiftDef=-132
 shiftDef=0
-#daysDef=-132
-toplist=.t.toplist.$(date "+%Y-%m-%d").shift$shiftDef
+daysDef=-132
+toplist=.t.toplist.$(date "+%Y-%m-%d").days$daysDef.shift$shiftDef
 
 
-#1. find out stock which age great than 5-year
-echo "*generate stock_ist which age great than 5" >&2
-cp $agedOrg{,.bak}
-_generateStockList2.sh  --age=1320 --days=792 --match=1 --checkingConditions='1' $stockList |tee $agedOrg
-echo "*save the result to $agedOrg" >&2
-
-#1.1. sort $aged according stockType(first 4 digital, such as 1300)
-echo "*sortting by liveValue, the first 1/3 will be alive" >&2
-cp $aged{,.bak}
-awk '
-    {
-        code=$1 ;
-        class=substr($1,1,4) ;
-        cnt[class]++ ;
-        lval=substr($NF,6) ;
-        dim[class,cnt[class]]=lval" "code ;
-    }
-    END{
-        sortCmd="sort -rn" ;
-
-        for(i in cnt){
-            print "#class="i,"cnt="cnt[i] ;
-
-            for(j=1; j<=cnt[i]; j++){
-                print dim[i,j] | sortCmd ;
-            }
-            close(sortCmd);
-        }
-    }
-    ' $agedOrg |
-awk '
-    {
-        if($0~"#"){
-            cnt = substr($2,5) ;
-            idx = 0 ;
-        }else{
-            if(idx < cnt/3) print $2,"lval="$1 ;
-            idx++ ;
-        }
-    }
-    ' |
-tee $aged
-echo "*save the result to $aged" >&2
-    
-#exit
+##1. find out stock which age great than 5-year
+#echo "*generate stock_list which age great than 5" >&2
+#cp $agedOrg{,.bak}
+#_generateStockList2.sh  --age=1320 --days=792 --match=1 --checkingConditions='1' $stockList > $agedOrg
+#echo "*save the result to $agedOrg" >&2
+#
+##1.1. sort $aged according stockType(first 4 digital, such as 1300)
+#echo "*sortting by liveValue, the first 1/3 will be alive" >&2
+#cp $aged{,.bak}
+#awk '
+#    {
+#        code=$1 ;
+#        class=substr($1,1,4) ;
+#        cnt[class]++ ;
+#        lval=substr($NF,6) ;
+#        dim[class,cnt[class]]=lval" "code ;
+#    }
+#    END{
+#        sortCmd="sort -rn" ;
+#
+#        for(i in cnt){
+#            print "#class="i,"cnt="cnt[i] ;
+#
+#            for(j=1; j<=cnt[i]; j++){
+#                print dim[i,j] | sortCmd ;
+#            }
+#            close(sortCmd);
+#        }
+#    }
+#    ' $agedOrg |
+#awk '
+#    {
+#        if($0~"#"){
+#            cnt = substr($2,5) ;
+#            idx = 0 ;
+#        }else{
+#            if(idx < cnt/3) print $2,"lval="$1 ;
+#            idx++ ;
+#        }
+#    }
+#    ' |
+#tee $aged
+#echo "*save the result to $aged" >&2
+#    
+##doExit
 
 #2. get rid of 2/3 lower AMPs
 echo "*genertae stock list, get rid of 2/3 lower AMPs ..." >&2
@@ -80,8 +85,7 @@ awk '
     (NR < totalRec/3){
         print $3,$2,$4
     }
-    ' |
-tee $ampped
+    ' > $ampped
 echo "*save the result to $ampped" >&2
 
 #3.1. get rid of 2/3 lower EXGs
@@ -101,8 +105,7 @@ awk '
     (NR < totalRec/3){
         print $3,$2,$4
     }
-    ' |
-tee $xchged
+    ' > $xchged
 echo "*save the result to $xchged" >&2
 
 #3.2. get rid of 2/3 lower ZhenFus
@@ -122,8 +125,7 @@ awk '
     (NR < totalRec/3){
         print $3,$2,$4
     }
-    ' |
-tee $zhenfu
+    ' > $zhenfu
 echo "*save the result to $zhenfu" >&2
 
 
@@ -150,11 +152,10 @@ awk '
         }
     }
     '   | 
-awk '{ print $5,$2"(amp)",$3"(xchg)",$4"(zhenfu)","in 792 samples"; }' |
-tee $toplist
+awk '{ print $5,$2"(amp)",$3"(xchg)",$4"(zhenfu)","in 792 samples"; }' > $toplist
 echo "*save the result to $toplist" >&2
 
-exit
+doExit
 
 
 

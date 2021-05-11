@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. comm.lib
+. ~/tools/lib/comm.lib
 
 # the data of input must be .hot data
 function programForgettingAvgTTandVolUpVolDnValUpValDn()
@@ -15,7 +15,7 @@ function programForgettingAvgTTandVolUpVolDnValUpValDn()
                 lastTimeStamp=$17 ;
             } 
         }' |
-    ./_getDelta.sh --segments=12,13 --keepRaw |       #get value and volume for each 15 second
+    _getDelta.sh --segments=12,13 --keepRaw |       #get value and volume for each 15 second
     awk -v awkStockId=$stockId '
         BEGIN{
 #            max_volUpDivVolDn = 0 ;
@@ -227,10 +227,10 @@ if [[ $1 == 3 ]] ; then
     grep $stockId stock.list >&2
 
     #_start=$(getActualDate ${_start:-1970-01-01})
-    _gap=$(cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -1) | awk 'END{print int($4/3)/100}')
-    cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -$daysFunc3) StockData/*$stockId.html.org.hot  |
+    _gap=$(cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -n1) | awk 'END{print int($4/3)/100}')
+    cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -n$daysFunc3) StockData/*$stockId.html.org.hot  |
     #cat StockData/*$stockId.html.org.hot  |
-    ./analizeAmpStatus.sh --seed='$4' --weight='$12' --gap=$_gap  --data --details  --top=40
+    analizeAmpStatus.sh --seed='$4' --weight='$12' --gap=$_gap  --data --details  --top=40
 
 elif [[ $1 == 1 ]] ; then
 # $1: function_id
@@ -250,22 +250,22 @@ elif [[ $1 == 1 ]] ; then
 
     # get the SMOOTHED history data from playStockList.sh
     # use last 10 years data
-    cont=$(./playStockList.sh --print <<< $stockId 2>/dev/null |
-            tail -2640 |
+    cont=$(playStockList.sh --print <<< $stockId 2>/dev/null |
+            tail -n2640 |
             awk '(NR>66 && $0!~/nan/){
                     gsub(/-/,"",$18);
                     print $4,($25-$26)*100/$27,$14,$2,  substr($18,3),  $25,$26,$16/$15,  $27,$24 ;
                 }')
 
     if [[ $printDataOnly != 0 ]] ; then
-        echo "$cont" | ./_getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw
+        echo "$cont" | _getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw
     else
         # draw lines: (1)amp, (2)amp_avg10Years, (3)ampHL, (4)ampHL_avg10Years, (5)exchange, (6)closePrice, (7)date
         count=$(echo "$cont" | wc -l | awk '{print $1}')
         lineNum=7
         echo "$cont" |
-            ./_getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw   |
-            ./drawLines $stockId - $lineNum $count --focus=5 --scale=1 --showlines=2,4,5,6
+            _getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw   |
+            drawLines $stockId - $lineNum $count --focus=5 --scale=1 --showlines=2,4,5,6
     fi
 
 elif [[ $1 == 2 ]] ; then
@@ -289,17 +289,17 @@ elif [[ $1 == 2 ]] ; then
 
     if [[ -f .dailyChecking.$stockId.$(date +%Y-%m-%d) ]] ; then
         content=$(cat .dailyChecking.$stockId.$(date +%Y-%m-%d) )
-        dateLastHis=$(echo "$content" | tail -1 | awk '{print $NF;}' )
+        dateLastHis=$(echo "$content" | tail -n1 | awk '{print $NF;}' )
     else
         rm .dailyChecking.$stockId.$(date +%Y)-* 2>/dev/null
 
         #get last N_day filenames of historyData and make include_argument for extracting
-        includeFiles=$(tar -tf .hotData.tar --include="*$stockId*hot*" | tail -$extractLastNdaysDailyData)
+        includeFiles=$(tar -tf .hotData.tar --include="*$stockId*hot*" | tail -n$extractLastNdaysDailyData)
         for i in $includeFiles; do includeArgs="$includeArgs --include=$i"; done
         tar -xf .HotData.tar $includeArgs -C tmp
         
         files=$(ls tmp/StockData/.HotData/*$stockId* | sort)
-        dateLastHis=$(echo "$files" | tail -1 | sed 's/.*\.//')
+        dateLastHis=$(echo "$files" | tail -n1 | sed 's/.*\.//')
 
         #extract data from history data
         content=$(
@@ -344,7 +344,7 @@ elif [[ $1 == 2 ]] ; then
     # (8)vol (9)val (10)volUp-volDn (11)valUp-valDn (12)stockId (13)date[MUST BE THE END]
     if [[ -n $content ]] ; then
         linesInfo=$(echo "$content" | awk 'END{print NF-8,NR;}')
-        echo "$content" | ./drawLines $stockId - $linesInfo --group=${linesInfo%% *} --focus=1 --scale=64
+        echo "$content" | drawLines $stockId - $linesInfo --group=${linesInfo%% *} --focus=1 --scale=64
     else
         showAlrt "no content!\n" >&2
     fi
@@ -364,16 +364,16 @@ elif [[ $1 == 4 ]] ; then
 
         # get the SMOOTHED history data from playStockList.sh
         # use last 10 years data
-        cont=$(./playStockList.sh --print <<< $stockId 2>/dev/null |
-                tail -2640 |
+        cont=$(playStockList.sh --print <<< $stockId 2>/dev/null |
+                tail -n2640 |
                 awk '(NR>66 && $0!~/nan/){
                         gsub(/-/,"",$18);
                         print $4,($25-$26)*100/$27,$14,$2,  substr($18,3),  $25,$26,$16/$15,  $27,$24 ;
                     }')
 
         echo "$cont" |
-            ./_getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw |
-            tail -400 |
+            _getAverage.sh --unitLen=2640 --segments=1,2 --keepRaw |
+            tail -n400 |
             awk -v stockId=$stockId '
                 {
                     if(NR==1) min=$2 ;
@@ -391,16 +391,16 @@ elif [[ $1 == 4 ]] ; then
 elif [[ $1 == 5 ]] ; then
 # $1: function_id
 # $2: stockId
-    # after executing ./dailyChecking.sh 2 $2 1, we get the data with format:
+    # after executing dailyChecking.sh 2 $2 1, we get the data with format:
     #   (1)open (2)cls (3)hig (4)low  (5)avgPri (6)avgAvgPri (7)ystdCls 
     #   (8)vol (9)val (10)volUp-volDn (11)valUp-valDn (12)stockId (13)date[MUST BE THE END]
-    content=$(./dailyChecking.sh 2 $2 1 1 | ./_getDelta.sh --segments=10,11 --doSum --keepRaw | awk '{print $1,$2,$3,$4,$5,$8,$11,$10;}')
+    content=$(dailyChecking.sh 2 $2 1 1 | _getDelta.sh --segments=10,11 --doSum --keepRaw | awk '{print $1,$2,$3,$4,$5,$8,$11,$10;}')
 
     #do drawing
     # (1)open (2)cls (3)hig (4)low  (5)avgPri (6)vol (7)volUp-VolDn (8)sumOfVolup-VolDn
     if [[ -n $content ]] ; then
         linesInfo=$(echo "$content" | awk 'END{print NF,NR;}')
-        echo "$content" | ./drawLines $2 - $linesInfo --scale=12 --group=5,3 --focus=6
+        echo "$content" | drawLines $2 - $linesInfo --scale=12 --group=5,3 --focus=6
     else
         showAlrt "no content!\n" >&2
     fi
@@ -418,20 +418,20 @@ elif [[ $1 == 6 ]] ; then
     if [[ ! -f $goodRef ]] ; then
         rm .dailyChecking.func6.orgGoodRef* 2>/dev/null
         rm .dailyChecking.func6.goodRef* 2>/dev/null
-        ./relationShipChecker.sh ampGE9.6_countGE5.info --rate=72 | tee $orgGoodRef
+        relationShipChecker.sh ampGE9.6_countGE5.info --rate=72 | tee $orgGoodRef
         cp $orgGoodRef $goodRef
-        sed -i '' '/^ /d;s/\*//;s/\[/ [/' $goodRef
+        sed -i'' '/^ /d;s/\*//;s/\[/ [/' $goodRef
     fi
 
     if [[ ! -f $badRef ]] ; then
         rm .dailyChecking.func6.orgBadRef* 2>/dev/null
         rm .dailyChecking.func6.badRef* 2>/dev/null
-        ./relationShipChecker.sh ampLE-9.6_countGE5.info --rate=52 | tee $orgBadRef
+        relationShipChecker.sh ampLE-9.6_countGE5.info --rate=52 | tee $orgBadRef
         cp $orgBadRef $badRef
-        sed -i '' '/^ /d;s/\*//;s/\[/ [/' $badRef
+        sed -i'' '/^ /d;s/\*//;s/\[/ [/' $badRef
     fi
 
-    ./hotdegree.sh --goodRef=$goodRef --badRef=$badRef ${2:-.hot}
+    hotdegree.sh --goodRef=$goodRef --badRef=$badRef ${2:-.hot}
 
 elif [[ $1 == 7 ]] ; then
 # $1: function_id
@@ -441,7 +441,7 @@ elif [[ $1 == 7 ]] ; then
     [[ ! -n $stockId ]] && showAlrt "no stockId specified\n" >&2 && exit
 
     # get forecastAmp
-    content=$( ./analizeAmpStatus.sh --top=100 --gap=0.2 --details --days=-132  2>/dev/null <<< $stockId )
+    content=$( analizeAmpStatus.sh --top=100 --gap=0.2 --details --days=-132  2>/dev/null <<< $stockId )
 
     echo "$content" 
     echo "--------------------------------"
@@ -489,7 +489,7 @@ elif [[ $1 == 7 ]] ; then
     # (7)rsi12, (8)rsi24, (9)pwri6, (10)pwri12, (11)pwri24, (12)rsiFuture6, (13)pwriFuture12
     # (14)exchange, (15)volume, (16)value, (17)liveValue, (18)date (19)rsiCustom (20)pwriCustom
     # (21)xcgAvgICustom (22) gEgrData (23) highestAmp (24)open (25)hig (26)low (27)ystdClose
-    ./playStockList.sh --printLastOne <<< $stockId 2>/dev/null | 
+    playStockList.sh --printLastOne <<< $stockId 2>/dev/null | 
     awk -v awkForecastAmp=$forecastAmp '
         {
             high  = $25 ;

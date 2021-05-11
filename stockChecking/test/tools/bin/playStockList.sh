@@ -220,7 +220,7 @@ trap "wait
       killHotDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
-cp "~/tools/bin/getStockData.sh" ./getStockData.$$.sh
+cp ~/tools/bin/getStockData.sh ./getStockData.$$.sh
 
 ((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -n 1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
@@ -292,7 +292,7 @@ do
     [[ ${_code:0:1} == '#' ]] && continue
 
     if [[ ${#_code} -eq 6 ]] ; then
-        [[ ${_code:0:1} == '6' ]] && _code="0$_code" || _code="1$_code"
+        [[ ${_code:0:1} == '6' || ${_code:0:1} == '9' ]] && _code="0$_code" || _code="1$_code"
     fi
     _hotFile=StockData/$_code.html.org.hot
     _hotFileBak=StockData/.HotData/$_code.html.org.hot.$(date "+%Y-%m-%d")

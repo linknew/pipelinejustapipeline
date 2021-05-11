@@ -359,22 +359,22 @@ while true; do
                     #resort buy and sel according remind_volume & price(from BIG to SMALL)
                     {
                         if(_cntBuy > 1){
-                            _sortFields[0,"prio"] =ARCHIVE ;
+                            _sortFields[0,"seg"] =ARCHIVE ;
                             _sortFields[0,"numeric"]=1;
                             _sortFields[0,"revert"]=1;
-                            _sortFields[1,"prio"]=PRICE;
+                            _sortFields[1,"seg"]=PRICE;
                             _sortFields[1,"numeric"]=1;
                             _sortFields[1,"revert"]=1;
-                            asortMult(buy,buy,1,1,_sortFields,_cntBuyPreprocess, _cntBuy-1) ;
+                            asortMult(buy,buy,_sortFields,2,_cntBuyPreprocess, _cntBuy-1) ;
                         }
                         if(_cntSel > 1){
-                            _sortFields[0,"prio"] =ARCHIVE ;
+                            _sortFields[0,"seg"] =ARCHIVE ;
                             _sortFields[0,"numeric"]=1;
                             _sortFields[0,"revert"]=1;
-                            _sortFields[1,"prio"]=PRICE;
+                            _sortFields[1,"seg"]=PRICE;
                             _sortFields[1,"numeric"]=1;
                             _sortFields[1,"revert"]=1;
-                            asortMult(sel,sel,1,1,_sortFields, _cntSelPreprocess, _cntSel-1) ;
+                            asortMult(sel,sel,_sortFields,2, _cntSelPreprocess, _cntSel-1) ;
                         }
                     }
 
@@ -622,13 +622,13 @@ while true; do
                     close(_tmpProfitLogFile)
                 }
 
-                _sortFields[0,"prio"]=LOCK_VOLUME;
+                _sortFields[0,"seg"]=LOCK_VOLUME;
                 _sortFields[0,"numeric"]=1;
                 _sortFields[0,"revert"]=1;
-                _sortFields[1,"prio"]=PRICE;
+                _sortFields[1,"seg"]=PRICE;
                 _sortFields[1,"numeric"]=1;
                 _sortFields[1,"revert"]=1;
-                asortMult(_buySort,_buySort,0,0,_sortFields) ;
+                asortMult(_buySort,_buySort,_sortFields,2) ;
 
                 print "[Bought]" > _tmpFile ;
                 _lockTT = 0 ;

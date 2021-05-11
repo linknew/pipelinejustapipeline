@@ -12,12 +12,12 @@ do
 done
 
 [[ -z $code ]] && echo "no code specified">&2 && doExit -1
-[[ ! -f data/$code.data ]] && echo "Cannot find data/$code.data" >&2 && doExit -1
+[[ ! -f StockData/$code.data ]] && echo "Cannot find StockData/$code.data" >&2 && doExit -1
 
 echo "*[$code]" >&2
 
 rawData=$(
-    cat data/$code.data |
+    cat StockData/$code.data |
 
     awk '
         #do sorting: avg 5k 22k 66k 132k 264k

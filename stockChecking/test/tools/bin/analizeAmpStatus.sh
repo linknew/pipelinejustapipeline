@@ -1,6 +1,8 @@
 #! /bin/bash
 
-source comm.lib
+source ~/tools/lib/comm.lib
+
+doStart
 
 _stockListOrDataFile=''
 _seed='($25-$26)*100/$27'       #check (high-low)*100/ystdCls
@@ -16,14 +18,10 @@ _isNotStockList=0
 _baseDef=0
 _shiftDef=0
 
-trap "doExit 2" SIGINT SIGTERM SIGQUIT
+trap "doExit 2 \"$doClean\" " SIGINT SIGTERM SIGQUIT
 
-function doExit()
-{
-    [[ -f .t.$$ ]] && rm .t.$$ 2>/dev/null
-    [[ -f .t.stockListOrDataFile.$$ ]] && rm .t.stockListOrDataFile.$$ 2>/dev/null
-    exit $1
-}
+doClean="[[ -f .t.$$ ]] && rm .t.$$ 2>/dev/null
+         [[ -f .t.stockListOrDataFile.$$ ]] && rm .t.stockListOrDataFile.$$ 2>/dev/null"
 
 #adjust $_days and $_shift
 function _arrange()
@@ -43,7 +41,7 @@ function _arrange()
     if [[ $__shift -gt 0 ]] ; then
         awk '(NR>'$__shift'){print}'
     elif [[ $__shift -lt 0 ]] ; then
-        tail -r | awk '(NR>'$((-__shift))'){print}' | tail -r
+        tac | awk '(NR>'$((-__shift))'){print}' | tac
     else
         cat -
     fi
@@ -101,7 +99,7 @@ for i in "$@"; do
 
     Default:
         --ge=$_geDef --le=$_leDef --days=$_daysDef --gap=$_gap --seed=$_seed --weight=$_weight
-    " && doExit 0
+    " && doExit 0 "$doClean"
 
     [[ ${i%%=*} == --days ]] && _days=${i##*=} && continue
     [[ ${i%%=*} == --shift ]] && _shift=${i##*=} && continue
@@ -117,21 +115,21 @@ for i in "$@"; do
     [[ ${i%%=*} == --hotData ]] && _hotData=1 && continue
     [[ ${i%%=*} == --verbose ]] && _verbose=1 && continue
     [[ ${i%%=*} == --data ]] && _isNotStockList=1 && continue
-    [[ ${i:0:1} == '-' ]] && showErr "unrecognize option:$i\n" && doExit 1
+    [[ ${i:0:1} == '-' ]] && showErr "unrecognize option:$i\n" && doExit 1 "$doClean"
 
     _stockListOrDataFile=$i
 done
 
 #check --shift
-[[ -n $_shift && -z $_days ]] && showErr "--shift must under --days\n" && doExit -1
+[[ -n $_shift && -z $_days ]] && showErr "--shift must under --days\n" && doExit -1 "$doClean"
 _shift=${_shift:-$_shiftDef}
 
 #check --days
 _days=${_days:-$_daysDef}
 
 # check --top --bottom --ge --le
-[[ -n $_top && (-n $_bottom || -n $_ge || -n $_le) ]] && showErr "--top exclude with --bottom or --ge or --le\n" >&2 && doExit 1
-[[ -n $_bottom && (-n $_top || -n $_ge || -n $_le) ]] && showErr "--bottom exclude with --top or --ge or --le\n" >&2 && doExit 1
+[[ -n $_top && (-n $_bottom || -n $_ge || -n $_le) ]] && showErr "--top exclude with --bottom or --ge or --le\n" >&2 && doExit 1 "$doClean"
+[[ -n $_bottom && (-n $_top || -n $_ge || -n $_le) ]] && showErr "--bottom exclude with --top or --ge or --le\n" >&2 && doExit 1 "$doClean"
 if [[ -z $_top && -z $_bottom ]] ; then 
     _ge=${_ge:-$_geDef}
     _le=${_le:-$_leDef}
@@ -141,7 +139,7 @@ else
 fi
 
 # check --data --hotData
-[[ $_isNotStockList -eq 1 && $_hotData -eq 1 ]] && showErr "--hotData exclude with --data\n" >&2 && doExit 1
+[[ $_isNotStockList -eq 1 && $_hotData -eq 1 ]] && showErr "--hotData exclude with --data\n" >&2 && doExit 1 "$doClean"
 
 # construct _stockListOrDataFile from stand input
 if [[ -z $_stockListOrDataFile ]] ; then
@@ -177,12 +175,12 @@ do
     if [[ $_isNotStockList -eq 1 ]] ; then
         cat $i 2>/dev/null
     elif [[ $_hotData == 1 ]] ; then
-        ./playStockList.sh --print <<< $i 2>/dev/null
+        playStockList.sh --print <<< $i 2>/dev/null
     else
-        grep "^$i" StockData/${i:0:6}-.package.data 2>/dev/null
+        (cat StockData/${i:1}.data 2>/dev/null || grep "^$i" StockData/${i:0:6}-.package.data)
     fi |
     _arrange $_days $_shift |
-    ./_classfy.sh --seed="$_seed" --weight="$_weight" --gap="$_gap" ${_verbose:+--verbose} --base=$_base  |
+    _classfy.sh --seed="$_seed" --weight="$_weight" --gap="$_gap" ${_verbose:+--verbose} --base=$_base  |
         awk -v _awkCode=$i  \
             -v _awkPrintDetails=$_printDetails \
             -v _awkGe=$_ge  \
@@ -272,4 +270,4 @@ do
             '
 done
 
-doExit 0
+doExit 0 "$doClean"
