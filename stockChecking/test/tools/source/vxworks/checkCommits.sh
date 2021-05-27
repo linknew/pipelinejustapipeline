@@ -50,16 +50,17 @@ awk '
             gsub(/^ +| +$/, "", jira[i]) ;
             gsub(/ +/, "/", jira[i]) ;
             #printf("[%s] %10s %10s %s %s\n\n", jira[i], date[i], author[i], authorEmail[i], commitInfo[i])  ;
-            printf("%02d: %s %s [*%s] %s\n    * maybe %s is correct\n    * please check %s\n\n", idx++, date[i], author[i], jira[i], commitInfo[i],jira[i],commitId[i])  ;
+            printf("%02d: %s %s [*%s] %s\n    * maybe %s is the US_ID\n    * please check %s\n\n", idx++, date[i], author[i], jira[i], commitInfo[i],jira[i],commitId[i])  ;
         }
     }
 
-    ' > .$$.gitlog
+    ' > /tmp/.$$.gitlog
 
 (echo -ne "\n\n"; sed -n '/^modification history/,/^\*\//{p;} ' $sourceFileLocal | 
     awk 'BEGIN{print "";} {if($1 ~ /^[0-3]/){print "@",$0,"[" (++idx) "]";}else{print "@",$0;} }' )    |   
-paste .$$.gitlog -
+paste /tmp/.$$.gitlog -
+echo ""
 
-rm -rf .$$.gitlog 2>/dev/null
+rm -rf /tmp/.$$.gitlog 2>/dev/null
 
 exit

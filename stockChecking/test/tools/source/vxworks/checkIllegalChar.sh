@@ -51,28 +51,57 @@ awk '
     }
 
     {
-        len = length($0) ;
-        num = split($0, arry, "") ;
-        warnIdx = 1 ;
-        warnInfo = "    * find illegal charater:" ;
-        
-        #check length
-        if(len > 80) print "    * should <= 80 characters @", FILENAME "::" FNR ;
-
-        #check illegal character
-        foundIllegal = 0 ;
-        prry = "" ;
-        for(i=1; i<=num; i++){
-            if(arry[i] > "~" || arry[i] < " "){
-                prry = prry "{" warnIdx "}" ;
-                warnInfo = warnInfo " " ( (arry[i] in illegalCharList) ? (illegalCharList[arry[i]] ) : ("\unk") ) "@{" warnIdx "}" ;
-                warnIdx ++ ;
-                foundIllegal = 1 ;
-            }else{
-                prry = prry arry[i] ;
+        #check indentation position
+        {
+            if($0 ~ /^ *[{}]/){
+                pos = match($0, /[{}]/) ;
+                if(pos%4 != 1){
+                    print "[check indentation of \"{\" and \"}\"]* wrong indentation width @", FILENAME ":" FNR ;
+                    rsltIndent = 1 ;
+                }
             }
         }
-        if(foundIllegal) print warnInfo, "@", FILENAME "::" FNR, "#", prry ;
+
+        #check length
+        {
+            len = length($0) ;
+
+            if(len > 80){
+                print "[check 80 byte_width limitation]* should <= 80 characters @", FILENAME ":" FNR ;
+                rslt80B = 1 ;
+            }
+        }
+
+        #check illegal character
+        {
+            num = split($0, arry, "") ;
+            warnIdx = 1 ;
+            warnInfo = "* find illegal charater:" ;
+            foundIllegal = 0 ;
+            prry = "" ;
+
+            for(i=1; i<=num; i++){
+                if(arry[i] > "~" || arry[i] < " "){
+                    prry = prry "{" warnIdx "}" ;
+                    warnInfo = warnInfo " " ( (arry[i] in illegalCharList) ? (illegalCharList[arry[i]] ) : ("\unk") ) "@{" warnIdx "}" ;
+                    warnIdx ++ ;
+                    foundIllegal = 1 ;
+                }else{
+                    prry = prry arry[i] ;
+                }
+            }
+
+            if(foundIllegal){
+                print "[check illegal characters]" warnInfo " @ " FILENAME ":" FNR " # " prry ;
+                rsltIllChar = 1 ;
+            }
+        }
+    }
+
+    END{
+        if(!rslt80B) print "[check 80 byte_width limitation]- No abnormalities found, Good J0b" ;
+        if(!rsltIndent) print "[check indentation of \"{\" and \"}\"]- No abnormalities found, Good J0b" ;
+        if(!rsltIllChar) print "[check illegal characters]- No abnormalities found, Good J0b" ;
     }
 
     '   $sourceFile
