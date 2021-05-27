@@ -2,17 +2,19 @@
 
 for i in "$@"
 do
-    [[ $i == "--help" ]] && echo -en "\n* Usage: $(basename $0) [--patHead=AWK_PAT_STR] [--patTail=AWK_PAT_STR] --outputLineSep=STR file1 file2 ...\n\n" >&2 && exit 0
+    [[ $i == "--help" ]] && echo -en "\n* Usage: $(basename $0) [--patHead=AWK_PAT] [--patTail=AWK_PAT]"    \
+                                                                "[--outputLineSep]=STR [--sourceFile=STR]file1 file2 ...\n\n" >&2 && exit 0
     [[ $i == "--showCondtions" ]] && showCondtions=1 && continue
     [[ ${i%%=*} == "--patHead" ]] && patHead=${i#*=} && continue
     [[ ${i%%=*} == "--patTail" ]] && patTail=${i#*=} && continue
     [[ ${i%%=*} == "--outputLineSep" ]] && outputLineSep=${i#*=} && continue
+    [[ ${i%%=*} == "--sourceFile" ]] && sourceFile=${i#*=} && continue
     [[ ${i:0:1} == "-" ]] && echo "!!unknown option: $i" >&2 && exit 1
     files=$files" "$i
 done
 
-patHead=${patHead:-"^"}
-patTail=${patTail:-"$"}
+patHead=${patHead:-"/^/"}
+patTail=${patTail:-"/$/"}
 outputLineSep=${outputLineSep:-'\n'}
 
 if [[ $showCondtions -eq 1 ]] ; then
@@ -25,21 +27,23 @@ if [[ $showCondtions -eq 1 ]] ; then
 fi
 
 awk -v outputLineSep="$outputLineSep"   \
+    -v sourceFile="$sourceFile"         \
     '
 
     BEGIN{
     }
 
     (FNR==1){
+        if(FILENAME == "-") FILENAME = sourceFile ;
         if(matchingStart) print "!!Incomplete matching" paraInfo > "/dev/stderr" ;
         matchingStart = 0 ;
     }
 
-    /'"$patHead"'/{
+    '"$patHead"'{
 
         if(matchingStart) print "!!Incomplete matching" paraInfo > "/dev/stderr" ;
 
-        paraInfo = "@" FILENAME "::" FNR ;
+        paraInfo = " @ " FILENAME "::" FNR ;
         body = "" ;
         matchingStart = FNR ;
 
@@ -48,7 +52,7 @@ awk -v outputLineSep="$outputLineSep"   \
 
     (matchingStart){
 
-        if($0 ~ /'"$patTail"'/){
+        if($0 ~ '"$patTail"'){
 
             paraInfo = paraInfo "-" FNR ;
             body = body $0 ;
