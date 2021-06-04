@@ -150,19 +150,22 @@ awk -v functionCategories="$functionCategories"     \
                 key = pathname "::" funcName ;
                 #print key, noManTag > "/dev/stderr" ;
 
-                if(! (key in funcCategory) ){
-                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* unclassified function @ " key ":" paragFrm "\n" ;
+                if(!(key in funcCategory) || (funcCategory[key] == "unclassified") ){
+                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* unclassified function " funcName " @ " pathname ":" paragFrm "\n" ;
 
                 }else if(funcCategory[key] == "manual_ignored"){
                     rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]- {manual_ignored} ignore tag_checking @ " pathname ":" paragFrm " # " funcName "\n" ;
 
                 }else if(funcCategory[key] == "API" && noManTag){
-                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* found incorrect NOMANUAL tag @ " pathname ":" paragFrm " # " funcName "\n" ;
+                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* found incorrect NOMANUAL tag in " funcName " @ " pathname ":" paragFrm " # " funcName "\n" ;
 
                 }else if(funcCategory[key] != "API" && !noManTag ){
-                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* need a NOMANUAL tag @ " pathname ":" paragFrm " # " funcName "\n" ;
+                    rsltNomanualTag = rsltNomanualTag "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]* need a NOMANUAL tag for " funcName " @ " pathname ":" paragFrm " # " funcName "\n" ;
 
+                }else{
+                    ;
                 }
+
             }
         }
 

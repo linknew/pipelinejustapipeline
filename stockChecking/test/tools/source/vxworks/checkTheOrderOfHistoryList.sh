@@ -110,7 +110,7 @@ awk -v ignErr=$ignErr                           \
 
         copyrightGen = copyrightGen " Wind River Systems, Inc." ;
 
-        if(copyrightOrg != copyrightGen) print copyrightOrg " [generated]\n" copyrightGen ;
+        if(copyrightOrg != copyrightGen) print copyrightOrg "\n" copyrightGen "  [generated]" ;
     }
 
     ' $sourceFile
