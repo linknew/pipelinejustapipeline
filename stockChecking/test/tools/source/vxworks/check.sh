@@ -67,6 +67,63 @@ function classifyCheckRslt
         '
 }
 
+function ignorUnusedSrcCodPart
+{
+    awk '
+
+        BEGIN{
+
+            # load empty preprocess info
+            {
+                while( (getline < "check.preprocessInfo.emptyLine") >0 ){
+                    key = $0; gsub(/^\[|\].*/, "", key) ;
+                    valList = $0; sub(/.*\]/, "", valList) ;
+                    lineNum[key] = split(valList, vals, / +/) ;
+
+                    for(i=1; i<=lineNum[key]; i++){
+                        h = vals[i]; sub(/-.*/, "", h) ;
+                        t = vals[i]; sub(/.*-/, "", t) ;
+                        val[key,i,"h"] = h ;
+                        val[key,i,"t"] = t ;
+                    }
+                }
+                close("check.preprocessInfo.emptyLine") ;
+            }
+
+        }
+
+        {
+            if($0 ~ / @ \/[^ \t]+:[0-9]+/){
+                _key = $0; gsub(/.* @ \/|:.*/, "", _key); _key="/"_key ;
+                _val = $0; sub(/.* @ \/[^ \t]+:/, "", _val) sub(/ .*$/, "", _val) ;
+
+                #print "------->"_key ;
+                #print "+++++++>"_val ;
+                if(_key in lineNum){
+
+                    for(i=1; i<=lineNum[_key]; i++){
+                        if(_val+0 > val[_key,i,"t"]) continue ;
+                        _isEmptyLine = (_val+0 >= val[_key,i,"h"]) ;
+                        break ;
+                    }
+
+                    if(_isEmptyLine) sub(/[^ \t]/,"- {noncert_ignored}") ;
+                    print $0;
+
+                }else{
+                    print "!!cannot find info of " _key " in preprocessInfo.emptyLine" > "/dev/stderr" ;
+                    print $0 ;
+                }
+
+            }else{
+                print ;
+            }
+        }
+
+        '   -
+}
+#ignorUnusedSrcCodPart ; exit
+
 [[ $# -eq 0 ]] && showHelp && exit
 
 for i in "$@"
@@ -178,7 +235,7 @@ if [[ $funcCheckIllegals -eq 1 ]] ; then
         ./checkInFunctionHeader.sh "$component" "$patPreDir" $files | classifyCheckRslt "$igrFcts"
 
 
-    ) | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
+    ) | ignorUnusedSrcCodPart | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
     echo "*check ILLEGALS in               $filenameIllegal"
 fi
 
@@ -187,7 +244,7 @@ fi
 
 if [[ $funcUnstableCheck -eq 1 ]] ; then
     echo -ne "prefix directory:\n\n    - $patPreDir\n\n" | sed -E 's@\S*/helix/@helix/@' > $filenameUnstableChecking
-    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" |
+    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | ignorUnusedSrcCodPart |
         sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameUnstableChecking &&
         echo "*check UNSTABLECHECKING in       $filenameUnstableChecking"
 fi
