@@ -165,7 +165,24 @@ awk -v functionCategories="$functionCategories"     \
                 }else{
                     ;
                 }
+            }
 
+            # check multiple title
+            {
+                key = pathname "::" funcName ;
+                if( !( (key in funcCategory) && (funcCategory[key] == "API") ) ){
+                    # is not API
+                    next ;
+                }
+
+                title = $0 ;
+                sub(/^([\/\* \t]+\\012\\n)+ ?\* +/, "", title) ;
+                sub(/\\012\\n ?\*[ \t]*\\012\\n.*/, "", title) ;
+                #print title > "/dev/stderr" ;
+
+                if(index(title, "\\012\\n")){
+                    rsltMultTitle = rsltMultTitle "[check multiple API title in FUNCTION_HEADER]* fouond multiple API title: " funcName " @ " pathname ":" paragFrm "\n" ;
+                }
             }
         }
 
@@ -220,6 +237,14 @@ awk -v functionCategories="$functionCategories"     \
             }
             else{
                 print "[check \"\\NOMANUAL\" tag in FUNCTION_HEADER]- No abnormalities found, Good J0b" ;
+            }
+
+            if(rsltMultTitle){
+                printf rsltMultTitle | "sort" ;
+                close("sort") ;
+            }
+            else{
+                print "[check multiple API title in FUNCTION_HEADER]- No abnormalities found, Good J0b" ;
             }
 
             for(i=1; i<=cntCase; i++){
