@@ -171,17 +171,16 @@ awk -v functionCategories="$functionCategories"     \
             {
                 key = pathname "::" funcName ;
                 if( !( (key in funcCategory) && (funcCategory[key] == "API") ) ){
-                    # is not API
-                    next ;
-                }
+                    # is not API, do nothing ;
+                }else{
+                    title = $0 ;
+                    sub(/^([\/\* \t]+\\012\\n)+ ?\* +/, "", title) ;
+                    sub(/\\012\\n ?\*[ \t]*\\012\\n.*/, "", title) ;
+                    #print title > "/dev/stderr" ;
 
-                title = $0 ;
-                sub(/^([\/\* \t]+\\012\\n)+ ?\* +/, "", title) ;
-                sub(/\\012\\n ?\*[ \t]*\\012\\n.*/, "", title) ;
-                #print title > "/dev/stderr" ;
-
-                if(index(title, "\\012\\n")){
-                    rsltMultTitle = rsltMultTitle "[check multiple API title in FUNCTION_HEADER]* fouond multiple API title: " funcName " @ " pathname ":" paragFrm "\n" ;
+                    if(index(title, "\\012\\n")){
+                        rsltMultTitle = rsltMultTitle "[check multiple API title in FUNCTION_HEADER]* fouond multiple API title: " funcName " @ " pathname ":" paragFrm "\n" ;
+                    }
                 }
             }
         }
