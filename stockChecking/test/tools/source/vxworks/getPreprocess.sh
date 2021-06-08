@@ -1,6 +1,6 @@
 #! /bin/bash
 
-[[ $WIND_PLATFORM != "helix" || $SHLVL -lt 2 ]] && echo -ne '\n!!go, back here after you have done "wrenv.sh -p helix"\n\n' && exit
+[[ $WIND_PLATFORM != "helix" || $SHLVL -lt 2 ]] && echo -ne '\n!!go, back here after you have done "wrenv.sh -p helix"\n\n' >&2 && exit
 
 helixBase=/ctu-cert1_02/mli2/workspace/vxworks/helix
 CC=$helixBase/compilers/llvm-10.0.1.1/LINUX64/bin/clang

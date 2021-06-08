@@ -161,23 +161,35 @@ fileStatusSum=status.summary.${round//./_}.$component.$ccr.$username.txt
 if [[ $funcCheckModCpr   -eq 1 || $funcCheckIllegals      -eq 1 ||
       $funcUnstableCheck -eq 1 || $funcListCheckFilesOnly -eq 1   ]] ; then
 
-    if [[ -f $patPreDir ]] ; then
-        files=$patPreDir
-    else
-        [[ ! -d $patPreDir ]] && echo "!!Cannot find $patPreDir" >&2 && exit
-        files=$(find $patPreDir -type f -a \( -name "*.[ch]" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.s" -o -name "*.inc" \) | sort -f)
-    fi
+    #get file list
+    #{
+        if [[ -f $patPreDir ]] ; then
+            files=$patPreDir
+        else
+            [[ ! -d $patPreDir ]] && echo "!!Cannot find $patPreDir" >&2 && exit
+            files=$(find $patPreDir -type f -a \( -name "*.[ch]" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.s" -o -name "*.inc" \) | sort -f)
+        fi
 
-    [[ -z $files ]] && echo "!!No C,C++ or asm source files found." >&2 && exit
+        [[ -z $files ]] && echo "!!No C,C++ or asm source files found." >&2 && exit
+    #}
 
-    igrFcts=$( grep -h "^function=" check.ignores | sed -E 's/^function=["'\'']?|["'\'']?\s*$//g' )
-    igrFls=$( grep -i "^$component.files=" check.ignores | sed 's/.*\.files=//' )
-    [[ -n $igrFls ]] && files=$( echo "$files" | grep -v "$igrFls" )
+    #get ignore checking_functions and files
+    #{
+        igrFcts=$( grep -h "^function=" check.ignores | sed -E 's/^function=["'\'']?|["'\'']?\s*$//g' )
+        igrFls=$( grep -i "^$component.files=" check.ignores | sed 's/.*\.files=//' )
+        [[ -n $igrFls ]] && files=$( echo "$files" | grep -v "$igrFls" )
 
-    echo -e "\n*following files will be ignored"
-    [[ -n "$igrFls" ]] && echo -e "$igrFls"  | sed 's/^/    /'
-    echo -e "\n*following files will be processed"
-    [[ -n "$files" ]]  && echo -e "$files\n"   | sed 's/^/    /'
+        echo -e "\n*following files will be ignored"
+        [[ -n "$igrFls" ]] && echo -e "$igrFls"  | sed 's/^/    /'
+        echo -e "\n*following files will be processed"
+        [[ -n "$files" ]]  && echo -e "$files\n"   | sed 's/^/    /'
+    #}
+
+#    #prepare empty lines info for preprocessing
+#    #{
+#        ./getPreprocess.sh $files > check.preprocessInfo.emptyLine
+#    #}
+
 fi
 
 [[ $funcListCheckFilesOnly -eq 1 ]] && exit

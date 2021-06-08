@@ -120,7 +120,7 @@ awk -v functionCategories="$functionCategories"     \
                 cnt ++ ;
                 lable[cnt] = "[check keyword \"this/the routine\" in FUNCTION_HEADER]";
                 keywords[cnt] = "([ \\t]+(this|the)[ \\t]+|^[ \\t]?\\*[ \\t])routine([ ,.:!@?\\175\\011\\051\\047\\042\\135]|$)" ;
-                hitInfo[cnt] = "found \"this/the routine\"" ;
+                hitInfo[cnt] = "* found \"this/the routine\"" ;
                 misInfo[cnt] = "- No abnormalities found, Good J0b" ;
             }
         }
@@ -179,7 +179,7 @@ awk -v functionCategories="$functionCategories"     \
                     #print title > "/dev/stderr" ;
 
                     if(index(title, "\\012\\n")){
-                        rsltMultTitle = rsltMultTitle "[check multiple API title in FUNCTION_HEADER]* fouond multiple API title: " funcName " @ " pathname ":" paragFrm "\n" ;
+                        rsltMultTitle = rsltMultTitle "[check multiple API title in FUNCTION_HEADER]* found multiple API title: " funcName " @ " pathname ":" paragFrm "\n" ;
                     }
                 }
             }

@@ -104,7 +104,7 @@ for i in "${!keywordsCase[@]}" ; do
     )
 
     if [[ -n $cont ]] ; then
-        echo -ne "$cont" | sed -E 's/(^\S+:[0-9]+):\s*/\1 # /; s/^/'"${lableCase[i]}${hitInfoCase[i]}"' /'
+        echo -e "$cont" | sed -E 's/(^\S+:[0-9]+):\s*/\1 # /; s/^/'"${lableCase[i]}${hitInfoCase[i]}"' /'
     else
         echo -ne "\n" | sed -E 's/^/'"${lableCase[i]}${misInfoCase[i]}"'/' ;
     fi

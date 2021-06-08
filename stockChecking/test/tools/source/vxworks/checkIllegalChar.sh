@@ -15,13 +15,13 @@ done
 awk '
 
     BEGIN{
-        illegalCharList["\x00"] = "\NUL" ;
-        illegalCharList["\x01"] = "\SOH" ;
-        illegalCharList["\x02"] = "\STX" ;
-        illegalCharList["\x03"] = "\ETX" ;
-        illegalCharList["\x04"] = "\EOT" ;
-        illegalCharList["\x05"] = "\ENQ" ;
-        illegalCharList["\x06"] = "\ACK" ;
+        illegalCharList["\x00"] = "\\NUL" ;
+        illegalCharList["\x01"] = "\\SOH" ;
+        illegalCharList["\x02"] = "\\STX" ;
+        illegalCharList["\x03"] = "\\ETX" ;
+        illegalCharList["\x04"] = "\\EOT" ;
+        illegalCharList["\x05"] = "\\ENQ" ;
+        illegalCharList["\x06"] = "\\ACK" ;
         illegalCharList["\x07"] = "\\a"  ;   #"\BEL";
         illegalCharList["\x08"] = "\\b"  ;   #"\BS" ;
         illegalCharList["\x09"] = "\\t"  ;   #"\HT" ;
@@ -29,25 +29,25 @@ awk '
         illegalCharList["\x0B"] = "\\v"  ;   #"\VT" ;
         illegalCharList["\x0C"] = "\\f"  ;   #"\FF" ;
         illegalCharList["\x0D"] = "\\r"  ;   #"\CR" ;
-        illegalCharList["\x0E"] = "\SO" ;
-        illegalCharList["\x0F"] = "\SI" ;
-        illegalCharList["\x10"] = "\DLE" ;
-        illegalCharList["\x11"] = "\DC1" ;
-        illegalCharList["\x12"] = "\DC2" ;
-        illegalCharList["\x13"] = "\DC3" ;
-        illegalCharList["\x14"] = "\DC4" ;
-        illegalCharList["\x15"] = "\NAK" ;
-        illegalCharList["\x16"] = "\SYN" ;
-        illegalCharList["\x17"] = "\ETB" ;
-        illegalCharList["\x18"] = "\CAN" ;
-        illegalCharList["\x19"] = "\EM" ;
-        illegalCharList["\x1A"] = "\SUB" ;
-        illegalCharList["\x1B"] = "\ESC" ;
-        illegalCharList["\x1C"] = "\FS" ;
-        illegalCharList["\x1D"] = "\GS" ;
-        illegalCharList["\x1E"] = "\RS" ;
-        illegalCharList["\x1F"] = "\US" ;
-        illegalCharList["\x7F"] = "\DEL" ;
+        illegalCharList["\x0E"] = "\\SO" ;
+        illegalCharList["\x0F"] = "\\SI" ;
+        illegalCharList["\x10"] = "\\DLE" ;
+        illegalCharList["\x11"] = "\\DC1" ;
+        illegalCharList["\x12"] = "\\DC2" ;
+        illegalCharList["\x13"] = "\\DC3" ;
+        illegalCharList["\x14"] = "\\DC4" ;
+        illegalCharList["\x15"] = "\\NAK" ;
+        illegalCharList["\x16"] = "\\SYN" ;
+        illegalCharList["\x17"] = "\\ETB" ;
+        illegalCharList["\x18"] = "\\CAN" ;
+        illegalCharList["\x19"] = "\\EM" ;
+        illegalCharList["\x1A"] = "\\SUB" ;
+        illegalCharList["\x1B"] = "\\ESC" ;
+        illegalCharList["\x1C"] = "\\FS" ;
+        illegalCharList["\x1D"] = "\\GS" ;
+        illegalCharList["\x1E"] = "\\RS" ;
+        illegalCharList["\x1F"] = "\\US" ;
+        illegalCharList["\x7F"] = "\\DEL" ;
     }
 
     {
@@ -83,7 +83,7 @@ awk '
             for(i=1; i<=num; i++){
                 if(arry[i] > "~" || arry[i] < " "){
                     prry = prry "{" warnIdx "}" ;
-                    warnInfo = warnInfo " " ( (arry[i] in illegalCharList) ? (illegalCharList[arry[i]] ) : ("\unk") ) "@{" warnIdx "}" ;
+                    warnInfo = warnInfo " " ( (arry[i] in illegalCharList) ? (illegalCharList[arry[i]] ) : ("\\unk") ) "@{" warnIdx "}" ;
                     warnIdx ++ ;
                     foundIllegal = 1 ;
                 }else{
