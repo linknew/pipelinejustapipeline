@@ -69,6 +69,8 @@ function classifyCheckRslt
 
 function ignorUnusedSrcCodPart
 {
+    #cat - ; return ;
+
     awk '
 
         BEGIN{
@@ -79,12 +81,13 @@ function ignorUnusedSrcCodPart
                     key = $0; gsub(/^\[|\].*/, "", key) ;
                     valList = $0; sub(/.*\]/, "", valList) ;
                     lineNum[key] = split(valList, vals, / +/) ;
+                    #print key,valList,"@",lineNum[key] > "/dev/stderr" ;
 
                     for(i=1; i<=lineNum[key]; i++){
                         h = vals[i]; sub(/-.*/, "", h) ;
                         t = vals[i]; sub(/.*-/, "", t) ;
-                        val[key,i,"h"] = h ;
-                        val[key,i,"t"] = t ;
+                        val[key,i,"h"] = h+0 ;
+                        val[key,i,"t"] = t+0 ;
                     }
                 }
                 close("check.preprocessInfo.emptyLine") ;
@@ -102,12 +105,11 @@ function ignorUnusedSrcCodPart
                 if(_key in lineNum){
 
                     for(i=1; i<=lineNum[_key]; i++){
-                        if(_val+0 > val[_key,i,"t"]) continue ;
-                        _isEmptyLine = (_val+0 >= val[_key,i,"h"]) ;
-                        break ;
+                        if(_val+0 >  val[_key,i,"t"]) continue ;
+                        if(_val+0 >= val[_key,i,"h"]) break ;
                     }
 
-                    if(_isEmptyLine) sub(/[^ \t]/,"- {noncert_ignored}") ;
+                    if(i <= lineNum[_key]) sub(/[^ \t]/,"- {noncert_ignored}") ;
                     print $0;
 
                 }else{
@@ -185,10 +187,10 @@ if [[ $funcCheckModCpr   -eq 1 || $funcCheckIllegals      -eq 1 ||
         [[ -n "$files" ]]  && echo -e "$files\n"   | sed 's/^/    /'
     #}
 
-#    #prepare empty lines info for preprocessing
-#    #{
-#        ./getPreprocess.sh $files > check.preprocessInfo.emptyLine
-#    #}
+    #prepare empty lines info for preprocessing
+    #{
+        ./getPreprocess.sh $files > check.preprocessInfo.emptyLine
+    #}
 
 fi
 

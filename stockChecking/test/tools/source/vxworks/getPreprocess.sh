@@ -182,7 +182,11 @@ awk -v preprocFileMap="$preprocFileMap"        \
                 s = "" ;
                 e = "" ;
                 infoFixed = "" ;
-                gsub(/^ *| *$/, "", emptyLineInfo[pn]) ;
+
+                #!!! gsub(/^ *| *$/, "", emptyLineInfo[pn]) ;  <-- awk bug, the pattern /^ */ of gsub matches all spaces in whole string !!!!
+                sub(/^ */, "", emptyLineInfo[pn]) ; sub(/ *$/, "", emptyLineInfo[pn]) ;
+                printLog("*before connect:" pn "\n" emptyLineInfo[pn], 1, 1) ;
+
                 num = split(emptyLineInfo[pn], arry, / +/) ;
 
                 for(i=1; i<=num; i++){
@@ -202,8 +206,9 @@ awk -v preprocFileMap="$preprocFileMap"        \
                 }
 
                 infoFixed = infoFixed ((s==e) ? s : s "-" e) " " ;
-                gsub(/^ *| *$/, "", infoFixed) ;
+                sub(/^ */, "", infoFixed) ; sub(/ *$/, "", infoFixed) ;
                 print "[" pn "]" infoFixed ;
+                printLog("*after connect: " pn "\n" infoFixed "\n", 1, 1) ;
             }
         }
     }

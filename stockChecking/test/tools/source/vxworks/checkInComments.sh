@@ -129,7 +129,7 @@ awk -v thisScriptFilename="$0"        '
                 cnt ++ ;
                 lable[cnt] = "[check keyword \"yes/no\" in COMMENTs]";
                 keywords[cnt] = "[ \\t]+(yes|no)[ \\t]*:" ;
-                hitInfo[cnt] = "found \"yes/no\"" ;
+                hitInfo[cnt] = "* found \"yes/no\"" ;
                 misInfo[cnt] = "- No abnormalities found, Good J0b" ;
             }
         }
@@ -139,7 +139,7 @@ awk -v thisScriptFilename="$0"        '
     {
         #print $0;
 
-        filename = $0; sub(/.*@/, "", filename); sub(/::.*/, "", filename) ;
+        filename = $0; sub(/.*@[ \t]/, "", filename); sub(/::.*/, "", filename) ;
         paragFrm = $0; sub(/.*::/, "", paragFrm); sub(/-.*/, "", paragFrm) ;
         paragTo  = $0; sub(/.*::/, "", paragTo); sub(/.*-/, "", paragTo) ;
 

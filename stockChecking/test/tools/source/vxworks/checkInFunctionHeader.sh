@@ -95,7 +95,7 @@ awk -v functionCategories="$functionCategories"     \
 
                 cntCase ++;
                 lableCase[cntCase] = "[check redundant spaces in FUNCTION_HEADER]" ;
-                keywordsCase[cntCase] = "^(/\\*| ?\\*[ \\t]).*[^ \\t,.:;!?][ \\t][ \\t]+[^ \\t]" ;
+                keywordsCase[cntCase] = "^(/\\*| ?\\*[ \\t]).*[a-zA-Z][ \\t][ \\t]+[a-zA-Z]" ;
                 hitInfoCase[cntCase] = "* found redundant sapces" ;
                 misInfoCase[cntCase] = "- No abnormalities found, Good J0b" ;
 
