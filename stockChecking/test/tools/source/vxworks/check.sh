@@ -2,13 +2,15 @@
 
 #. comm.lib
 
+#set env
+PATH=/folk/mli2/tools/bin:/folk/mli2/tools/lib:$PATH && cd /ctu-cert1_02/mli2/workspace/vxworks 
 
 function showHelp
 {
     echo -ne "\nThis routine is used to check whether the source code conforms to the CSTG
               \nUsage:      \
               \n    $0 CCR round component dirPrefix    \\      \
-              \n               [--genReport] [--checkModificationCopyright] [--checkIllegals] [--doUnstableCheck] [--listCheckFilesOnly]
+              \n               [--genReport] [--markNoncert] [--checkModificationCopyright] [--checkIllegals] [--doUnstableCheck] [--listCheckFilesOnly]
               \nArguments:  \
               \n    -
               \nOptions:    \
@@ -67,96 +69,114 @@ function classifyCheckRslt
         '
 }
 
-function ignorUnusedSrcCodPart
-{
-    #cat - ; return ;
+if [[ $markNoncert -eq 1 ]] ; then
+    function markNoncertItems
+    {
+        awk '
 
-    awk '
+            BEGIN{
 
-        BEGIN{
+                # load empty preprocess info
+                {
+                    while( (getline < "check.preprocessInfo.solidLines") >0 ){
+                        key = $0; gsub(/^\[|\].*/, "", key) ;
+                        valList = $0; sub(/.*\]/, "", valList) ;
+                        lineNum[key] = split(valList, vals, / +/) ;
+                        #print key,valList,"@",lineNum[key] > "/dev/stderr" ;
 
-            # load empty preprocess info
-            {
-                while( (getline < "check.preprocessInfo.emptyLine") >0 ){
-                    key = $0; gsub(/^\[|\].*/, "", key) ;
-                    valList = $0; sub(/.*\]/, "", valList) ;
-                    lineNum[key] = split(valList, vals, / +/) ;
-                    #print key,valList,"@",lineNum[key] > "/dev/stderr" ;
-
-                    for(i=1; i<=lineNum[key]; i++){
-                        h = vals[i]; sub(/-.*/, "", h) ;
-                        t = vals[i]; sub(/.*-/, "", t) ;
-                        val[key,i,"h"] = h+0 ;
-                        val[key,i,"t"] = t+0 ;
+                        for(i=1; i<=lineNum[key]; i++){
+                            h = vals[i]; sub(/-.*/, "", h) ;
+                            t = vals[i]; sub(/.*-/, "", t) ;
+                            val[key,i,"h"] = h+0 ;
+                            val[key,i,"t"] = t+0 ;
+                        }
                     }
+                    close("check.preprocessInfo.solidLines") ;
                 }
-                close("check.preprocessInfo.emptyLine") ;
+
             }
 
-        }
+            {
+                if($0 ~ / @ \/[^ \t]+\.(c|s|cpp):[0-9]+/){
 
-        {
-            if($0 ~ / @ \/[^ \t]+:[0-9]+/){
-                _key = $0; gsub(/.* @ \/|:.*/, "", _key); _key="/"_key ;
-                _val = $0; sub(/.* @ \/[^ \t]+:/, "", _val) sub(/ .*$/, "", _val) ;
+                    #only .c .s .cpp will be checked
 
-                #print "------->"_key ;
-                #print "+++++++>"_val ;
-                if(_key in lineNum){
+                    _key = $0; gsub(/.* @ \/|:.*/, "", _key); _key="/"_key ;
+                    _val = $0; sub(/.* @ \/[^ \t]+:/, "", _val) sub(/ .*$/, "", _val) ;
 
-                    for(i=1; i<=lineNum[_key]; i++){
-                        if(_val+0 >  val[_key,i,"t"]) continue ;
-                        if(_val+0 >= val[_key,i,"h"]) break ;
+                    #print "------->"_key ;
+                    #print "+++++++>"_val ;
+                    if(_key in lineNum){
+
+                        for(i=1; i<=lineNum[_key]; i++){
+                            if(_val+0 >  val[_key,i,"t"]) continue ;
+                            if(_val+0 >= val[_key,i,"h"]) break ;
+                        }
+
+                        if(i > lineNum[_key]) sub(/[^ \t]/,"- {noncert_ignored}") ;
+                        print $0;
+
+                    }else{
+                        print "!!cannot find info of " _key " in check.preprocessInfo.solidLines" > "/dev/stderr" ;
+                        print $0 ;
                     }
-
-                    if(i <= lineNum[_key]) sub(/[^ \t]/,"- {noncert_ignored}") ;
-                    print $0;
 
                 }else{
-                    print "!!cannot find info of " _key " in preprocessInfo.emptyLine" > "/dev/stderr" ;
-                    print $0 ;
+                    print ;
                 }
-
-            }else{
-                print ;
             }
-        }
 
-        '   -
-}
-#ignorUnusedSrcCodPart ; exit
+            '   -
+    }
+else
+    function markNoncertItems
+    {
+        cat - ;
+    }
+fi
+#markNoncertItems ; exit
+
 
 [[ $# -eq 0 ]] && showHelp && exit
 
-for i in "$@"
-do
-    [[ $i == "--help" ]] && showHelp && exit
-    [[ $i == "--checkModificationCopyright" ]] && funcCheckModCpr=1 && continue
-    [[ $i == "--checkIllegals" ]] && funcCheckIllegals=1 && continue
-    [[ $i == "--doUnstableCheck" ]] && funcUnstableCheck=1 && continue
-    [[ $i == "--genReport" ]] && funcGenReport=1 && continue
-    [[ $i == "--listCheckFilesOnly" ]] && funcListCheckFilesOnly=1 && continue
-    [[ ${i:0:1} == "-" ]] && echo "!!unknown options $i" >&2 && exit
-    argv[++argc]=$i
-done
+#paramters
+#{
+    for i in "$@"
+    do
+        [[ $i == "--help" ]] && showHelp && exit
+        [[ $i == "--checkModificationCopyright" ]] && funcCheckModCpr=1 && continue
+        [[ $i == "--checkIllegals" ]] && funcCheckIllegals=1 && continue
+        [[ $i == "--doUnstableCheck" ]] && funcUnstableCheck=1 && continue
+        [[ $i == "--genReport" ]] && funcGenReport=1 && continue
+        [[ $i == "--markNoncert" ]] && markNoncert=1 && continue
+        [[ $i == "--listCheckFilesOnly" ]] && funcListCheckFilesOnly=1 && continue
+        [[ ${i:0:1} == "-" ]] && echo "!!unknown options $i" >&2 && exit
+        argv[++argc]=$i
+    done
+#}
 
-username=$(whoami)
-ccr=${argv[1]}
-round=R${argv[2]:-1}
-component=${argv[3]:-wildComponent}
-patPreDir=${argv[4]:-"sourceChecking/review-${ccr}-files/"}
-[[ -z $funcCheckModCpr   &&
-   -z $funcCheckIllegals &&
-   -z $funcUnstableCheck &&
-   -z $funcGenReport     &&
-   -z $funcListCheckFilesOnly  ]] && funcCheckModCpr=1 funcCheckIllegals=1 funcUnstableCheck=1
 
-filenameCopyright_modification=copyright_modification.${round//./_}.$component.$ccr.$username.txt
-filenameIllegal=illegals.${round//./_}.$component.$ccr.$username.txt
-filenameUnstableChecking=unstableChecking.${round//./_}.$component.$ccr.$username.txt
-fileStatusOrg=$ccr.status.org
-fileStatusDtl=status.${round//./_}.$component.$ccr.$username.txt
-fileStatusSum=status.summary.${round//./_}.$component.$ccr.$username.txt
+#init varialbes
+#{
+    username=$(whoami)
+    ccr=${argv[1]}
+    round=R${argv[2]:-1}
+    component=${argv[3]:-wildComponent}
+    patPreDir=${argv[4]:-"sourceChecking/review-${ccr}-files/"}
+    [[ -z $funcCheckModCpr   &&
+       -z $funcCheckIllegals &&
+       -z $funcUnstableCheck &&
+       -z $funcGenReport     &&
+       -z $funcListCheckFilesOnly  ]] && funcCheckModCpr=1 funcCheckIllegals=1 funcUnstableCheck=1
+
+    filenameCopyright_modification=copyright_modification.${round//./_}.$component.$ccr.$username.txt
+    filenameIllegal=illegals.${round//./_}.$component.$ccr.$username.txt
+    filenameUnstableChecking=unstableChecking.${round//./_}.$component.$ccr.$username.txt
+    fileStatusOrg=$ccr.status.org
+    fileStatusDtl=status.${round//./_}.$component.$ccr.$username.txt
+    fileStatusSum=status.summary.${round//./_}.$component.$ccr.$username.txt
+#}
+
 
 [[ -z $ccr ]] && echo "!!Please specify a CCR number." >&2 && exit
 
@@ -186,15 +206,22 @@ if [[ $funcCheckModCpr   -eq 1 || $funcCheckIllegals      -eq 1 ||
         echo -e "\n*following files will be processed"
         [[ -n "$files" ]]  && echo -e "$files\n"   | sed 's/^/    /'
     #}
-
-    #prepare empty lines info for preprocessing
-    #{
-        ./getPreprocess.sh $files > check.preprocessInfo.emptyLine
-    #}
-
 fi
 
+
 [[ $funcListCheckFilesOnly -eq 1 ]] && exit
+
+
+#prepare solid lines info for preprocessing
+#{
+    #only .c .cpp .s files need be preprocessed
+
+    if [[ $markNoncert -eq 1 && ( $funcCheckIllegals -eq 1 || $funcUnstableCheck ) ]]; then
+        ./getPreprocess.sh `echo "$files" | grep -E "\.(c|cpp|s)$"` > check.preprocessInfo.solidLines
+        [[ $? -ne 0 ]] && exit 3
+    fi
+#}
+
 
 # modification and copyright checking
 
@@ -249,7 +276,7 @@ if [[ $funcCheckIllegals -eq 1 ]] ; then
         ./checkInFunctionHeader.sh "$component" "$patPreDir" $files | classifyCheckRslt "$igrFcts"
 
 
-    ) | ignorUnusedSrcCodPart | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
+    ) | markNoncertItems | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
     echo "*check ILLEGALS in               $filenameIllegal"
 fi
 
@@ -258,7 +285,7 @@ fi
 
 if [[ $funcUnstableCheck -eq 1 ]] ; then
     echo -ne "prefix directory:\n\n    - $patPreDir\n\n" | sed -E 's@\S*/helix/@helix/@' > $filenameUnstableChecking
-    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | ignorUnusedSrcCodPart |
+    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | markNoncertItems |
         sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameUnstableChecking &&
         echo "*check UNSTABLECHECKING in       $filenameUnstableChecking"
 fi
@@ -306,6 +333,8 @@ fi
 #    fi
 #fi
 echo ""
+
+git reset --hard 2>&1 >/dev/null
 
 exit
 

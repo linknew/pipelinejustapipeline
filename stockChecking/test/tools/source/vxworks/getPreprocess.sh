@@ -1,6 +1,6 @@
 #! /bin/bash
 
-[[ $WIND_PLATFORM != "helix" || $SHLVL -lt 2 ]] && echo -ne '\n!!go, back here after you have done "wrenv.sh -p helix"\n\n' >&2 && exit
+[[ $WIND_PLATFORM != "helix" || $SHLVL -lt 2 ]] && echo -ne '\n!!go, back here after you have done "wrenv.sh -p helix"\n\n' >&2 && exit 3
 
 helixBase=/ctu-cert1_02/mli2/workspace/vxworks/helix
 CC=$helixBase/compilers/llvm-10.0.1.1/LINUX64/bin/clang
@@ -8,12 +8,15 @@ preprocInfoFile=check.preprocessInfo.data
 fileList=""
 fileListOrg=""
 curDir=`pwd`
+printSolidLineIdxes=${printSolidLineIdxes:-1}
 
 
-# fix prefix path
+# get options and fix prefix path
 #{
     for i in "$@"  ; do
-        [[ ! -f "$i" ]] && echo "!!cannot open the file $i" >&2 && continue
+        [[ $i == "--printEmptyLineIdxes" ]] && printSolidLineIdxes=0 && continue ;
+
+        [[ ! -f "$i" ]] && echo "!!cannot open the file $i" >&2 && continue ;
 
         [[ ${i:0:1} == "/" ]] && srcFile=$i || srcFile=$curDir/$i
         srcFile=$(echo $(cd ${srcFile%/*} && pwd)/${srcFile##*/})
@@ -98,7 +101,7 @@ awk -v preprocInfoFile="$preprocInfoFile"   \
 
                     #expand to last tag
                     while(tagNext){
-                        printLog("*try to expand tag:" tag " to tag:" tagNext, 0, 1) ;
+                        printLog("*try to expand tag:" tag " to tag:" tagNext, 1, 1) ;
 
                         if(!(tag in cmds)){
                             printLog("!!cannot find index of " tag " in " preprocInfoFile, 0, 1) ;
@@ -109,7 +112,7 @@ awk -v preprocInfoFile="$preprocInfoFile"   \
                         printLog("*execute cmd:" cmds[tag],1,1) ;
                         print cmds[tag] | sh ;
                         if(close(sh) == 0){
-                            printLog("*[success]expand tag:" tag " to tag:" tagNext, 0, 1) ;
+                            printLog("*[success]expand tag:" tag " to tag:" tagNext, 1, 1) ;
                         }else{
                             printLog("*[failed]expand tag:" tag " to tag:" tagNext, 0, 1) ;
                         }
@@ -128,12 +131,12 @@ awk -v preprocInfoFile="$preprocInfoFile"   \
             }
 
             for(tag in preprocess){
-                printLog("*[preprocessing...]\n  tag=" tag "\n  tagOrg="map2Org[tag], 0, 1) ;
-                printLog("#*generate preprocessing text [" map2Org[tag] "] -> [" tag "]", 0, 0) ;
+                printLog("*[preprocessing...]\n  tag=" tag "\n  tagOrg="map2Org[tag], 1, 1) ;
+                print "#*generate preprocessing text [" map2Org[tag] "] -> [" tag "]" ;
                 printLog("*" preprocess[tag],1,1) ;
                 print preprocess[tag] | sh ;
                 if(close(sh) == 0){
-                    printLog("*[success]", 0, 1) ;
+                    printLog("*[success]", 1, 1) ;
                 }else{
                     printLog("*[failed]", 0, 1) ;
                 }
@@ -152,10 +155,11 @@ preprocFileMap=$(
 )
 
 #generate preproc content
-echo "$preprocMassData" > .t3
+#echo "$preprocMassData" > .t
 echo "$preprocMassData" |   #cat - ; exit
 
-awk -v preprocFileMap="$preprocFileMap"        \
+awk -v preprocFileMap="$preprocFileMap"         \
+    -v printSolidLineIdxes=$printSolidLineIdxes \
     '
     function printLog(      \
         msg,                # string, mandatory, message for print
@@ -171,46 +175,70 @@ awk -v preprocFileMap="$preprocFileMap"        \
         else                print msg > "/dev/stderr" ;
     }
 
+    function catLineIdxes(  \
+        lineIdxes,          # string, mandatory, lines idx of a file
+                            \
+        s, e, rslt, num, arry, i, h, t)
+    {
+        s = "" ;
+        e = "" ;
+        rslt = "" ;
+
+        #!!! gsub(/^ *| *$/, "", lineIdxes) ;  <-- awk bug, the pattern /^ */ of gsub matches all spaces in whole string !!!!
+        sub(/^ */, "", lineIdxes) ; sub(/ *$/, "", lineIdxes) ;
+
+        num = split(lineIdxes, arry, / +/) ;
+
+        for(i=1; i<=num; i++){
+            h = arry[i]; sub(/-.*/, "", h) ;
+            t = arry[i]; sub(/.*-/, "", t) ;
+
+            if(!e){
+                s = h ;
+                e = t ;
+            }else if(h == e+1){
+                e = t ;
+            }else{
+                rslt = rslt ((s==e) ? s : s "-" e) " " ;
+                s = h ;
+                e = t ;
+            }
+        }
+
+        rslt = rslt ((s==e) ? s : s "-" e) " " ;
+        sub(/^ */, "", rslt) ; sub(/ *$/, "", rslt) ;
+
+        return rslt ;
+    }
+
     BEGIN{
     }
 
     END{
-        # fix and log empty line infomation
-        {
-            for(pn in emptyLineInfo){
+        
+        if(printSolidLineIdxes){
 
-                s = "" ;
-                e = "" ;
-                infoFixed = "" ;
+            #printout solid lines info
 
-                #!!! gsub(/^ *| *$/, "", emptyLineInfo[pn]) ;  <-- awk bug, the pattern /^ */ of gsub matches all spaces in whole string !!!!
-                sub(/^ */, "", emptyLineInfo[pn]) ; sub(/ *$/, "", emptyLineInfo[pn]) ;
-                printLog("*before connect:" pn "\n" emptyLineInfo[pn], 1, 1) ;
+            for(pn in solidLineIdxs){
+                printLog("*before concatenate:" pn "\n" solidLineIdxs[pn], 1, 1) ;
+                catRslt = catLineIdxes(solidLineIdxs[pn]) ;
+                printLog("*after concatenate: " pn "\n" catRslt "\n", 1, 1) ;
+                print "[" pn "]" catRslt ;
+            }
 
-                num = split(emptyLineInfo[pn], arry, / +/) ;
+        }else{
 
-                for(i=1; i<=num; i++){
-                    h = arry[i]; sub(/-.*/, "", h) ;
-                    t = arry[i]; sub(/.*-/, "", t) ;
+            #printout empty lines info 
 
-                    if(!e){
-                        s = h ;
-                        e = t ;
-                    }else if(h == e+1){
-                        e = t ;
-                    }else{
-                        infoFixed = infoFixed ((s==e) ? s : s "-" e) " " ;
-                        s = h ;
-                        e = t ;
-                    }
-                }
-
-                infoFixed = infoFixed ((s==e) ? s : s "-" e) " " ;
-                sub(/^ */, "", infoFixed) ; sub(/ *$/, "", infoFixed) ;
-                print "[" pn "]" infoFixed ;
-                printLog("*after connect: " pn "\n" infoFixed "\n", 1, 1) ;
+            for(pn in emptyLineIdxs){
+                printLog("*before concatenate:" pn "\n" emptyLineIdxs[pn], 1, 1) ;
+                catRslt = catLineIdxes(emptyLineIdxs[pn]) ;
+                printLog("*after concatenate: " pn "\n" catRslt "\n", 1, 1) ;
+                print "[" pn "]" catRslt ;
             }
         }
+
     }
 
     /^#\*generate preprocessing text/{
@@ -219,9 +247,10 @@ awk -v preprocFileMap="$preprocFileMap"        \
         mappedFile = $0; gsub(/.*\[|\] *$/, "", mappedFile) ;
         tag = mappedFile; sub(/.*\//, "", tag) ;
         posWrite = 1 ;
-        emptyLineInfo[orgFile] = "" ;
-        printLog("*generating preprocess content for " orgFile, 0, 1) ;
-        printLog("*collect all content from tag: " tag, 0, 1) ;
+        emptyLineIdxs[orgFile] = "" ;
+        solidLineIdxs[orgFile] = "" ;
+        printLog("*generating preprocess content for " orgFile, 1, 1) ;
+        printLog("*collect all content from tag: " tag, 1, 1) ;
         next ;
     }
 
@@ -234,7 +263,7 @@ awk -v preprocFileMap="$preprocFileMap"        \
         filler = "" ;
         for(i=posWrite; i<posSrcCode; i++) filler = filler "\n" ;
         if(filler){
-            emptyLineInfo[orgFile] = emptyLineInfo[orgFile] posWrite "-" posSrcCode-1 " " ;
+            emptyLineIdxs[orgFile] = emptyLineIdxs[orgFile] posWrite "-" posSrcCode-1 " " ;
             posWrite = posSrcCode ;
             printLog(filler,1,1,1) ;
         }
@@ -249,7 +278,11 @@ awk -v preprocFileMap="$preprocFileMap"        \
     }
 
     (startCollect){
-        if($0 ~ /^$/) emptyLineInfo[orgFile] = emptyLineInfo[orgFile] posWrite " " ;
+        if($0 ~ /^$/){
+            emptyLineIdxs[orgFile] = emptyLineIdxs[orgFile] posWrite " " ;
+        }else{
+            solidLineIdxs[orgFile] = solidLineIdxs[orgFile] posWrite " " ;
+        }
         printLog(posWrite " " $0, 1, 1) ;
         posWrite ++ ;
     }
