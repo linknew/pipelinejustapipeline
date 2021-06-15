@@ -69,71 +69,71 @@ function classifyCheckRslt
         '
 }
 
-if [[ $markNoncert -eq 1 ]] ; then
-    function markNoncertItems
-    {
-        awk '
+function markNoncertItems
+#--org, just cat
+{
 
-            BEGIN{
+    if [[ $1 == "--org" ]]; then
+        cat - ;
+        return 0 ;
+    fi
 
-                # load empty preprocess info
-                {
-                    while( (getline < "check.preprocessInfo.solidLines") >0 ){
-                        key = $0; gsub(/^\[|\].*/, "", key) ;
-                        valList = $0; sub(/.*\]/, "", valList) ;
-                        lineNum[key] = split(valList, vals, / +/) ;
-                        #print key,valList,"@",lineNum[key] > "/dev/stderr" ;
+    awk '
 
-                        for(i=1; i<=lineNum[key]; i++){
-                            h = vals[i]; sub(/-.*/, "", h) ;
-                            t = vals[i]; sub(/.*-/, "", t) ;
-                            val[key,i,"h"] = h+0 ;
-                            val[key,i,"t"] = t+0 ;
-                        }
+        BEGIN{
+
+            # load empty preprocess info
+            {
+                while( (getline < "check.preprocessInfo.solidLines") >0 ){
+                    key = $0; gsub(/^\[|\].*/, "", key) ;
+                    valList = $0; sub(/.*\]/, "", valList) ;
+                    lineNum[key] = split(valList, vals, / +/) ;
+                    #print key,valList,"@",lineNum[key] > "/dev/stderr" ;
+
+                    for(i=1; i<=lineNum[key]; i++){
+                        h = vals[i]; sub(/-.*/, "", h) ;
+                        t = vals[i]; sub(/.*-/, "", t) ;
+                        val[key,i,"h"] = h+0 ;
+                        val[key,i,"t"] = t+0 ;
                     }
-                    close("check.preprocessInfo.solidLines") ;
                 }
-
+                close("check.preprocessInfo.solidLines") ;
             }
 
-            {
-                if($0 ~ / @ \/[^ \t]+\.(c|s|cpp):[0-9]+/){
+        }
 
-                    #only .c .s .cpp will be checked
+        {
+            if($0 ~ / @ \/[^ \t]+\.(c|s|cpp):[0-9]+/){
 
-                    _key = $0; gsub(/.* @ \/|:.*/, "", _key); _key="/"_key ;
-                    _val = $0; sub(/.* @ \/[^ \t]+:/, "", _val) sub(/ .*$/, "", _val) ;
+                #only .c .s .cpp will be checked
 
-                    #print "------->"_key ;
-                    #print "+++++++>"_val ;
-                    if(_key in lineNum){
+                _key = $0; gsub(/.* @ \/|:.*/, "", _key); _key="/"_key ;
+                _val = $0; sub(/.* @ \/[^ \t]+:/, "", _val) sub(/ .*$/, "", _val) ;
 
-                        for(i=1; i<=lineNum[_key]; i++){
-                            if(_val+0 >  val[_key,i,"t"]) continue ;
-                            if(_val+0 >= val[_key,i,"h"]) break ;
-                        }
+                #print "------->"_key ;
+                #print "+++++++>"_val ;
+                if(_key in lineNum){
 
-                        if(i > lineNum[_key]) sub(/[^ \t]/,"- {noncert_ignored}") ;
-                        print $0;
-
-                    }else{
-                        print "!!cannot find info of " _key " in check.preprocessInfo.solidLines" > "/dev/stderr" ;
-                        print $0 ;
+                    for(i=1; i<=lineNum[_key]; i++){
+                        if(_val+0 >  val[_key,i,"t"]) continue ;
+                        if(_val+0 >= val[_key,i,"h"]) break ;
                     }
+
+                    if(i > lineNum[_key]) sub(/[^ \t]/,"- {noncert_ignored}") ;
+                    print $0;
 
                 }else{
-                    print ;
+                    print "!!cannot find info of " _key " in check.preprocessInfo.solidLines" > "/dev/stderr" ;
+                    print $0 ;
                 }
-            }
 
-            '   -
-    }
-else
-    function markNoncertItems
-    {
-        cat - ;
-    }
-fi
+            }else{
+                print ;
+            }
+        }
+
+        '   -
+}
 #markNoncertItems ; exit
 
 
@@ -263,6 +263,7 @@ fi
 
 if [[ $funcCheckIllegals -eq 1 ]] ; then
     echo -ne "prefix directory:\n\n    - $patPreDir\n\n" | sed -E 's@\S*/helix/@helix/@' > $filenameIllegal
+    [[ $markNoncert -eq 1 ]] && markNoncertOpt="" || markNoncertOpt="--org"
 
     # execute checkers
 
@@ -276,7 +277,7 @@ if [[ $funcCheckIllegals -eq 1 ]] ; then
         ./checkInFunctionHeader.sh "$component" "$patPreDir" $files | classifyCheckRslt "$igrFcts"
 
 
-    ) | markNoncertItems | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
+    ) | markNoncertItems $markNoncertOpt | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
     echo "*check ILLEGALS in               $filenameIllegal"
 fi
 
@@ -285,7 +286,7 @@ fi
 
 if [[ $funcUnstableCheck -eq 1 ]] ; then
     echo -ne "prefix directory:\n\n    - $patPreDir\n\n" | sed -E 's@\S*/helix/@helix/@' > $filenameUnstableChecking
-    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | markNoncertItems |
+    ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | markNoncertItems $markNoncertOpt |
         sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameUnstableChecking &&
         echo "*check UNSTABLECHECKING in       $filenameUnstableChecking"
 fi
