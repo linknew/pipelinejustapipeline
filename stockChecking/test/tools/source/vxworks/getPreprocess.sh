@@ -15,6 +15,8 @@ printSolidLineIdxes=${printSolidLineIdxes:-1}
 #{
     for i in "$@"  ; do
         [[ $i == "--printEmptyLineIdxes" ]] && printSolidLineIdxes=0 && continue ;
+        [[ $i == "--genMidFile" ]] && genMidFile=1 && continue ;
+        [[ $i == "--withNo" ]] && withNo=1 && continue ;
 
         [[ ! -f "$i" ]] && echo "!!cannot open the file $i" >&2 && continue ;
 
@@ -63,8 +65,10 @@ awk -v preprocInfoFile="$preprocInfoFile"   \
         # load preprocess info
         {
             while( (getline < preprocInfoFile) > 0){
-                tag = $0; gsub(/^\[|\].*/, "", tag);
 
+                if($0 ~ /^[ \t]*$/ || substr($0,1,1) == "#") continue ;
+
+                tag = $0; gsub(/^\[|\].*/, "", tag);
                 if(substr(tag, 1, 1) == "*"){
                     tag = substr(tag, 2) ;
                     tagNext = $0; gsub(/.* \[|\]$/, "", tagNext);
@@ -160,6 +164,8 @@ echo "$preprocMassData" |   #cat - ; exit
 
 awk -v preprocFileMap="$preprocFileMap"         \
     -v printSolidLineIdxes=$printSolidLineIdxes \
+    -v genMidFile=$genMidFile                   \
+    -v withNo=$withNo                           \
     '
     function printLog(      \
         msg,                # string, mandatory, message for print
@@ -212,10 +218,14 @@ awk -v preprocFileMap="$preprocFileMap"         \
     }
 
     BEGIN{
+        tagStrHead = "^# [0-9]+ \"" ;
+        tagStrTail = "\"($|.* [12]$)" ;
     }
 
     END{
         
+        if(genMidFile && mdf) close(mdf) ;
+
         if(printSolidLineIdxes){
 
             #printout solid lines info
@@ -241,6 +251,10 @@ awk -v preprocFileMap="$preprocFileMap"         \
 
     }
 
+    {
+        printLog("rawPreprocCont: " $0, 1, 1) ;
+    }
+
     /^#\*generate preprocessing text/{
 
         orgFile = $0; gsub(/.*text \[|\].*/, "", orgFile) ;
@@ -251,10 +265,15 @@ awk -v preprocFileMap="$preprocFileMap"         \
         solidLineIdxs[orgFile] = "" ;
         printLog("*generating preprocess content for " orgFile, 1, 1) ;
         printLog("*collect all content from tag: " tag, 1, 1) ;
+        if(genMidFile){
+            if(mdf) close(mdf) ;
+            mdf = orgFile; gsub(/\//, "_", mdf) ;
+            mdf = mdf ".mdf" ;
+        }
         next ;
     }
 
-    ($0 ~ "^# [0-9]+ [^ \\t]+($|( [0-9]+)* [12]$)" ){
+    ($0 ~ tagStrHead tag tagStrTail){
         printLog("*found tag:" tag " @ " $0, 1, 1) ;
         startCollect = 1 ;
         posSrcCode = $0; gsub(/^# *| *".*/, "", posSrcCode) ;
@@ -265,6 +284,7 @@ awk -v preprocFileMap="$preprocFileMap"         \
         if(filler){
             emptyLineIdxs[orgFile] = emptyLineIdxs[orgFile] posWrite "-" posSrcCode-1 " " ;
             posWrite = posSrcCode ;
+            if(genMidFile) printf filler > mdf ;
             printLog(filler,1,1,1) ;
         }
 
@@ -283,6 +303,8 @@ awk -v preprocFileMap="$preprocFileMap"         \
         }else{
             solidLineIdxs[orgFile] = solidLineIdxs[orgFile] posWrite " " ;
         }
+        _no = (withNo) ? (posWrite " ")  : ("") ;
+        if(genMidFile) print _no $0 > mdf ;
         printLog(posWrite " " $0, 1, 1) ;
         posWrite ++ ;
     }

@@ -60,7 +60,7 @@ awk -v ignErr=$ignErr                           \
 
         mon = substr($1,3,3) ;
         if(!(mon in hMon)){
-            print "    * month abbrevation is incorrect @",FILENAME "::" FNR,"#",$1 > "/dev/stdout" ;
+            print "    * month abbrevation is incorrect @ line", FNR,"#",$1 > "/dev/stdout" ;
             if(!ignErr) next ;
         }
 
@@ -70,7 +70,7 @@ awk -v ignErr=$ignErr                           \
         date = year2D mon2D day2D ;
         if(checkingDateOrder){
             if(date>lastDate){
-                print "    * this entry does not arrange by date @",FILENAME "::" FNR,"#",$1,"[" date">"lastDate "]" > "/dev/stdout" ;
+                print "    * this entry does not arrange by date @ line", FNR,"#",$1,"[" date">"lastDate "]" > "/dev/stdout" ;
                 if(!ignErr) next ;
             }
         }

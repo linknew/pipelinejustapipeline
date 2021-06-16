@@ -10,7 +10,7 @@ function showHelp
     echo -ne "\nThis routine is used to check whether the source code conforms to the CSTG
               \nUsage:      \
               \n    $0 CCR round component dirPrefix    \\      \
-              \n               [--genReport] [--markNoncert] [--checkModificationCopyright] [--checkIllegals] [--doUnstableCheck] [--listCheckFilesOnly]
+              \n               [--genReport] [--cleanEnvAftRun] [--refreshRep] [--markNoncert] [--checkModificationCopyright] [--checkIllegals] [--doUnstableCheck] [--listCheckFilesOnly]
               \nArguments:  \
               \n    -
               \nOptions:    \
@@ -133,6 +133,7 @@ function markNoncertItems
         }
 
         '   -
+
 }
 #markNoncertItems ; exit
 
@@ -149,6 +150,8 @@ function markNoncertItems
         [[ $i == "--doUnstableCheck" ]] && funcUnstableCheck=1 && continue
         [[ $i == "--genReport" ]] && funcGenReport=1 && continue
         [[ $i == "--markNoncert" ]] && markNoncert=1 && continue
+        [[ $i == "--cleanEnvAftRun" ]] && cleanEnvAftRun=1 && continue
+        [[ $i == "--refreshRep" ]] && refreshRep=1 && continue
         [[ $i == "--listCheckFilesOnly" ]] && funcListCheckFilesOnly=1 && continue
         [[ ${i:0:1} == "-" ]] && echo "!!unknown options $i" >&2 && exit
         argv[++argc]=$i
@@ -163,12 +166,6 @@ function markNoncertItems
     round=R${argv[2]:-1}
     component=${argv[3]:-wildComponent}
     patPreDir=${argv[4]:-"sourceChecking/review-${ccr}-files/"}
-    [[ -z $funcCheckModCpr   &&
-       -z $funcCheckIllegals &&
-       -z $funcUnstableCheck &&
-       -z $funcGenReport     &&
-       -z $funcListCheckFilesOnly  ]] && funcCheckModCpr=1 funcCheckIllegals=1 funcUnstableCheck=1
-
     filenameCopyright_modification=copyright_modification.${round//./_}.$component.$ccr.$username.txt
     filenameIllegal=illegals.${round//./_}.$component.$ccr.$username.txt
     filenameUnstableChecking=unstableChecking.${round//./_}.$component.$ccr.$username.txt
@@ -179,6 +176,14 @@ function markNoncertItems
 
 
 [[ -z $ccr ]] && echo "!!Please specify a CCR number." >&2 && exit
+
+
+if [[ $refreshRep -eq 1 ]] ; then
+    echo "*refresh repo vx7-SC0630"
+    git reset --hard; git checkout vx7-SC0630; git pull -p
+    echo ""
+fi
+
 
 if [[ $funcCheckModCpr   -eq 1 || $funcCheckIllegals      -eq 1 ||
       $funcUnstableCheck -eq 1 || $funcListCheckFilesOnly -eq 1   ]] ; then
@@ -254,7 +259,7 @@ if [[ $funcCheckModCpr -eq 1 ]] ; then
         '   |
     sed -E 's/ +$//;' | align.sh --gaps='@' --gapsOnly --widthLimit=90 >  \
     $filenameCopyright_modification &&
-    echo "*check COPYRIGHT_MODIFICATION in $filenameCopyright_modification"
+    echo -ne "*check COPYRIGHT_MODIFICATION --> $filenameCopyright_modification\n\n"
 fi
 
 
@@ -278,7 +283,7 @@ if [[ $funcCheckIllegals -eq 1 ]] ; then
 
 
     ) | markNoncertItems $markNoncertOpt | sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameIllegal &&
-    echo "*check ILLEGALS in               $filenameIllegal"
+    echo -ne "*check ILLEGALS               --> $filenameIllegal\n\n"
 fi
 
 
@@ -288,7 +293,7 @@ if [[ $funcUnstableCheck -eq 1 ]] ; then
     echo -ne "prefix directory:\n\n    - $patPreDir\n\n" | sed -E 's@\S*/helix/@helix/@' > $filenameUnstableChecking
     ./checkUnstable.sh $files | classifyCheckRslt "$igrFcts" | markNoncertItems $markNoncertOpt |
         sed -E 's@'$patPreDir'@.../@' | align.sh --gaps='@,#' --gapsOnly >> $filenameUnstableChecking &&
-        echo "*check UNSTABLECHECKING in       $filenameUnstableChecking"
+        echo -ne "*check UNSTABLECHECKING       --> $filenameUnstableChecking\n\n"
 fi
 
 
@@ -300,7 +305,7 @@ if [[ $funcGenReport -eq 1 ]] ; then
     # generate status report
 
     ./genCCR_StatusFromCCR_WebPage.sh "$fileStatusOrg"   | sort -n | align.sh > $fileStatusDtl &&
-    echo "*check STATUS in                 $fileStatusDtl"
+    echo -ne "*check STATUS                 --> $fileStatusDtl\n\n"
 
     # generate summary status report
 
@@ -323,18 +328,17 @@ if [[ $funcGenReport -eq 1 ]] ; then
             }
         }
         '   | sort -n > $fileStatusSum &&
-    echo "*check SUMMARY_STATUS in         $fileStatusSum"
+    echo -ne "*check SUMMARY_STATUS         --> $fileStatusSum\n\n"
 fi
 
-#if [[ $funcCheckModCpr   -eq 1 || $funcCheckIllegals      -eq 1 ||
-#      $funcUnstableCheck -eq 1 || $funcListCheckFilesOnly -eq 1   ]] ; then
-#
-#    if [[ ${patPreDir:0:1} != '/' ]] ; then
-#        "$(pwd)/$patPreDir"
-#    fi
-#fi
-echo ""
 
+if [[ $cleanEnvAftRun -eq 1 ]] ; then
+    echo "*try to rm sourceChecking/review-$ccr-files and sourceChecking/review-$ccr-files.zip"
+    rm -rf sourceChecking/review-$ccr-files sourceChecking/review-$ccr-files.zip
+fi
+
+
+echo ""
 git reset --hard 2>&1 >/dev/null
 
 exit

@@ -1,0 +1,55 @@
+##########################################################################
+# ignore checking functions(Temporary solution)
+#
+#function="check keyword "this/the function" in FUNCTION_HEADER"
+#function='check keyword "this/the routine" in FUNCTION_HEADER'
+function="check redundant spaces in FUNCTION_HEADER"
+####function="check "->" or "." in FUNCTION_HEADER"
+####function='check "\NOMANUAL" tag in FUNCTION_HEADER'
+##function='check keyword "yes/no" in COMMENTs'
+##function='check "strcat/strcmp/strcpy/strlen"'
+##function='check "?" in COMMENTs'
+function='check RIGHT_ALIGNED tags'
+##function='check "sprintf/alloca"'
+##function='check "setjmp/longjmp"'
+##function='check illegal characters'
+##function='check indentation of "{" and "}"'
+##function='check 80 byte_width limitation'
+##function='check keyword "should" in COMMENTs'
+##function='check nested comments'
+##function='check "\ml" tag in FUNCTION_HEADER'
+##function='check "#if 0~"'
+##function='check multiple API title in FUNCTION_HEADER'
+#
+#
+#
+##########################################################################
+# ignore files in module
+#
+Vx_kernel_rtp_load.files=helix/guests/vxworks-7/pkgs_v2/os/core/rtp/src/rtpLib.c
+#
+GOS_hv_support.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/lib/src/bstreeLib.c
+GOS_hv_support.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/lib/src/ivtreeLib.c
+GOS_hv_support.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/lib/src/rbtreeLib.c
+GOS_hv_support.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/shmem/src/resource/vxbVirtShmemPci.c
+#
+GOS_Apex.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7_safe/apex/src/private/apexPortLibP.h
+#
+HV_Manager.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/sys/sysinfo.h
+HV_Manager.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/sys/wrhvStartup.h
+HV_Manager.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/usr/usrStartup.h
+#
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/libraries/libfdt/fdt.h
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/bmpLib.h
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/include/cptLib.h
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/kernel/src/wrhvPower.c
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/arch/arm/include/sys/arm/regs.h
+VMM_Kernel.files=helix/guests/vxworks-7/pkgs_v2/os/hv/hypervisor/vmm/managers/src/hv/hvMemMgr.c
+#
+Vx_kernel_mm_page.files=helix/guests/vxworks-7/pkgs_v2/os/core/kernel/src/mm/poolLib.c
+#
+GOS_hvif.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/hvif/h/hvSyscalls.h
+GOS_hvif.files=helix/guests/vxworks-7/pkgs_v2/os/hv/guest_support_vx7/hvif/protectedh/arm/v8/hvMacros.h
+GOS_hvif.files=helix/guests/vxworks-7/pkgs_v2/test/helix-cert-tests/native/Vx_kernel_vxbus/LLTP/vxbPci/tl_vxbPci.c
+GOS_hvif.files=helix/guests/vxworks-7/pkgs_v2/test/helix-cert-tests/native/Vx_kernel_vxbus/LLTP/vxbPci/tp_vxbPci_vxbPciDevBarSize.c
+GOS_hvif.files=helix/guests/vxworks-7/pkgs_v2/test/helix-cert-tests/native/Vx_kernel_vxbus/LLTP/vxbPci/tp_vxbPci_vxbPciFdtDevAdd.c
