@@ -280,14 +280,14 @@ fi
 #star the loop
 
 if (( _cmdCode & (_cmdCodeUpdate|_cmdCodeDownload|_cmdCodeDoDailyHomework|_cmdCodeJustDoit) )) ; then
-    showHi "*Download 1399001 for the base of systemSync\n" >&2
-    ./getStockData.$$.sh --update 1399001 2>/dev/null
-    _dateEnd=$(grep "'399001" StockData/139900-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
+    showHi "*Download 1000001 for the base of systemSync\n" >&2
+    ./getStockData.$$.sh --update 1000001 2>/dev/null
+    _dateEnd=$(grep "'000001" StockData/100000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
     _dateEnd=${_dateEnd:-$(date "+%Y%m%d")}
 fi
 
 awk '{if($1~/'$_firstCode'/) _start=1; if(_start) print $1; }' $_list |            # do not use "$_list" (because $_list can be empty)
-while read _code x
+while read _code x y
 do
     [[ ${_code:0:1} == '#' ]] && continue
 

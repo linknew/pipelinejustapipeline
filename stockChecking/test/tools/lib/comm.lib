@@ -321,7 +321,7 @@ function getActualDate()
     [[ $# -lt 1 || $# -gt 2 ]] && echo "only 1 or 2 arguments supported" >&2 && return 1
     [[ $# == 1 ]] && _baseDate=$(date "+%Y-%m-%d")
     [[ $# == 2 ]] && _baseDate=$2
-    _weekDay=$(date -j -f "%Y-%m-%d" $_baseDate "+%u")
+    _weekDay=$(date -d $_baseDate "+%u") 	#_weekDay=$(date -j -f "%Y-%m-%d" $_baseDate "+%u")
 #
     if [[ ${1:0:1} == '-' || ${1} == '0' ]] ; then
         let _actWorkingDays=-$1
@@ -331,7 +331,7 @@ function getActualDate()
         [[ $(($_actWorkingDays%5)) -gt $(($_weekDay-1)) ]] && let _fix+=2
         let _actWorkingDays=$(( $_actWorkingDays/5*7 + $_actWorkingDays%5 + $_fix ))
         [[ _actWorkingDays -lt 0 ]] && let _actWorkingDays=0
-        echo $(date -j -v -${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+        echo $(date -v -${_actWorkingDays}d -d $_baseDate "+%Y-%m-%d") 	#echo $(date -j -v -${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
     elif [[ ${1:0:1} == '+' ]] ; then
         let _actWorkingDays=$1
         if [[ $_weekDay -eq 6 ]] ; then
@@ -342,12 +342,12 @@ function getActualDate()
             let _fix=2
         fi
         let _actWorkingDays=$(( ($_actWorkingDays/5)*7 + ($_actWorkingDays%5) + $_fix ))
-        echo $(date -j -v +${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+        echo $(date -d "$_baseDate +${_actWorkingDays} days" "+%Y-%m-%d") 	#echo $(date -j -v +${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
     elif [[ ${1:4:1} == '-' && ${1:7:1} == '-' ]] ; then
         echo $1
     elif [[ $1 -le 31 ]] ; then
         _baseDate=$(date "+%Y-%m-%d")
-        date -j -v ${1}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d"
+        date -d "$_baseDate +1 days" "+%Y-%m-%d"	#date -j -v ${1}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d"
     else
         echo "unknown argument $1"
         return 1
@@ -441,7 +441,7 @@ EOF
 #
 awkFunction_asortSet=$(cat - <<-AWK_FUNCTION_ASORTSET_EOF
 #
-# !! _asortMult is a interal function for asort and asortMult, do NOT invoke it outside
+# !! _asortMult is a interal function for isort and asortMult, do NOT invoke it outside
 #
 function _asortMult(    \
     src,            # array for sorting. this parameter must be presented
@@ -526,7 +526,7 @@ function _asortMult(    \
     return 0 ;
 }
 #
-function asort(         \
+function isort(         \
     src,                # array
     dest,               # array
 #

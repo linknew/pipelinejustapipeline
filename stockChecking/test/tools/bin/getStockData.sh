@@ -103,13 +103,38 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
     else
         echo "*[$_stockCode]update history data" >&2
         _timeStampReq=$(date '+%Y-%m-%d %H:%M:%S')
+
+#@  get history data from **163**
+#       _dataRcvd=$(
+#           curl -f http://quotes.money.163.com/service/chddata.html?code=${_stockCode}\&start=$_dateStart\&end=$_dateEnd 2>/dev/null |
+#           iconv -f GBK -t utf8 |
+#           sed -n '$d; 2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' | 
+#           awk '($4>0){print}' |
+#           tac
+#       )
+#@	//////////
+
+#@  get history data from **tushare**
+		code_py=$_stockCode
+		  if [[ ${#code_py} -eq 7 && ${code_py:0:1} == '0' ]]; then code_py=${code_py:1}.sh
+		elif [[ ${#code_py} -eq 7 && ${code_py:0:1} == '1' ]]; then code_py=${code_py:1}.sz
+		elif [[ ${#code_py} -eq 6 && ( ${code_py:0:1} == '6' || ${code_py:0:1} == '9' ) ]]; then code_py=${code_py}.sh
+		else code_py=${code_py}.sz
+		  fi
+	    #echo "dbg: getHis.py $code_py $_dateStart $_dateEnd" > /dev/tty
         _dataRcvd=$(
-            curl -f http://quotes.money.163.com/service/chddata.html?code=${_stockCode}\&start=$_dateStart\&end=$_dateEnd 2>/dev/null |
+			getHis.py $code_py $_dateStart $_dateEnd 2>/dev/null | 
             iconv -f GBK -t utf8 |
-            sed -n '$d; 2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' | 
-            awk '($4>0){print}' |
+            sed -n '2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' |
+            awk -v code=${_stockCode:1} '
+					($4>0){
+						date = substr($2,1,4) "-" substr($2,5,2) "-" substr($2,7);
+						print date, "\047" code, "-", $6, $4, $5, $3, $7, $8, $9, "-", $10, $11, "-", "-", "-";
+					} ' |
             tac
         )
+#@	//////////
+
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2
         echo "$_dataRcvd" >> StockData/$_stockCode.html.org 2>/dev/null

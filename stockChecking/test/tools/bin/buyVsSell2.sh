@@ -42,7 +42,8 @@ doExit()
 for i in "$@"; do
     [[ $i == --help ]] && echo "
     Usage:
-        $0 [--help] [--onlyOnce] [--code=stockID] [--list=listFile] [--details] [[--date=([+|-]N|yyyy-mm-dd)] | ([--start=(-N|yyyy-mm-dd)] [--end=(-N|yyyy-mm-dd)])] statementAccountFile
+        `basename $0` [--help] [--onlyOnce] [--code=stockID] [--list=listFile] [--details] \\
+	     	      [[--date=([+|-]N|yyyy-mm-dd)] | ([--start=(-N|yyyy-mm-dd)] [--end=(-N|yyyy-mm-dd)])] statementAccountFile
 
         --onlyOnce, only run once.
         --code, check single stock specified by 'stockId'.
@@ -74,7 +75,8 @@ trap "doExit -1" SIGTERM SIGINT SIGQUIT
 _start=$(getActualDate ${_start:-1970-01-01})
 _end=$(getActualDate ${_end:-+0})
 _statementAccountFile=${_statementAccountFile:-.statementAccount}
-_modDate=$(ls -alT $_statementAccountFile | awk '{print $8}')
+_modDate=$(ls -alt $_statementAccountFile | awk '{print $8}')
+#_modDate=$(ls -alT $_statementAccountFile | awk '{print $8}')
 
 while true; do
 
@@ -518,12 +520,11 @@ while true; do
             if(length(_awkCode)==0) _blurryStockId = 1 ;
             _tmpFile = ".tmp.'$$'" ;
             _tmpProfitLogFile = ".profitDetails.log.'$$'" ;
-            print "---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" ;
+            print "-----------------------------------------------------------------------------------------------------------------------------------------------------------" ;
         }
 
         (substr($1,1,1) != "#")\
         {
-
             if($5 > _awkDateEnd) next ;
 
 #            gsub(/X/,"",_awkCode) ;
@@ -558,7 +559,7 @@ while true; do
             # get stock name
             if(!stockName[_code]){
                 _name=" " ;
-                _bashCmd="grep "_code" stock.list | sed s/^.*\\ //" ;
+                _bashCmd="grep "substr(_code,2)" stock.list | sed \"s/.*[ \t]//\"" ;
                 _bashCmd | getline _name ;
                 stockName[_code] = _name ;
                 close(_bashCmd) ;
@@ -612,7 +613,7 @@ while true; do
                     _sellSort[i] = sold[_code,i] ;
                 }
 
-                print "\n*"stockName[_code]"["_code"]","\n----------------" > _tmpFile ;
+                print "\n*"stockName[_code]"["_code"]","\n------------------" > _tmpFile ;
                 _tEarn=neutralize(_code,_buySort,_sellSort,_awkDateStart,_awkDateEnd) ;
                 if(_awkDetail){
                     print "[Details]" > _tmpFile ;
@@ -671,7 +672,7 @@ while true; do
                 if(_selVolRemain == _buyVolRemain){
                     _lastPrice[_code] = 0 ;
                 }else{
-                    _bashCmd="./playStockList.sh --print --fixType=N <<< "_code" 2>/dev/null | grep "_awkDateEnd" | awk \"END{print \\$2}\" " ;
+                    _bashCmd="echo "_code" | ~/tools/bin/playStockList.sh --print --fixType=N 2>/dev/null | grep "_awkDateEnd" | awk \"END{print \\$2}\" " ;
                     _bashCmd | getline _lastPrice[_code] ;
                     close(_bashCmd) ;
                 }
@@ -683,10 +684,10 @@ while true; do
                 _investment = (_buyVolRemain==_selVolRemain)?0:_payRemain ;
                 _profit = (asset[_code,"earn"] - asset[_code,"pay"]) + _lastPrice[_code]*(_buyVolRemain-_selVolRemain) ;
 
-                printf("    TEarn:\t  %.2f\n",_tEarn) > _tmpFile ;
-                printf("    Asset:\t  %d(%d+%d)\n", _asset, _cash, _stockValue) > _tmpFile ;
-                printf("    Investment:\t  %d\n", _investment) > _tmpFile ;
-                printf("    Profit:\t  %d\n", _profit) > _tmpFile ;
+                printf("    TEarn:\t   %15.2f\n",_tEarn) > _tmpFile ;
+                printf("    Asset:\t   %15d(%d+%d)\n", _asset, _cash, _stockValue) > _tmpFile ;
+                printf("    Investment:\t   %15d\n", _investment) > _tmpFile ;
+                printf("    Profit:\t   %15d\n", _profit) > _tmpFile ;
                 close(_tmpFile) ;
 
                 if(_tEarn || _selVolRemain != _buyVolRemain || _lockTT){
@@ -702,14 +703,14 @@ while true; do
                 TotalProfit += _profit ;
 #                print " ok" > "/dev/stderr" ;
             }
-            print "OK" > "/dev/stderr" ; 
+            print "" > "/dev/stderr" ; 
 
             if(length(stockName)>1){
-                printf ("\n======================\n%s\t %d\n%s\t %d(%d+%d)\n%s %d\n%s\t %d\n\n",
-                        "TotalTEarn:", TotalTEarn,
-                        "TotalAsset:", TotalCash+TotalStock, TotalCash, TotalStock,
+                printf ("\n==================\n%s\t %17d\n%s\t %17d(%d+%d)\n%s %17d\n%s\t %17d\n\n",
+                        "TotalTEarn:",		TotalTEarn,
+                        "TotalAsset:",		TotalCash+TotalStock, TotalCash, TotalStock,
                         "TotalInvestment:", TotalInvestment,
-                        "TotalProfit:", TotalProfit) ;
+                        "TotalProfit:",		TotalProfit) ;
             }
         }
 
@@ -718,7 +719,8 @@ while true; do
     [[ $_onlyOnce -eq 1 ]] && break ;
 
     while true ; do
-        _tmp=$(ls -alT $_statementAccountFile | awk '{print $8}')
+        _tmp=$(ls -alt $_statementAccountFile | awk '{print $8}')
+        #_tmp=$(ls -alT $_statementAccountFile | awk '{print $8}')
         if [[ $_tmp == $_modDate ]]; then
             sleep 5
         else

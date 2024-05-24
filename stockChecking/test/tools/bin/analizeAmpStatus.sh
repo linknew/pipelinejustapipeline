@@ -220,7 +220,7 @@ do
                     _outPut = sprintf("\t%s %6.2f%% [%.02f,%d]", _awkCode, _arry[i]*100.0/_tt, i, _arry[i]) ;
                     arry4Sorting[_cnt++] = _arry[i]"@"_outPut ;
                 }
-                asort(arry4Sorting,arry4Sorting,1,1) ;
+                isort(arry4Sorting,arry4Sorting,1,1) ;
 
                 # do filte  and print result
                 if(_awkFilteTop || _awkFilteBottom){
