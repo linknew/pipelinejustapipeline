@@ -13,9 +13,9 @@ ORG_SEG_OPR_MV=2
 function Help
 {
     echo -ne "
-    Usage: ${0} [[!]/regExp/] [-segSort] [--revert] [--cp2Head | --mv2Head] [--noSorting] [--help] textFile
+    Usage: ${0} [[!]/regExp/] [-<idx_sort>] [--revert] [--cp2Head | --mv2Head] [--noSorting] [--help] <textFile>
 
-        -segSort, specify which seg to sorting
+        -idx_sort, specify which seg to sorting
         --cp2Head, copy the sorting segment to the head
         --mv2Head, move the sorting segment to the head
         --noSorting, do not operat sorting

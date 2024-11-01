@@ -11,8 +11,6 @@ seedSerialLvlDef=3 ;
 skipNewBornDef=60 ;
 taxRatPrtDef=0.001 ;
 taxRatHandFeeDef=0.00035 ;
-fnCodeFltDef=""
-fnSeedFltDef=""
 pruneOrgDataDef=1 ;
 noAbbDef=0 ;
 keepNoneItemDef=0 ;
@@ -20,20 +18,18 @@ noSortingDef=0 ;
 countingProfitDef=0 ;
 verboseDef=0 ;
 genSyncProfitDef=0 ;
-orgFundsDef=20000 ;
+orgFundsDef=0 ; #20000 ;
 segFileDef=""
 startDef="" ;
 endDef="" ;
-#no need listFltCodeDef as listFltCode will be load from $fnCodeFlt
-#no need listFltSeedDef as listFltSeed will be load from $fnSeedFlt
 
-function Help
+Usage()
 {
     echo -ne "
     Description:
         -
 
-    Usage: ${0} [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YY-MM-DD] [--end=YY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--fltCode=S] [--fltSeed=S] 
+    Usage:  $(basename $0) [--serialLvl=N | -N] [--skipNewBorn=N] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--taxRatPrt=F] [--taxRatHandFee=F] [--fltCode=S] [--fltSeed=S] 
                      [ ( ( (--dispPruneData [--noAbb] [--keepNoneItem]) | --dispPD) [--noSorting]) | ( (--dispProfit | --dispSyncProfit) [--verbose] ) ]         
                      [--help] 
                      segFile
@@ -60,14 +56,14 @@ function Help
         -
 
     Default:
-        --serialLvl=$seedSerialLvlDef --skipNewBorn=$skipNewBornDef --taxRatPrt=$taxRatPrtDef --taxRatHandFee=$taxRatHandFeeDef --fltCode=$fnCodeFltDef --fltSeed=$fnSeedFltDef
+        --serialLvl=$seedSerialLvlDef --skipNewBorn=$skipNewBornDef --taxRatPrt=$taxRatPrtDef --taxRatHandFee=$taxRatHandFeeDef
         --dispProfit
 \n"
 }
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help >&2 && doExit 0
+    [[ ${i} == "--help" ]] && Usage >&2 && doExit 0
     [[ ${i%%=*} == "--serialLvl" ]] && seedSerialLvl=${i##*=} && continue
     [[ ${i%%=*} == "--skipNewBorn" ]] && skipNewBorn=${i##*=} && continue
     [[ ${i%%=*} == "--taxRatPrt" ]] && taxRatPrt=${i##*=} && continue
@@ -96,6 +92,8 @@ done
 [[ $keepNoneItem -eq 1 && $dispPruneData -eq 0 ]] && showErr "--keepNoneItem must bind with --dispPruneData\n" >&2 && doExit -1
 [[ $noSorting -eq 1 && $dispPruneData -eq 0 ]] && showErr "--noSorting must bind with --dispPruneData\n" >&2 && doExit -1
 [[ $((dispPruneData + dispProfit + dispSyncProfit)) -eq 0 ]] && dispProfit=1 && showWarn "*no display contnet, set --dispProfit as default\n" >&2
+[[ -n $fnCodeFlt && ! -f $fnCodeFlt ]] && showErr "cannot find or open code filter\"$fnCodeFlt\"\n" && doExit -1
+[[ -n $fnSeedFlt && ! -f $fnSeedFlt ]] && showErr "cannot find or open seed filter\"$fnSeedFlt\"\n" && doExit -1
 
 [[ $((dispPruneData + dispProfit + dispSyncProfit)) -ge 2 ]] && showErr "only one of --dispPruneData/--dispProfit/--dispSyncProfit exist\n" >&2 && exit -1 
 
@@ -105,8 +103,6 @@ done
 [[ $dispSyncProfit ]] && pruneOrgData=1 && countingProfit=1 && genSyncProfit=1
 
 taxRatPrt=${taxRatPrt:-$taxRatPrtDef}
-fnCodeFlt=${fnCodeFlt:-$fnCodeFltDef}
-fnSeedFlt=${fnSeedFlt:-$fnSeedFltDef}
 skipNewBorn=${skipNewBorn:-$skipNewBornDef}
 taxRatHandFee=${taxRatHandFee:-$taxRatHandFeeDef}
 seedSerialLvl=${seedSerialLvl:-$seedSerialLvlDef}
@@ -121,8 +117,6 @@ orgFunds=${orgFunds:-$orgFundsDef}
 segFile=${segFile:-$segFileDef}
 start=${start:-$startDef}
 end=${end:-$endDef}
-[[ -n $fnCodeFlt ]] && listFltCode=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnCodeFlt) )
-[[ -n $fnSeedFlt ]] && listFltSeed=$( echo $( awk '($1 !~ /^#/){ print $1; }' $fnSeedFlt) )
 
 # in $segFile, the data list by stocks, but we want:
 #   * the data sorting by date
@@ -168,8 +162,8 @@ if [[ $pruneOrgData -eq 1 ]]; then
 awk -v skipNewBorn=$skipNewBorn     \
     -v startDate=$start             \
     -v endDate=$end                 \
-    -v listFltCode="$listFltCode"   \
-    -v listFltSeed="$listFltSeed"   \
+    -v fnCodeFlt="$fnCodeFlt"   \
+    -v fnSeedFlt="$fnSeedFlt"   \
     -v seedSerialLvl=$seedSerialLvl \
     -v noAbb=$noAbb                 \
     -v keepNoneItem=$keepNoneItem   \
@@ -217,65 +211,70 @@ awk -v skipNewBorn=$skipNewBorn     \
 
         #load code filter table
         {
-            $0 = listFltCode ;
-            filterNumCode = NF ;
-            for(i=1; i<=filterNumCode; i++) aFilterCode[$i] = 1 ;
+            if(fnCodeFlt) {
+                while( (getline <fnCodeFlt) > 0) {
+                    if(substr($1,1) == "#") continue;
+                    aFilterCode[$1] = 1;
+                }
+                close(fnCodeFlt);
+            }
         }
 
         #load serial_seed filter table
         {
-            $0 = listFltSeed ;
-            filterNumSeed = NF ;
+            if(fnSeedFlt) {
+                while( (getline <fnSeedFlt) > 0) {
+                    if(substr($1,1) == "#") continue;
+                    if(noAbb){
+                        aFilterSeed[$1] = 1 ;
+                    }else{
+                        num = split($1, seeds, "_") ;
 
-            for(i=1; i<=filterNumSeed; i++){
-                if(noAbb){
-                    aFilterSeed[$i] = 1 ;
-                }else{
-                    num = split($i, aTmpArry, "_") ;
+                        #use serial_seed filter list to update seed abbrevation table
+                        for(j=1; j<=num; j++){
+                            seed = seeds[j] ;
+                            if(!(seed in seedAbbs)) seedAbbs[seed] = (seedAbbIdx++) ;
+                            seeds[j] = seedAbbs[seed] ;
+                        }
 
-                    #use serial_seed filter list to update seed abbrevation table
-                    for(j=1; j<=num; j++){
-                        seed = aTmpArry[j] ;
-                        if(!(seed in seedAbbs)) seedAbbs[seed] = (seedAbbIdx++) ;
-                        aTmpArry[j] = seedAbbs[seed] ;
+                        #use seed abbrevation table to create serial_seed filter table
+                        seedAbb = "" ;
+                        for(j=1; j<=num; j++){
+                            seedAbb = seedAbb seeds[j] ;
+                            if(j<num) seedAbb = seedAbb "_" ;
+                        }
+                        aFilterSeed[seedAbb] = 1 ;
                     }
-
-                    #use seed abbrevation table to create serial_seed filter table
-                    seedAbb = "" ;
-                    for(j=1; j<=num; j++){
-                        seedAbb = seedAbb aTmpArry[j] ;
-                        if(j<num) seedAbb = seedAbb "_" ;
-                    }
-                    aFilterSeed[seedAbb] = 1 ;
                 }
+                close(fnSeedFlt);
             }
         }
 
         $0 = "" ;
     }
 
-    !($1~/#/){
-        if(!noAbb && !($1 in seedAbbs)) seedAbbs[$1]=(seedAbbIdx++) ;     # update seed abbrevation table
+    ($1 !~ /#/){
         code = substr($14,13,6) ;
+        cnt[code]++ ;
+        if(cnt[code] <= skipNewBorn) next ;
+
+        cur = $9;
+        if(startDate && cur < startDate) next ;
+        if(endDate && cur > endDate) next ;
+
+        fcstStart = $7 ;
+        if(!keepNoneItem && fcstStart == "NONE") next ;
+
+        if(fnCodeFlt && (!(code in aFilterCode)) ) next ;
+
+        if(!noAbb && !($1 in seedAbbs)) seedAbbs[$1]=(seedAbbIdx++) ;     # update seed abbrevation table
         if(code != codeLast) cleanSeedStack() ;
         codeLast = code ;
         pushSeedStack((noAbb) ? $1 : seedAbbs[$1]) ;
-        #print "*",$1 > "dev/stderr";
+       #print "*",$1 > "/dev/stderr";
         seed = getSerialSeed() ;
-        #print "*",seed > "/dev/stderr" ;
-
-        fcstStart = $7 ;
-        fcstEnd = $8 ;
-        cur = $9 ;
-        cnt[code]++ ;
-
-        if(filterNumCode && (!(code in aFilterCode)) ) next ;
-        if(filterNumSeed && (!(seed in aFilterSeed)) ) next ;
-        if(cnt[code] <= skipNewBorn) next ;
-        if(startDate && cur < startDate) next ;
-        if(endDate && cur > endDate) next ;
-        if(!keepNoneItem && fcstStart == "NONE") next ;
-
+       #print "*",seed > "/dev/stderr" ;
+        if(fnSeedFlt && (!(seed in aFilterSeed)) ) next ;
         $1 = "" ;
         $14 = "" ;
         print code,seed,$0 ;
@@ -339,37 +338,73 @@ else
             cntCode[code]++ ;
             cntSeed[seed]++ ;
 
-            if(seed in aFunds){
+            #@ funds for each seed
+            if(seed in funds_seed){
                 if(cur < aEnd[seed]){
                     if(verbose) print "#",cur,code,getOrgSeed(seed),"IGNR("ampDur*100"%) in processing [" aCur[seed] "~" aEnd[seed] ") \t@",$0 ;
-                    next ;
+                    #next ;
                 }
             }else{
-                aFunds[seed] = orgFunds ;
-                lose[seed] = 0 ;
+                funds_seed[seed] = orgFunds ;
+                lose_seed[seed] = 0 ;
             }
 
-            cntSeedDeal[seed] ++ ;
-            aCur[seed] = cur ;
-            aStart[seed] = fcstStart ;
-            aEnd[seed] = fcstEnd ;
+            #@ funds for each code
+            if(!(code in funds_code)) {
+                funds_code[code] = orgFunds;
+                lose_code[code] = 0;
+            }
+
+            dealCnt_seed[seed] ++;      dealCnt_code[code]++;
+            aCur[seed] = cur ;          code_cur[code] = cur;
+            aStart[seed] = fcstStart ;  start_code[code] = fcstStart;
+            aEnd[seed] = fcstEnd ;      end_code[code] = fcstEnd;
             if(verbose) print "#",cur,code,getOrgSeed(seed),"DEAL("ampDur*100"%), [" aCur[seed] "~" aEnd[seed] "), \t@",$0 ;
 
-            stockNum = int(aFunds[seed]/((1+taxRatHandFee)*clsP)) ;
-            aFunds[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
-            aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,code,getOrgSeed(seed),"BOUT("ampDur*100"%)",stockNum,"*",clsP,"and funds left",aFunds[seed] ;
+            #stockNum = int(funds_seed[seed]/((1+taxRatHandFee)*clsP)) ;
+            stockNum = int(20000/((1+taxRatHandFee)*clsP)) ;
+            funds_seed[seed] -= (stockNum*clsP)*(1+taxRatHandFee) ;
+            funds_seed[seed] = int(funds_seed[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "#",cur,code,getOrgSeed(seed),"BOUT("ampDur*100"%)",stockNum,"*",clsP,"and funds_seed left",funds_seed[seed] ;
 
-            aFunds[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
-            aFunds[seed] = int(aFunds[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
-            if(verbose) print "#",cur,code,getOrgSeed(seed),"SOLD("ampDur*100"%)",stockNum,"with up rates",ampDur*100"% and funds left",aFunds[seed] ;
+            funds_seed[seed] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
+            funds_seed[seed] = int(funds_seed[seed]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "#",cur,code,getOrgSeed(seed),"SOLD("ampDur*100"%)",stockNum,"with up rates",ampDur*100"% and funds_seed left",funds_seed[seed] ;
 
-            if(aFunds[seed]+0 < 20000) lose[seed]++ ;
+            stockNum = int(20000/((1+taxRatHandFee)*clsP)) ;
+            funds_code[code] -= (stockNum*clsP)*(1+taxRatHandFee) ;
+            funds_code[code] = int(funds_code[code]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "##",cur,code,getOrgSeed(seed),"BOUT("ampDur*100"%)",stockNum,"*",clsP,"and funds_code left",funds_code[code] ;
+
+            funds_code[code] += (stockNum*clsP)*(1+ampDur)*(1-taxRatHandFee-taxRatPrt) ;
+            funds_code[code] = int(funds_code[code]*100)/100.0 ;              # the smallest unit is 1 Fen.
+            if(verbose) print "##",cur,code,getOrgSeed(seed),"SOLD("ampDur*100"%)",stockNum,"with up rates",ampDur*100"% and funds_code left",funds_code[code] ;
+
+
+            #if(funds_seed[seed]+0 < 20000) lose_seed[seed]++ ;
+            if(ampDur<=0) {
+                lose_seed[seed]++ ;
+                lose_code[code]++ ;
+            }
         }
 
         END{
-            for(i in aFunds){
-                print getOrgSeed(i), aFunds[i], cntSeedDeal[i] "/" cntSeed[i], ((lose[i]==0) ? "NeverLose" : lose[i]) ;
+            print "#seri_seeds    funds    n_effect_/_n_total   n_lose    hitrate_effect_*_hitrate_total"
+            for(i in funds_seed){
+                rate = 1-lose_seed[i]/dealCnt_seed[i];
+                mult_eff_up = dealCnt_seed[i] * (dealCnt_seed[i]-lose_seed[i]) / 8192;
+                printf ("%s %.2f %d/%d %s %d,%.2f\n",
+                        getOrgSeed(i), funds_seed[i], dealCnt_seed[i], cntSeed[i],
+                        ((lose_seed[i]==0) ? "NeverLose" : lose_seed[i]),
+                        mult_eff_up, rate);
+            }
+            for(i in funds_code) {
+                rate = 1-lose_code[i]/dealCnt_code[i];
+                mult_eff_up = dealCnt_code[i] * (dealCnt_code[i]-lose_code[i]) / 8192;
+                printf ("%s %.2f %d/%d %s %d,%.2f\n",
+                        i, funds_code[i], dealCnt_code[i], cntCode[i],
+                        ((lose_code[i]==0) ? "NeverLose" : lose_code[i]),
+                        mult_eff_up, rate);
             }
         }
 
@@ -416,15 +451,18 @@ else
         }
 
         END{
+            print "cntSeed=" cntSeed, "cntDate=" cntDate;
             # print map info: seed line-number seg-number,  line-1 is the date
             for(idxSeed=0; idxSeed<cntSeed; idxSeed++){
                 print "#", aSeed[idxSeed], "line-" idxSeed+2, "seg-" idxSeed+2 ;
             }
+print 1;
 
             # fill init funds
             for(seedIdx=0; seedIdx<cntSeed; seedIdx++){
                 if(!(seedIdx SUBSEP 0 in funds)) funds[seedIdx,0] = fundsInit ;
             }
+print 2;
 
             # fill whole funds table
             for(idxDate=0; idxDate<cntDate; idxDate++){
@@ -432,6 +470,7 @@ else
                     if(!(idxSeed SUBSEP idxDate in funds)) funds[idxSeed,idxDate] = funds[idxSeed,idxDate-1] ;
                 }
             }
+print 3;
 
             # print funds table
             for(idxDate=0; idxDate<cntDate; idxDate++){

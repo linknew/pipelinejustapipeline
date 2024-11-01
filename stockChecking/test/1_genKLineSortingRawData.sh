@@ -2,22 +2,39 @@
 
 . ~/tools/lib/comm.lib
 
+Usage() {
+    echo -en "
+    Usage:
+
+        $(basename $0) [--segment] [--source= ( <pathname> | -) ]  <code_6>
+
+        --segment: do segementation
+        --source:  specify source data file. if no file spedified,
+                   create it according playStock.sh --print <<< \$code
+    " >&2
+}
+
 echo -ne "*executing $0($$)\n" >&2
 
 for i in "${@}"
 do
+    [[ $i == "--help" || $i == "-h" ]] && Usage && doExit
     [[ $i == "--segment" ]] && segment=1 && continue ;
+    [[ ${i%%=*} == "--sourceData" ]] && sourceData=${i#*=} && continue
     [[ ${i:0:1} == "-" ]] && echo "unknown option:$i">&2 && doExit -1
     code=$i
 done
 
 [[ -z $code ]] && echo "no code specified">&2 && doExit -1
-[[ ! -f StockData/$code.data ]] && echo "Cannot find StockData/$code.data" >&2 && doExit -1
+sourceData=${sourceData:--}
+#[[ -z $sourceData ]] && printData=$(~/tools/bin/playStockList.sh --print <<< $code 2>/dev/null) || printData=$(cat $sourceData)
+#[[ -z $printData ]] && echo "failed to retrive data of $code or $sourceData does not exist" >&2 && doExit -1
 
 echo "*[$code]" >&2
 
 rawData=$(
-    cat StockData/$code.data |
+    #echo "$printData" |
+    cat $sourceData |
 
     awk '
         #do sorting: avg 5k 22k 66k 132k 264k
@@ -31,12 +48,12 @@ rawData=$(
 
             print "#input:"
             print "#(1)stockID, (2)closePrice, (3)power, (4)amplitude, (5)trueAmplitude, (6)rsi6"
-            print "#\t(7)rsi12, (8)rsi24, (9)pwri6, (10)pwri12, (11)pwri24, (12)rsiFuture6, (13)pwriFuture12"
-            print "#\t(14)exchange, (15)volume, (16)value, (17)liveValue, (18)date (19)rsiCustom (20)pwriCustom"
-            print "#\t(21)xcgAvgICustom (22) gEgrData (23) highestAmp (24)open (25)hig (26)low (27)ystdClose"
-            print "#\t(28)5kline (29)22kline (30)66kline (31)132kline (32)264kline (33)avg=1kline=$16/$15"
+            print "#(7)rsi12, (8)rsi24, (9)pwri6, (10)pwri12, (11)pwri24, (12)rsiFuture6, (13)pwriFuture12"
+            print "#(14)exchange, (15)volume, (16)value, (17)liveValue, (18)date (19)rsiCustom (20)pwriCustom"
+            print "#(21)xcgAvgICustom (22) gEgrData (23) highestAmp (24)open (25)hig (26)low (27)ystdClose"
+            print "#(28)5kline (29)22kline (30)66kline (31)132kline (32)264kline (33)avg=1kline=$16/$15"
             print "#output:"
-            print "#\t(1)[sorting] (2)amp (3)date (4)close (5)hig (6)low (7)open (8)amp (9)xchg (10)vol (11)val (12)1k=avg (13)5k (14)22k (15)66k (16)132k (17)264k"
+            print "#(1)[sorting] amp date cls hig (6)low opn amp xch vol (11)val 1k 5k 22k 66k (16)132k 264k"
             idxs=split2("32,27,28,29,30,31",sortIdxs,",") ; #base on 0
             split2("stockID,closePrice,power,amplitude,trueAmplitude,rsi6,rsi12,rsi24,pwri6,pwri12,pwri24,rsiFuture6,pwriFuture12,exchange,volume,value,liveValue,date,rsiCustom,pwriCustom,xcgAvgICustomg,EgrData,highestAmp,open,hig,low,ystdClose,5k,22k,66k,132k,264k,1k",names,",") ;
         }
@@ -74,9 +91,9 @@ awk '
 
     BEGIN{
         print "#input:"
-        print "#\t(1)[sorting] (2)amp (3)date (4)close (5)hig (6)low (7)open (8)amp (9)xchg (10)vol (11)val (12)1k=avg (13)5k (14)22k (15)66k (16)132k (17)264k" ;
+        print "#(1)[sorting] (2)amp (3)date (4)close (5)hig (6)low (7)open (8)amp (9)xchg (10)vol (11)val (12)1k=avg (13)5k (14)22k (15)66k (16)132k (17)264k" ;
         print "#output:"
-        print "#\t(1)[sorting] (2)dur (3)open (4)close (5)hig (6)hig% (7)low (8)low% (9)from (10)to" ;
+        print "#(1)[sorting] (2)dur (3)open (4)close (5)hig (6)hig% (7)low (8)low% (9)from (10)to" ;
     }
 
     ($0!~"#"){

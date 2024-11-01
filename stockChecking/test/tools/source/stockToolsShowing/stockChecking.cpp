@@ -33,8 +33,7 @@
 #define RSLT_REQ_QUIT           (2)     // request to quit
 
 #define MAX_LINES               (8)
-#define ALL_ITEMS               (0)
-#define LAST_ITEM               (1)
+#define ALL_ITEMS               (-1)
 
 #define GAP_SECOND              (15)    // must be divd by 60
 #define MAX_DAILY_CNT           (4*3600/(GAP_SECOND)+1)
@@ -48,10 +47,10 @@
 #define FORECAST_DATA_DAYS      (MONTH_DAYS*6+1)
 #define MAX_DAYS_NUM            (HISTORY_DATA_DAYS+HOT_DATA_DAYS+FORECAST_DATA_DAYS)
 
-#define MAX_WIN_WIDTH           (1280)
-#define MAX_WIN_HEIGHT          (670)
+#define MAX_WIN_WIDTH           (1920)
+#define MAX_WIN_HEIGHT          (1080)
 
-#define LEFT_VIEW_W             (120)
+#define LEFT_VIEW_W             (180)
 
 #define DATA_FIX_TYPE_NONE      (0)
 #define DATA_FIX_TYPE_FORWARD   (1)
@@ -71,17 +70,15 @@
 #define  GET_FIRST_IDX_OF_DATA_ON_VIEW(view,data,scale)   max(0,data.cols-GET_COUNT_OF_VIEW(view.cols,scale))
 
 #define  IS_BIG_DISK(stockId)   ((stockId=="1399001" || stockId=="1399006" || stockId=="0000001" || stockId=="0000300") ? 1 : 0)
-#define  PRINT_INFO(lastOne)                                                                                        \
+#define  PRINT_INFO(lastN)                                                                                        \
 {                                                                                                                   \
+    /*  (1)stockID,        (2)closePrice,  (3)power,       (4)amplitude,  (5)trueAmplitude,  (6)rsi6           (7)rsi12,      */    \
+    /*  (8)rsi24,          (9)pwri6,       (10)pwri12,     (11)pwri24,    (12)rsiFuture6,    (13)pwriFuture12  (14)exchange,  */    \
+    /*  (15)volume,        (16)value,      (17)liveValue,  (18)date       (19)rsiCustom      (20)pwriCustom                   */    \
+    /*  (21)xcgAvgICustom  (22)gEgrData    (23)highestAmp  (24)open       (25)hig            (26)low                          */    \
+    /*  (27)ystdClose      (28)5kline      (29)22kline     (30)66kline    (31)132kline       (32)264kline                     */    \
     long _date ;                                                                                                    \
-    int  _i ;                                                                                                       \
-                                                                                                                    \
-    /* (1)stockID, (2)closePrice, (3)power, (4)amplitude, (5)trueAmplitude, (6)rsi6 */                              \
-    /* (7)rsi12, (8)rsi24, (9)pwri6, (10)pwri12, (11)pwri24, (12)rsiFuture6, (13)pwriFuture12 */                    \
-    /* (14)exchange, (15)volume, (16)value, (17)liveValue, (18)date (19)rsiCustom (20)pwriCustom */                 \
-    /* (21)xcgAvgICustom (22) gEgrData (23) highestAmp (24)open (25)hig (26)low (27)ystdClose */                    \
-    /* (28)5kline (29)22kline (30)66kline (31)132kline (32)264kline */                                              \
-    _i = ((lastOne) == LAST_ITEM) ? max(gMessData.cols-1,0) : 0 ;                                                   \
+    int  _i = ( (lastN)==ALL_ITEMS || gMessData.cols<=(lastN) )? 0 : gMessData.cols-(lastN);                        \
     for( ; _i < gMessData.cols; _i ++){                                                                             \
         _date = (long)(gDateData.at<double>(0,_i)) ;                                                                \
         cout << setiosflags(ios::fixed) << setprecision(2)   /* set precision to 2 */                               \
@@ -1236,6 +1233,7 @@ int printViewInfo (
         )
 {
     if( curtView ){
+        //@ fix me
         PRINT_INFO(ALL_ITEMS) ;
     }else{
         PRINT_INFO(ALL_ITEMS) ;
@@ -3109,8 +3107,7 @@ int main( int argc, char** argv )
     map<size_t,char*>   _args ;
     size_t              _argCnt = 0 ;
     bool                _firstLooking = false ;
-    bool                _print = false ;
-    bool                _printLastOne = false ;
+    int                 _printLastN = 0/*dont print*/ ;
     char*               _hotData = NULL ;
     char*               _searchingDate = NULL ;     // to find the firstLooking_date
 #if THREAD_SUPPORT
@@ -3129,18 +3126,24 @@ int main( int argc, char** argv )
     /* parsing arguments */
     for(int _i = 1; _i < argc; _i++){
         if (string(argv[_i]) == "--help"){
-            cerr << endl << "Usage: " << endl << argv[0] << " [--print] [--printLastOne] [--showDaily] [--winOrder] [--fixType F/B/N] stockName stockCode hisDataFile hisDataRecNum hotDataFile hotDataRecNum" << endl << endl ;
+            cerr << endl << "Usage: " << endl << argv[0] << " [--print | --printLastOne --printLastN=<N>] [--showDaily] [--winOrder] [--fixType F/B/N] stockName stockCode hisDataFile hisDataRecNum hotDataFile hotDataRecNum" << endl << endl ;
             return 0 ;
         }
 
         if (string(argv[_i]) == "--print"){
-            _print = true ;
+            _printLastN = ALL_ITEMS;
             continue ;
         }
 
         if (string(argv[_i]) == "--printLastOne"){
-            _printLastOne = true ;
+            _printLastN = 1 ;
             continue ;
+        }
+
+        if (strncmp(argv[_i], "--printLastN=", 13)==0) {
+            _printLastN = atoi(argv[_i]+13);
+            assert(_printLastN>0);
+            continue;
         }
 
         if (string(argv[_i]) == "--showDaily"){
@@ -3259,13 +3262,8 @@ int main( int argc, char** argv )
 #endif
         }
 
-        if(_printLastOne){
-            PRINT_INFO(LAST_ITEM) ;
-            return 0 ;
-        }
-
-        if(_print){
-            PRINT_INFO(ALL_ITEMS) ;
+        if(_printLastN){
+            PRINT_INFO(_printLastN) ;
             return 0 ;
         }
 

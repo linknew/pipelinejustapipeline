@@ -7,12 +7,13 @@ do
     [[ $i == '--help' ]] && 
     echo "
     Usage:
-        $0 [--help] [--print] [--printLastOne] [--showDaily|--firstLooking=yyyy-mm-dd] [--silent] [--classFile=classFilename] [--winOrder=N] [--fixType=F/B/N] stockCode
+        $0 [--help] [--print | --printLastOne | --printLastN=<N>] [--showDaily|--firstLooking=yyyy-mm-dd] [--silent] [--classFile=classFilename] [--winOrder=N] [--fixType=F/B/N] stockCode
         " >&2 &&
     exit 0
 
     [[ $i == '--print' ]] && _print='--print' && _silent=1 && continue
     [[ $i == '--printLastOne' ]] && _print='--printLastOne' && _silent=1 && continue
+    [[ ${i%%=*} == '--printLastN' ]] && _print="$i" && _silent=1 && continue
     [[ $i == '--showDaily' ]] && _showDaily=1 && continue
     [[ $i == '--silent' ]] && _silent=1 && continue
     [[ ${i%%=*} == '--firstLooking' ]] && _firstLooking=${i##*=} && continue

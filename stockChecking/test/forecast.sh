@@ -98,9 +98,14 @@ fi
 
 for i in $codes
 do
-    [[ $genRaw -eq 1 ]] && ./1_genKLineSortingRawData.sh $i > sorting-raw/$i.raw
-    [[ $genSegment -eq 1 ]] && ./2_genSegmentUpDnRate.sh --dur=$dur --offset=1 --disSrc $i >> "$segData" && echo *Append $i\'s data to "$segData" >&2
-    [[ $genRaw -eq 1 || $genSegment -eq 1 ]] && echo "----"
+    ~/tools/bin/playStockList.sh --printLastN=80 <<< $i |
+    ./1_genKLineSortingRawData.sh $i |
+    ./2_genSegmentUpDnRate.sh --dur=$dur --offset=1 $i >> "$segData" &&
+    echo *Append $i\'s data to "$segData" >&2
+    echo "----"
+    #[[ $genRaw -eq 1 ]] && ./1_genKLineSortingRawData.sh $i > sorting-raw/$i.raw
+    #[[ $genSegment -eq 1 ]] && ./2_genSegmentUpDnRate.sh --dur=$dur --offset=1 --sortingRaw=sorting-raw/$i.raw $i >> "$segData" && echo *Append $i\'s data to "$segData" >&2
+    #[[ $genRaw -eq 1 || $genSegment -eq 1 ]] && echo "----"
 done
 #endif
 
@@ -128,7 +133,7 @@ if [[ $genCounting -eq 1 ]]; then
 
                 }else if("-" == FILENAME){
                     codeNum = split2($0,a," ") ;
-                    for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+                    for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;    #@ fix me
                 }
             }
             ' - $segData    |

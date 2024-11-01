@@ -8,7 +8,7 @@ let _cmdCodeHotData=$((1<<3))
 let _cmdCodeShow=$((1<<4))
 let _cmdCodeShowNext=$((1<<5))
 let _cmdCodePrint=$((1<<6))
-let _cmdCodePrintLastOne=$((1<<7))
+let _cmdCodePrintLastN=$((1<<7))
 let _cmdCodeCheckHitRate=$((1<<8))
 let _cmdCodeAnalize=$((1<<9))
 let _cmdCodeRestDatabase=$((1<<10))
@@ -151,7 +151,8 @@ showHelp()
     Usage: ${0} [[--update] [--download] [--hotData [--keepRefresh]] [--resetDatabase] \\
                               [--show|--showNext|--monit [--showDaily | --firstLooking=yyyy-mm-dd] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
                               [--analize=filename [--analizeOptions='...']] \\
-                              [--packDailyData] [--genRelationshipData] [--checkHitRate] [(--print | --printLastOne) [--output=PREFIX{}SUFFIX]] [--classFile=filename] listFile
+                              [--packDailyData] [--genRelationshipData] [--checkHitRate] \\
+                              [(--print | --printLastOne | --printLastN=<n>) [--output=PREFIX{}SUFFIX]] [--classFile=filename] listFile
 
         --download, download stock data
         --update, update stock data
@@ -159,6 +160,7 @@ showHelp()
         --keepRefresh, after program complete, keep refresh current data (does not stop data-retrieve job), this option must use under --hotData.
         --print, print stock infos(date,amplitude,power,etc.)
         --printLastOne, print the last item of stock infos(date,amplitude,power,etc.)
+        --printLastN, print the last N_items of stock infos(date,amplitude,power,etc.)
         --output, output to specified file, for example: --output="a/b/{}.data" will save result to a/b/code_6.data
         --monit, group of --show --showDaily --silent --order --bg
         --show, show stock info listed in the listFile
@@ -191,7 +193,8 @@ do
     [[ $i == --hotData ]]  && ((_cmdCode |=_cmdCodeHotData)) && continue
     [[ $i == --keepRefresh ]] && ((_cmdCode |=_cmdCodeKeepRefresh)) && continue
     [[ $i == --print ]]    && ((_cmdCode |=_cmdCodePrint)) && continue
-    [[ $i == --printLastOne ]] && ((_cmdCode |=_cmdCodePrintLastOne)) && continue
+    [[ $i == --printLastOne ]] && ((_cmdCode |=_cmdCodePrintLastN)) && lastN=1 && continue
+    [[ ${i%%=*} == --printLastN ]] && ((_cmdCode |=_cmdCodePrintLastN)) && lastN=${i#*=} && continue
     [[ ${i%%=*} == --output ]] && _output=${i#*=} && continue
     [[ $i == --show ]]     && ((_cmdCode |=_cmdCodeShow)) && continue
     [[ $i == --showNext ]] && ((_cmdCode |=_cmdCodeShowNext)) && continue
@@ -255,8 +258,13 @@ if (( (_cmdCode & (_cmdCodeFixType | _cmdCodeDoDailyHomework) ) == (_cmdCodeFixT
     doExit 0
 fi
 
-if [[ $((_cmdCode & (_cmdCodePrint | _cmdCodePrintLastOne) )) -eq 0 && -n $_output ]] ; then
-    showErr "option --output must combin with --print or --printLastOne \n">&2
+if [[ $((_cmdCode & (_cmdCodePrint | _cmdCodePrintLastN) )) -eq 0 && -n $_output ]] ; then
+    showErr "option --output must combin with --print or --printLastOne ro --printLastN\n">&2
+    doExit 0
+fi
+
+if [[  $((_cmdCode & _cmdCodePrintLastN )) && $lastN -lt 0 ]]; then
+    showErr "option must specify a positive number for --printLastN\n">&2
     doExit 0
 fi
 
@@ -265,7 +273,7 @@ if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
 fi
 
 if ((_cmdCode & _cmdCodeJustDoit)) ; then
-    ((_cmdCode|=(_cmdCodeHotData|_cmdCodePrintLastOne|_cmdCodeAnalize) ))
+    ((_cmdCode|=(_cmdCodeHotData|_cmdCodePrintLastN|_cmdCodeAnalize) ))
     _anaProg=analizeBestBuy.sh
     _pipe4Ana=.out.$$.ana
 fi
@@ -324,11 +332,11 @@ do
     fi
 
     # print stock info
-    if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastOne) )) ; then
+    if ((_cmdCode & (_cmdCodePrint|_cmdCodePrintLastN) )) ; then
         _tmpName=""
         [[ -n $_output ]] && _tmpName=${_output/'{}'/${_code:1}}
         ((_cmdCode & _cmdCodePrint)) && "showStock.sh" --print ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
-        ((_cmdCode & _cmdCodePrintLastOne)) && "showStock.sh" --printLastOne ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
+        ((_cmdCode & _cmdCodePrintLastN)) && "showStock.sh" --printLastN=${lastN} ${_fixType:+--fixType=$_fixType} $_code > ${_tmpName:-$_pipe4Ana}
         [[ -n $_tmpName ]] && cat $_tmpName > $_pipe4Ana ;
     fi
 

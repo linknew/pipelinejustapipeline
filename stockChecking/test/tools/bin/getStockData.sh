@@ -48,6 +48,32 @@ sendSigToDispProc()
     return 0
 }
 
+getHis() 
+{
+    [[ ( ${#1} -ne 6 && ${#1} -ne 7 ) || ${#2} -ne 8 || ${#3} -ne 8 ]] &&
+        echo "*Error, getHis code_6or7 startYYYYMMDD endYYYYMMDD" >&2 &&
+        exit
+
+    local code=$1
+    local dateStart=$2
+    local dateEnd=$3
+
+    if [[ ${#code} -eq 6 ]]; then
+        [[ ${1:0:1} -eq 6 || ${1:0:1} -eq 9 ]] && code=0${code} || code=1${code};
+    fi
+
+#@  get history data from **tushare**
+    ~/tools/bin/getHis.tushare.sh $code $dateStart $dateEnd
+
+#@  get history data from **akshare**
+#   ~/tools/bin/getHis.akshare.sh $code $dateStart $dateEnd
+
+#@  get history data from **163**
+#   ~/tools/bin/getHis.163.sh $code $dateStart $dateEnd
+
+}
+
+
 #
 #
 #start the main routing
@@ -104,36 +130,8 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
         echo "*[$_stockCode]update history data" >&2
         _timeStampReq=$(date '+%Y-%m-%d %H:%M:%S')
 
-#@  get history data from **163**
-#       _dataRcvd=$(
-#           curl -f http://quotes.money.163.com/service/chddata.html?code=${_stockCode}\&start=$_dateStart\&end=$_dateEnd 2>/dev/null |
-#           iconv -f GBK -t utf8 |
-#           sed -n '$d; 2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' | 
-#           awk '($4>0){print}' |
-#           tac
-#       )
-#@	//////////
-
-#@  get history data from **tushare**
-		code_py=$_stockCode
-		  if [[ ${#code_py} -eq 7 && ${code_py:0:1} == '0' ]]; then code_py=${code_py:1}.sh
-		elif [[ ${#code_py} -eq 7 && ${code_py:0:1} == '1' ]]; then code_py=${code_py:1}.sz
-		elif [[ ${#code_py} -eq 6 && ( ${code_py:0:1} == '6' || ${code_py:0:1} == '9' ) ]]; then code_py=${code_py}.sh
-		else code_py=${code_py}.sz
-		  fi
-	    #echo "dbg: getHis.py $code_py $_dateStart $_dateEnd" > /dev/tty
-        _dataRcvd=$(
-			getHis.py $code_py $_dateStart $_dateEnd 2>/dev/null | 
-            iconv -f GBK -t utf8 |
-            sed -n '2,${ s/ //g; s/,,,/ 0 0 /g; s/,,/ 0 /g; s/,/ /g; s/None/0/g; p; }' |
-            awk -v code=${_stockCode:1} '
-					($4>0){
-						date = substr($2,1,4) "-" substr($2,5,2) "-" substr($2,7);
-						print date, "\047" code, "-", $6, $4, $5, $3, $7, $8, $9, "-", $10, $11, "-", "-", "-";
-					} ' |
-            tac
-        )
-#@	//////////
+    #@  get history data
+        _dataRcvd=$(getHis $_stockCode $(($_dateStart+1)) $_dateEnd)
 
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
         echo "*[$_stockCode]copy history data to StockData/$_stockCode.html.org" >&2

@@ -11,19 +11,18 @@ for i in "${@}"
 do
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
     [[ ${i%%=*} == "--offset" ]] && offset=${i##*=} && continue
-    [[ ${i} == "--disSrc" ]] && disSrc=1 && continue
+    [[ ${i%%=*} == "--sortingRaw" ]] && sortingRaw=${i##*=} && continue
     [[ ${i:0:1} == "-" ]] && echo "unknown option:$i">&2 && doExit -1
     code=$i
 done
 
 [[ -z $code ]] && echo "no code specified">&2 && doExit -1
 
-sortingRaw="sorting-raw/$code.raw"
-[[ ! -f $sortingRaw ]] && echo "cannot find $sortingRaw">&2 && doExit -1
+sortingRaw=${sortingRaw:--}
+#[[ ! -f $sortingRaw ]] && echo "cannot find $sortingRaw, read RAW data from stdin">&2 && sortingRaw=-
 
 dur=${dur:-$defDur}
 offset=${offset:-$defOffset}
-disSrc=${disSrc:-1}
 describtion="#input:\n\
 #\t(1)sorting (2)amp (3)date (4)close (5)hig (6)low (7)open (8)amp (9)xchg (10)vol (11)val (12)1k=avg (13)5k (14)22k (15)66k (16)132k (17)264k\n\
 #output:\n\
@@ -32,15 +31,14 @@ describtion="#input:\n\
 echo "*[$code]" >&2
 echo *dur=$dur >&2
 echo *offset=$offset >&2
-echo *disSrc=$disSrc >&2
 echo *source=$sortingRaw >&2
 
 
 awk                             \
 -v dur="$dur"                   \
 -v offset="$offset"             \
--v disSrc="$disSrc"             \
 -v sourceFile="$sortingRaw"     \
+-v code="$code"                 \
     '
 
     '"$awkFunction_getMaxMin"'
@@ -224,7 +222,7 @@ awk                             \
                    cnt,dur,offset,
                    durHigCA,durHigFA,durLowCA,durLowFA,dateStart,dateEnd,durOpen,durClose,durAmp,durXchg,durVol,durVal) ;
         for(i=0; i<cnt; i++){
-            srcFile = disSrc ? FILENAME : "" ;
+            srcFile = (FILENAME == "-")? ("sorting-raw/" code ".raw") : FILENAME;   #@ fix me
             print content[i],durHigCA[i]"%",durHigFA[i]"%",durLowCA[i]"%",durLowFA[i]"%",durAmp[i],dateStart[i],dateEnd[i],durOpen[i],durClose[i],durXchg[i],durVol[i],durVal[i],srcFile ;
         }
     }
