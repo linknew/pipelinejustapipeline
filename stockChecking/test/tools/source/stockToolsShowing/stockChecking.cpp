@@ -32,7 +32,7 @@
 #define RSLT_NOTHING            (1)     // current function do not care this key. (main process need to take it)
 #define RSLT_REQ_QUIT           (2)     // request to quit
 
-#define MAX_LINES               (8)
+#define MAX_LINES               (9)
 #define ALL_ITEMS               (-1)
 
 #define GAP_SECOND              (15)    // must be divd by 60
@@ -153,16 +153,16 @@
 }
 
 enum DATA_TYPE{
-    DATA_TYPE_CLOSE = 0 ,       /* do not change this index(for kLines) */
-    DATA_TYPE_AVERAGE_5 ,       /* do not change this index(for kLines) */
-    DATA_TYPE_AVERAGE_22 ,      /* do not change this index(for kLines) */
-    DATA_TYPE_AVERAGE_66 ,      /* do not change this index(for kLines) */
-    DATA_TYPE_AVERAGE_132 ,     /* do not change this index(for kLines) */
-    DATA_TYPE_AVERAGE_264 ,     /* do not change this index(for kLines) */
-    DATA_TYPE_HIG ,             /* do not change this index(for kLines) */
-    DATA_TYPE_LOW ,             /* do not change this index(for kLines) */
+    DATA_TYPE_CLOSE = 0 ,       /* do not change this index(for kLines), hotkey '1' */
+    DATA_TYPE_AVERAGE_5 ,       /* do not change this index(for kLines), hotkey '2' */
+    DATA_TYPE_AVERAGE_22 ,      /* do not change this index(for kLines), hotkey '3' */
+    DATA_TYPE_AVERAGE_66 ,      /* do not change this index(for kLines), hotkey '4' */
+    DATA_TYPE_AVERAGE_132 ,     /* do not change this index(for kLines), hotkey '5' */
+    DATA_TYPE_AVERAGE_264 ,     /* do not change this index(for kLines), hotkey '6' */
+    DATA_TYPE_HIG ,             /* do not change this index(for kLines), hotkey '7' */
+    DATA_TYPE_AVG ,             /* do not change this index(for kLines), hotkey '8' */
+    DATA_TYPE_LOW ,             /* do not change this index(for kLines), hotkey '9', must be the last one!! */
     DATA_TYPE_OPEN ,
-    DATA_TYPE_AVG ,
     DATA_TYPE_AMP ,
     DATA_TYPE_VOL ,
     DATA_TYPE_VAL ,
@@ -180,7 +180,7 @@ enum DATA_TYPE{
     DATA_TYPE_PWRI24 ,      /* stock index, do not change its position */
     DATA_TYPE_RSI_CUSTOM ,       /* stock index, do not change its position */
     DATA_TYPE_PWRI_CUSTOM ,      /* stock index, do not change its position */
-    DATA_TYPE_XCGI_CUSTOM,      /* stock index, do not change its position */
+    DATA_TYPE_XCGI_CUSTOM,      /* stock index, do not change its position, must be the last one!! */
     NUMBERS_OF_DATA_TYPE    /* after and ONLY after indexer type */
 } ;
 
@@ -244,7 +244,8 @@ static Scalar  lineColors[MAX_LINES] = {
                         Scalar(0,0,255),
                         Scalar(0,255,255),
                         Scalar(0,0,150),
-                        Scalar(255,255,255)
+                        Scalar(255,125,125),
+                        Scalar(255,255,255),
                     } ;
 static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digital keys) function switch.
                         digtFuncBaselineFilter,
@@ -256,7 +257,7 @@ static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digit
 
 static unsigned int     sysSwitchers = 0 ;
 static unsigned int     baseLineSwitchers = (3<<2) ;        // if (MAX_LINES > sizeof(int)*8), this maybe take you to a fault!!
-static unsigned int     linesSwitchers = (0xffff & (~((1<<1)|(1<<6)|(1<<7))));   // comments here, same with above line's!!
+static unsigned int     linesSwitchers = (0xffff & (~((1<<1)|(1<<6)|(1<<7)|(1<<8))));   // comments here, same with above line's!!
 static unsigned int     indexSwitchers = ((1<<0)|(1<<4));   // rsi6 & pwri12
 
 static unsigned char    digtFuncIdx = 3 ;
@@ -1035,11 +1036,16 @@ int importData(
                         _liveValueYstd = _liveValue ;
                     }
 
+#if 0
                     if(!_liveValueYstd){
                         _pwrData.at<double>(0,_dataCnt) = 0 ;
                     }else{
                         _pwrData.at<double>(0,_dataCnt) = (_value / _liveValueYstd - _exchange/100) * 100 * 100 ;
                     }
+#else
+                    _pwrData.at<double>(0,_dataCnt) = _volume;
+#endif
+
                     _liveValueYstd = _liveValue ;
                 }
 
@@ -1121,7 +1127,7 @@ int importData(
 
         /* caculate average(val/vol) */
         {
-            _avrgPrice = _valData / _volData ;
+            _avrgPrice = _valData / _volData  * 10/*unify the units of val & vol*/;
         }
 
         /* caculate average/eager datas*/
@@ -1170,9 +1176,9 @@ int importData(
 
         /* caculate PWRI */
         {
-            _getUpDnRateIndexer(_pwrData, _pwri6Data,   6, false, false) ;
-            _getUpDnRateIndexer(_pwrData, _pwri12Data, 12, false, false) ;
-            _getUpDnRateIndexer(_pwrData, _pwri24Data, 24, false, false) ;
+            _getUpDnRateIndexer(_pwrData, _pwri6Data,   6, true, false) ;
+            _getUpDnRateIndexer(_pwrData, _pwri12Data, 12, true, false) ;
+            _getUpDnRateIndexer(_pwrData, _pwri24Data, 24, true, false) ;
         }
 
         /* caculate rsiFuture6 & pwriFuture12 */
@@ -1419,16 +1425,19 @@ int digtFuncLineFilter(char c)
 
     switch( c ){
         case '1' : case '2' : case '3' : case '4' :
-        case '5' : case '6' : case '7' : case '8' :
+        case '5' : case '6' : case '7' : case '8' : case '9' :
             TOGGLE_SWITCH(&linesSwitchers,c-'0'-1) ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             _rslt = RSLT_OK ;
             break ;
+    //@ '9' show truly daily average price
+#if 0
         case '9' :      // display all lines
             SETALL_SWITCHERS(&linesSwitchers) ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             _rslt = RSLT_OK ;
             break ;
+#endif
         default :
             _rslt = RSLT_NOTHING ;
             break ;
@@ -2245,7 +2254,7 @@ void _doRefreshView(void)
 
         /* show stock name & code & data-fix status */
         s.str("");
-        s << " [" << stockId << "]" ;
+        s << " [" << stockId /*<< "," << stockName*/ << "]" ;
 
         if(dataFixType == DATA_FIX_TYPE_FORWARD) s << " [Forward Fixing]" ;
         else if(dataFixType == DATA_FIX_TYPE_BACKWARD) s << " [Backward Fixing]" ;

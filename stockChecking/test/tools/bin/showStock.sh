@@ -37,8 +37,8 @@ trap "doExit 1" SIGTERM SIGINT
 
 _fixType=${_fixType:=B}
 _classFile=${_classFile:='stock.list.class.tmp'}
-_stockName=$(grep $_stockCode stock.list | sed 's/^.* //') 
-_stockFile=.t.$$ && grep "'${_stockCode:1}" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >.t.$$
+_stockName=$(grep ${_stockCode:1} stock.list | sed 's/^.*\s//') 
+_stockFile=.t.$$ && grep "'${_stockCode:1}" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >.t.$$ && cp .t.$$ .t.test
 
 while true 
 do
@@ -47,6 +47,7 @@ do
     [[ -f $_stockFile ]] && _hisCnt=$(wc -l $_stockFile | awk '{print $1}') || _hisCnt=0
     [[ -f StockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l StockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
 
+set -x
     stockChecking     \
         $_print         \
         ${_fixType:+--fixType $_fixType}    \
@@ -59,6 +60,7 @@ do
         $_hisCnt    \
         StockData/$_stockCode.html.org.hot   \
         $_hotCnt
+set +x
 
     if [[ -z $_silent ]] ; then
         echo "
