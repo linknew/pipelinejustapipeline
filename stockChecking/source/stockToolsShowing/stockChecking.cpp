@@ -42,7 +42,7 @@
 #define SEASON_DAYS             (MONTH_DAYS*3)
 #define HALF_YEAR_DAYS          (MONTH_DAYS*6)
 #define YEAR_DAYS               (MONTH_DAYS*12)
-#define HISTORY_DATA_DAYS       (YEAR_DAYS*30)
+#define HISTORY_DATA_DAYS       (YEAR_DAYS*40)
 #define HOT_DATA_DAYS           (1)
 #define FORECAST_DATA_DAYS      (MONTH_DAYS*6+1)
 #define MAX_DAYS_NUM            (HISTORY_DATA_DAYS+HOT_DATA_DAYS+FORECAST_DATA_DAYS)
@@ -1014,9 +1014,12 @@ int importData(
                     _xcgData.at<double>(0,_dataCnt)  = _exchange ;
                 }
 
+                //@ data source may not provide the xchange or living_value
                 /* re_caculate exchange and living_value (assume the living_vol does not change) */
                 if( (0 == _lvalData.at<double>(0,_dataCnt)) && (_dataCnt > 0) ){
-                     _exchange = ((_lvalData.at<double>(0,_dataCnt-1) > 0) ? _volume * _ystdClose/_lvalData.at<double>(0,_dataCnt-1) : 0) *100 ;
+                     if(_exchange==0) {
+                         _exchange = ((_lvalData.at<double>(0,_dataCnt-1) > 0) ? _volume * _ystdClose/_lvalData.at<double>(0,_dataCnt-1) : 0) *100 ;
+                     }
                      _liveValue = _lvalData.at<double>(0,_dataCnt-1) * _close / _ystdClose ;
                      _xcgData.at<double>(0,_dataCnt) = _exchange ;
                      _lvalData.at<double>(0,_dataCnt) = _liveValue ;
@@ -1602,6 +1605,7 @@ void _doRefreshView(void)
                 Scalar(0,0,255), 1, LINE_8 ) ;
     }
 
+#if 1
     /* adjust _xcg */
     {
         Mat _t1, _t2, _v;
@@ -1629,6 +1633,7 @@ void _doRefreshView(void)
                 true) ;
         addWeighted(_p,1,gBottomView,1,0,gBottomView);
     }
+#endif
 #endif
 
     /* draw volume for bigDisks */
@@ -2373,19 +2378,40 @@ void _doRefreshView(void)
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(82,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
+            /* k6 (high) */
+            _d = gLinesData.at<double>(6,dtlsIdxOnMainView);
+            _color = lineColors[6] ;
+            s.str("");
+            s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
+            putText( gLeftDetailsView, s.str(), Point(1,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+
+            /* k7 (average) */
+            _d = gLinesData.at<double>(7,dtlsIdxOnMainView);
+            _color = lineColors[7] ;
+            s.str("");
+            s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
+            putText( gLeftDetailsView, s.str(), Point(41,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+
+            /* k8 (low) */
+            _d = gLinesData.at<double>(8,dtlsIdxOnMainView);
+            _color = lineColors[8] ;
+            s.str("");
+            s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
+            putText( gLeftDetailsView, s.str(), Point(82,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+
             _idx++ ;
             /* volume */
             s.str("");
-            _d = gVolData.at<double>(0,dtlsIdxOnMainView)/100/10000 ;    // use 10'thousand(hand) for the unit
+            _d = gVolData.at<double>(0,dtlsIdxOnMainView)/10000 ;    // use 10'thousand(hand) for the unit
             _color = Scalar(127,127,127);
             s << " VOL=" << setprecision(2) << abs(_d) << "W";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
             /* value */
             s.str("");
-            _d = gValData.at<double>(0,dtlsIdxOnMainView)/100/10000 ;    // use 1 Million yuan for the unit
+            _d = gValData.at<double>(0,dtlsIdxOnMainView)/100000 ;    // use 1 Million yuan for the unit
             _color = Scalar(127,127,127);
-            s << " VAL=" << abs(_d) << "M";
+            s << " VAL=" << abs(_d) << "Y";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
             /* live-value */
