@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 doStart
 
@@ -177,7 +177,7 @@ do
     elif [[ $_hotData == 1 ]] ; then
         playStockList.sh --print <<< $i 2>/dev/null
     else
-        (cat StockData/${i:1}.data 2>/dev/null || grep "^$i" StockData/${i:0:6}-.package.data)
+        (cat ~/StockData/${i:1}.data 2>/dev/null || grep "^$i" ~/StockData/${i:0:6}-.package.data)
     fi |
     _arrange $_days $_shift |
     _classfy.sh --seed="$_seed" --weight="$_weight" --gap="$_gap" ${_verbose:+--verbose} --base=$_base  |

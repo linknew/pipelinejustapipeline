@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 for i in "$@"
 do
@@ -35,18 +35,22 @@ trap "doExit 1" SIGTERM SIGINT
 
 [[ $_winOrder == '--winOrder' ]] && showErr "must specify order number for --winOrder, for example --winOrder=3" && doExit 0
 
+_stockData=~/StockData
 _fixType=${_fixType:=B}
 _classFile=${_classFile:='stock.list.class.tmp'}
-_stockName=$(grep ${_stockCode:1} stock.list | sed 's/^.*\s//') 
-_stockFile=.t.$$ && grep "'${_stockCode:1}" StockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >.t.$$ && cp .t.$$ .t.test
+_stockName=$(grep ${_stockCode:1} ~/StockData/stock.list | sed 's/^.*\s//') 
+set -x; set -x;
+_stockFile=.t.$$ && grep "'${_stockCode:1}" $_stockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >$_stockFile && cp $_stockFile .t.test
+set +x
 
 while true 
 do
     showMsg "\n*[$_stockCode]$_stockName: showStock $_print --classFile=$_classFile\n" >&2
     [[ -z $_silent ]] && echo save result to $_classFile >&2
     [[ -f $_stockFile ]] && _hisCnt=$(wc -l $_stockFile | awk '{print $1}') || _hisCnt=0
-    [[ -f StockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l StockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
+    [[ -f $_stockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l $_stockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
 
+set -x
 set -x
     stockChecking     \
         $_print         \
@@ -58,7 +62,7 @@ set -x
         $_stockCode     \
         $_stockFile \
         $_hisCnt    \
-        StockData/$_stockCode.html.org.hot   \
+        $_stockData/$_stockCode.html.org.hot   \
         $_hotCnt
 set +x
 

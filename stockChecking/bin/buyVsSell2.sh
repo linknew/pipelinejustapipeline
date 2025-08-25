@@ -17,7 +17,7 @@
 #store size will only appear in bought item.
 #lock volume will only affect on bought item.
 
-source ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 _tmp=''
 _code=''
@@ -559,7 +559,7 @@ while true; do
             # get stock name
             if(!stockName[_code]){
                 _name=" " ;
-                _bashCmd="grep "substr(_code,2)" stock.list | sed \"s/.*[ \t]//\"" ;
+                _bashCmd="grep "substr(_code,2)" ~/StockData/stock.list | sed \"s/.*[ \t]//\"" ;
                 _bashCmd | getline _name ;
                 stockName[_code] = _name ;
                 close(_bashCmd) ;
@@ -672,7 +672,7 @@ while true; do
                 if(_selVolRemain == _buyVolRemain){
                     _lastPrice[_code] = 0 ;
                 }else{
-                    _bashCmd="echo "_code" | ~/tools/bin/playStockList.sh --print --fixType=N 2>/dev/null | grep "_awkDateEnd" | awk \"END{print \\$2}\" " ;
+                    _bashCmd="echo "_code" | playStockList.sh --print --fixType=N 2>/dev/null | grep "_awkDateEnd" | awk \"END{print \\$2}\" " ;
                     _bashCmd | getline _lastPrice[_code] ;
                     close(_bashCmd) ;
                 }

@@ -48,7 +48,7 @@
 #define MAX_DAYS_NUM            (HISTORY_DATA_DAYS+HOT_DATA_DAYS+FORECAST_DATA_DAYS)
 
 #define MAX_WIN_WIDTH           (1920)
-#define MAX_WIN_HEIGHT          (1080)
+#define MAX_WIN_HEIGHT          (1080-40)
 
 #define LEFT_VIEW_W             (180)
 
@@ -238,12 +238,12 @@ int digtFuncScale( char c);
 /* color-list for lines */
 static Scalar  lineColors[MAX_LINES] = {
                         Scalar(255,50,50),
-                        Scalar(0,255,0),
+                        Scalar(80,80,150),
                         Scalar(255,255,0),
                         Scalar(255,0,255),
                         Scalar(0,0,255),
                         Scalar(0,255,255),
-                        Scalar(0,0,150),
+                        Scalar(0,255,0),
                         Scalar(255,125,125),
                         Scalar(255,255,255),
                     } ;
@@ -652,7 +652,7 @@ int importData(
     double          _volume  = 0 ;
     double          _value  = 0 ;
     double          _liveValue = 0 ;
-    double          _liveValueYstd = 0 ;
+//  double          _liveValueYstd = 0 ;
     double          _ampValue = 0 ;
     double          _totalValue = 0 ;
     double          _dealNum = 0 ;
@@ -737,7 +737,8 @@ int importData(
 
             /* get items from history & hot files */
             while(1){
-                if(false == _hisDataIsGot && getline(_hisData, _tmpStr)){     // history data
+                // history data
+                if(false == _hisDataIsGot && getline(_hisData, _tmpStr)){
                     if(cuttingIdx != IDX_RANGE_UNSET && _dataCnt > cuttingIdx){
                         /* do not load cutting data */
                         _hisDataIsGot = true ;
@@ -748,7 +749,9 @@ int importData(
                         _hisDataIsGot = true ;
                         continue ;
                     }
-                }else{                              // hot data
+                }
+                // hot data
+                else{
                     static Mat  _dailyData(NUMBERS_OF_DAILY_DATA_TYPE, MAX_DAILY_CNT,CV_64F) ;
                     string      _lastHotData = "" ;
                     int         _cnt = 0 ;
@@ -1033,25 +1036,6 @@ int importData(
                     _dateData.at<double>(0,_dataCnt) = (_yyyy - 1970)*12*31 + (_mm - 1)*31 + (_dd - 1) ;
                 }
 
-                /* caculate power */
-                {
-                    if(0 == _dataCnt){                     // first day
-                        _liveValueYstd = _liveValue ;
-                    }
-
-#if 0
-                    if(!_liveValueYstd){
-                        _pwrData.at<double>(0,_dataCnt) = 0 ;
-                    }else{
-                        _pwrData.at<double>(0,_dataCnt) = (_value / _liveValueYstd - _exchange/100) * 100 * 100 ;
-                    }
-#else
-                    _pwrData.at<double>(0,_dataCnt) = _volume;
-#endif
-
-                    _liveValueYstd = _liveValue ;
-                }
-
                 ++ _dataCnt ;
             }
 
@@ -1129,7 +1113,10 @@ int importData(
         }
 
         /* caculate average(val/vol) */
-        {
+        if(IS_BIG_DISK(stockId)){
+            _avrgPrice = (_higData + _lowData)/2;
+        }
+        else {
             _avrgPrice = _valData / _volData  * 10/*unify the units of val & vol*/;
         }
 
@@ -1177,11 +1164,16 @@ int importData(
             _getUpDnRateIndexer(_ampData, _rsi24Data, 24, false, false) ;
         }
 
+        /* caculate value rate, value/average5_value */
+        {
+            _getAvgRateIndexer(_valData, _pwrData, WEEK_DAYS, false);
+        }
+
         /* caculate PWRI */
         {
-            _getUpDnRateIndexer(_pwrData, _pwri6Data,   6, true, false) ;
-            _getUpDnRateIndexer(_pwrData, _pwri12Data, 12, true, false) ;
-            _getUpDnRateIndexer(_pwrData, _pwri24Data, 24, true, false) ;
+            _getUpDnRateIndexer(_valData, _pwri6Data,   6, true, false) ;
+            _getUpDnRateIndexer(_valData, _pwri12Data, 12, true, false) ;
+            _getUpDnRateIndexer(_valData, _pwri24Data, 24, true, false) ;
         }
 
         /* caculate rsiFuture6 & pwriFuture12 */
@@ -1194,8 +1186,9 @@ int importData(
             for(j=max(0,i-4);j<=i;j++){
                 (_ampData.at<double>(0,j) > 0) ? _RSUpFuture6 += _ampData.at<double>(0,j)
                                                : _RSDnFuture6 -= _ampData.at<double>(0,j) ;
-                (_pwrData.at<double>(0,j) > 0) ? _PWRUpFuture12 += _pwrData.at<double>(0,j)
-                                               : _PWRDnFuture12 -= _pwrData.at<double>(0,j);
+                //@ FIXME, should replace _ampData with somedata else
+                (_ampData.at<double>(0,j) > 0) ? _PWRUpFuture12 += _ampData.at<double>(0,j)
+                                               : _PWRDnFuture12 -= _ampData.at<double>(0,j);
             }
 
             _RSDnFuture6 -= -10.0;      // the maximue down amplitude is -10%
@@ -1559,10 +1552,32 @@ void _doRefreshView(void)
                  Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gMainView.rows - LINE_MARGIN_T - LINE_MARGIN_B)) ;
     }
 
+#if 0
+    /* draw _value */
+    {
+        Mat _m ;
+
+        if( GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
+            normalize(gValData.colRange(dataRangeStart,dataRangeEnd), _m, 0+1, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+        }else{
+            normalize(gValData, _m, 0+1, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _m = _m.colRange(dataRangeStart,dataRangeEnd) ;
+        }
+
+        paintData(_m,
+                gBottomView,
+                scale,
+                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                Scalar(255,195,0),
+                PAINT_TYPE_FILLED_RECT,
+                true) ;
+    }
+#endif
+
 #if 1
     /* adjust _pwr */
     {
-        Mat _t1, _t2, _v;
+        Mat _t1, _t2;
         Mat _p(gBottomView.size(),gBottomView.type(),Scalar::all(0)) ;
         int _posY = 0 ;
 
@@ -1594,7 +1609,8 @@ void _doRefreshView(void)
                 scale,
                 Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
                 Scalar(255,195,0),
-                PAINT_TYPE_FILLED_RECT,
+                //PAINT_TYPE_FILLED_RECT,
+                PAINT_TYPE_LINE,
                 true) ;
         addWeighted(_p,1,gBottomView,0,0,gBottomView);
 
@@ -1604,6 +1620,7 @@ void _doRefreshView(void)
                 Point(gBottomView.cols - LINE_MARGIN_R -1, gBottomView.rows -LINE_MARGIN_B -1 -_posY),
                 Scalar(0,0,255), 1, LINE_8 ) ;
     }
+#endif
 
 #if 1
     /* adjust _xcg */
@@ -1634,28 +1651,6 @@ void _doRefreshView(void)
         addWeighted(_p,1,gBottomView,1,0,gBottomView);
     }
 #endif
-#endif
-
-    /* draw volume for bigDisks */
-    if(IS_BIG_DISK(stockId)){
-        Mat _m ;
-        Mat _t, _v ;
-
-        if( GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
-            normalize(gVolData.colRange(dataRangeStart,dataRangeEnd), _m, 0+1, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-        }else{
-            normalize(gVolData, _m, 0+1, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-            _m = _m.colRange(dataRangeStart,dataRangeEnd) ;
-        }
-
-        paintData(_m,
-                gBottomView,
-                scale,
-                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
-                Scalar(255,195,0),
-                PAINT_TYPE_FILLED_RECT,
-                true) ;
-    }
 
 #if 0
     /* draw eager line */
@@ -2273,51 +2268,51 @@ void _doRefreshView(void)
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_RSI_CUSTOM - DATA_TYPE_RSI6)) s << " [RSI_CUSTOM:" << rsiCustom <<"]";
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_PWRI_CUSTOM - DATA_TYPE_RSI6)) s << " [PWRI_CUSTOM:" << pwriCustom <<"]";
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_XCGI_CUSTOM - DATA_TYPE_RSI6)) s << " [XCGI_CUSTOM:" << xcgAvgICustom <<"]";
-        putText( gTopStatus_view, s.str(), Point(0,22), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gTopStatus_view, s.str(), Point(0,22), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         s.str("") ;
         /* show baseline info */
         ( digtFuncList[ digtFuncIdx ] == digtFuncBaselineFilter ) ?  s << "*Base:" : s << " Base:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
             if( GET_SWITCHER_STATUS(baseLineSwitchers,i) ){
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+1*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+1*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show line info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "*Lines:" : s << " Lines:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+2*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+2*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
             if( GET_SWITCHER_STATUS(linesSwitchers,i) ){
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+3*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+3*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show index info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncIndexFilter) ? s << "*Indexs:" : s << " Indexs:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+4*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+4*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < NUMBERS_OF_DATA_TYPE - DATA_TYPE_RSI6; i++ ){
             if( GET_SWITCHER_STATUS(indexSwitchers,i) ){
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+5*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+5*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show scale info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "*Scale:" : s << " Scale:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+6*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+6*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("") ;
         s << scale ;
-        putText( gLeftDetailsView, s.str(), Point(20,54+7*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+7*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show details info */
         if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
@@ -2338,7 +2333,7 @@ void _doRefreshView(void)
 
             /* k0 (today) */
             _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
-            _color = lineColors[0] ;
+            _color = Scalar(255,80,80) ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(1,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
@@ -2403,21 +2398,21 @@ void _doRefreshView(void)
             /* volume */
             s.str("");
             _d = gVolData.at<double>(0,dtlsIdxOnMainView)/10000 ;    // use 10'thousand(hand) for the unit
-            _color = Scalar(127,127,127);
+            _color = Scalar(200,200,200);
             s << " VOL=" << setprecision(2) << abs(_d) << "W";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
             /* value */
             s.str("");
             _d = gValData.at<double>(0,dtlsIdxOnMainView)/100000 ;    // use 1 Million yuan for the unit
-            _color = Scalar(127,127,127);
+            _color = Scalar(200,200,200);
             s << " VAL=" << abs(_d) << "Y";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
             /* live-value */
             s.str("");
             _d = gLvalData.at<double>(0,dtlsIdxOnMainView)/100/10000 ; // use 10'Million(yuan) for the unit
-            _color = Scalar(127,127,127);
+            _color = Scalar(200,200,200);
             s << " LVal=" << (_d) << "M";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2425,7 +2420,7 @@ void _doRefreshView(void)
             s.str("");
             _d = gAmpData.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>0) ? Scalar(0,0,255)
-                           : (_d==0) ? Scalar(127,127,127)
+                           : (_d==0) ? Scalar(200,200,200)
                                     : Scalar(0,255,0) ;
             s << " AMP=" << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
@@ -2433,7 +2428,7 @@ void _doRefreshView(void)
             /* exchange */
             s.str("");
             _d = gXcgData.at<double>(0,dtlsIdxOnMainView) ;
-            _color = Scalar(127,127,127) ;
+            _color = Scalar(200,200,200) ;
             s << " Exchg=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << '%' ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2441,7 +2436,7 @@ void _doRefreshView(void)
             s.str("");
             _d = gPwrData.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>0) ? Scalar(0,0,255)
-                            : (_d==0) ? Scalar(127,127,127)
+                            : (_d==0) ? Scalar(200,200,200)
                                       : Scalar(0,255,0) ;
             s << " Power=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
@@ -2454,7 +2449,7 @@ void _doRefreshView(void)
             _d = gEgrData.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=75) ? Scalar(0,0,255)
                               : (_d<=25) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " Eager=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 #endif
@@ -2464,7 +2459,7 @@ void _doRefreshView(void)
             _d = gRsi6Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " RSI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2473,7 +2468,7 @@ void _doRefreshView(void)
             _d = gRsi12Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " RSI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2483,7 +2478,7 @@ void _doRefreshView(void)
             _d = gRsi24Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " RSI24=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 #endif 
@@ -2493,7 +2488,7 @@ void _doRefreshView(void)
             _d = gPwri6Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " PWRI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2502,7 +2497,7 @@ void _doRefreshView(void)
             _d = gPwri12Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " PWRI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2512,7 +2507,7 @@ void _doRefreshView(void)
             _d = gPwri24Data.at<double>(0,dtlsIdxOnMainView) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
-                                         : Scalar(127,127,127) ;
+                                         : Scalar(200,200,200) ;
             s << " PWRI24=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 #endif
@@ -2572,7 +2567,7 @@ void _doRefreshView(void)
                 _d = (rsiCustom>0) ? _getUpDnRateIndexer(gAmpData.colRange(_dataS,_dataE+1), gRsiCustomData, _dataE - _dataS + 1, false, true) : 0 ;
                 _color = (_d>=85) ? Scalar(0,0,255)
                                   : (_d<=15) ? Scalar(0,255,0)
-                                             : Scalar(127,127,127) ;
+                                             : Scalar(200,200,200) ;
                 s << " RSI-" << rsiCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2581,7 +2576,7 @@ void _doRefreshView(void)
                 _d = (pwriCustom>0) ? _getUpDnRateIndexer(gPwrData.colRange(_dataS,_dataE+1), gPwriCustomData, _dataE - _dataS + 1, false, true) : 0 ;
                 _color = (_d>=85) ? Scalar(0,0,255)
                                   : (_d<=15) ? Scalar(0,255,0)
-                                             : Scalar(127,127,127) ;
+                                             : Scalar(200,200,200) ;
                 s << " PWRI-" << pwriCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2590,7 +2585,7 @@ void _doRefreshView(void)
                 _d = (xcgAvgICustom>0) ? _getUpDnRateIndexer(gXcgData.colRange(_dataS,_dataE+1), gXcgAvgICustomData, _dataE - _dataS + 1, true, true) : 0 ;
                 _color = (_d>=85) ? Scalar(0,0,255)
                                   : (_d<=15) ? Scalar(0,255,0)
-                                             : Scalar(127,127,127) ;
+                                             : Scalar(200,200,200) ;
                 s << " XCG-" << xcgAvgICustom << "="  << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
             }
@@ -2602,35 +2597,35 @@ void _doRefreshView(void)
                 /* pre-close */
                 s.str("");
                 _d = gYstdData.at<double>(0,dtlsIdxOnMainView) ;
-                _color = Scalar(127,127,127) ;
+                _color = Scalar(200,200,200) ;
                 s << " YstdC=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
                 /* open */
                 s.str("");
                 _d = gOpenData.at<double>(0,dtlsIdxOnMainView) ;
-                _color = Scalar(127,127,127) ;
+                _color = Scalar(200,200,200) ;
                 s << " Open=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
                 /* close */
                 s.str("");
                 _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
-                _color = Scalar(127,127,127) ;
+                _color = Scalar(200,200,200) ;
                 s << " Close=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
                 /* high */
                 s.str("");
                 _d = gHigData.at<double>(0,dtlsIdxOnMainView) ;
-                _color = Scalar(127,127,127) ;
+                _color = Scalar(200,200,200) ;
                 s << " High=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
                 /* lower */
                 s.str("");
                 _d = gLowData.at<double>(0,dtlsIdxOnMainView) ;
-                _color = Scalar(127,127,127) ;
+                _color = Scalar(200,200,200) ;
                 s << " Lower=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
 
@@ -2668,13 +2663,13 @@ void _doRefreshView(void)
                         _floor = _n.at<double>(_i,5) ;
                         _ceiling = _n.at<double>(_i,6) ;
                         _date = _n.at<double>(_i,_CNT-1) ;
-                        _color = (_close > _open) ? Scalar(0,0,255) : ( (_close == _open) ? Scalar(127,127,127) : Scalar(0,255,0) ) ;
+                        _color = (_close > _open) ? Scalar(0,0,255) : ( (_close == _open) ? Scalar(200,200,200) : Scalar(0,255,0) ) ;
                         _basePosX = gLeftDetailsView.cols/_itemsNumber * _i + gLeftDetailsView.cols/_itemsNumber/2 - 25;
                         _basePosY = 120 + (_idx * 14) +14*4;
 
-                        line( gLeftDetailsView, Point(8, _basePosY-_ceiling), Point(gLeftDetailsView.cols-1-58, _basePosY-_ceiling), Scalar(127,127,127), 1, LINE_8) ;
-                        line( gLeftDetailsView, Point(8, _basePosY-_ystdClose), Point(gLeftDetailsView.cols-1-58, _basePosY-_ystdClose), Scalar(127,127,127), 1, LINE_8) ;
-                        line( gLeftDetailsView, Point(8, _basePosY-_floor), Point(gLeftDetailsView.cols-1-58, _basePosY-_floor), Scalar(127,127,127), 1, LINE_8) ;
+                        line( gLeftDetailsView, Point(8, _basePosY-_ceiling), Point(gLeftDetailsView.cols-1-58, _basePosY-_ceiling), Scalar(200,200,200), 1, LINE_8) ;
+                        line( gLeftDetailsView, Point(8, _basePosY-_ystdClose), Point(gLeftDetailsView.cols-1-58, _basePosY-_ystdClose), Scalar(200,200,200), 1, LINE_8) ;
+                        line( gLeftDetailsView, Point(8, _basePosY-_floor), Point(gLeftDetailsView.cols-1-58, _basePosY-_floor), Scalar(200,200,200), 1, LINE_8) ;
                         line( gLeftDetailsView, Point(_basePosX,_basePosY-_max), Point(_basePosX, _basePosY-max(_open,_close)), _color, 1, LINE_8 ) ;
                         line( gLeftDetailsView, Point(_basePosX,_basePosY-_min), Point(_basePosX, _basePosY-min(_open,_close)), _color, 1, LINE_8 ) ;
                         rectangle( gLeftDetailsView, Point(_basePosX-2, _basePosY-_open), Point(_basePosX+2, _basePosY-_close), _color, FILLED, LINE_8 );

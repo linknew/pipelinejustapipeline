@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 Usage() {
     echo -en "
@@ -27,7 +27,7 @@ done
 
 [[ -z $code ]] && echo "no code specified">&2 && doExit -1
 sourceData=${sourceData:--}
-#[[ -z $sourceData ]] && printData=$(~/tools/bin/playStockList.sh --print <<< $code 2>/dev/null) || printData=$(cat $sourceData)
+#[[ -z $sourceData ]] && printData=$(playStockList.sh --print <<< $code 2>/dev/null) || printData=$(cat $sourceData)
 #[[ -z $printData ]] && echo "failed to retrive data of $code or $sourceData does not exist" >&2 && doExit -1
 
 echo "*[$code]" >&2

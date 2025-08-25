@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 let _cmdCodeUpdate=$((1<<1))
 let _cmdCodeDownload=$((1<<2))
@@ -46,13 +46,13 @@ doPacking()
     local _code
     local _ext
     local _cmd
-    local _list=$(ls StockData/*.data StockData/*.html.org 2>/dev/null | grep -v '-')
+    local _list=$(ls ~/StockData/*.data ~/StockData/*.html.org 2>/dev/null | grep -v '-')
 
     for _i in $_list
     do
         _ext=${_i#*.}
         _code=${_i##*/};  _code=${_code%%.*}
-        _packFile=StockData/${_code:0:6}-.package.$_ext
+        _packFile=~/StockData/${_code:0:6}-.package.$_ext
 
         if [[ $_ext == "data" ]] ; then
             sed -i'' /^$_code/d $_packFile 2>/dev/null
@@ -223,7 +223,7 @@ trap "wait
       killHotDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
-cp ~/tools/bin/getStockData.sh ./getStockData.$$.sh
+cp $(dirname $0)/../bin/getStockData.sh ./getStockData.$$.sh
 
 ((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -n 1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
@@ -290,7 +290,7 @@ fi
 if (( _cmdCode & (_cmdCodeUpdate|_cmdCodeDownload|_cmdCodeDoDailyHomework|_cmdCodeJustDoit) )) ; then
     showHi "*Download 1000001 for the base of systemSync\n" >&2
     ./getStockData.$$.sh --update 1000001 2>/dev/null
-    _dateEnd=$(grep "'000001" StockData/100000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
+    _dateEnd=$(grep "'000001" ~/StockData/100000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
     _dateEnd=${_dateEnd:-$(date "+%Y%m%d")}
 fi
 
@@ -302,9 +302,9 @@ do
     if [[ ${#_code} -eq 6 ]] ; then
         [[ ${_code:0:1} == '6' || ${_code:0:1} == '9' ]] && _code="0$_code" || _code="1$_code"
     fi
-    _hotFile=StockData/$_code.html.org.hot
-    _hotFileBak=StockData/.HotData/$_code.html.org.hot.$(date "+%Y-%m-%d")
-    _stockDataPackage=StockData/${_code:0:6}-.package.data
+    _hotFile=~/StockData/$_code.html.org.hot
+    _hotFileBak=~/StockData/.HotData/$_code.html.org.hot.$(date "+%Y-%m-%d")
+    _stockDataPackage=~/StockData/${_code:0:6}-.package.data
 
     # download
     _opt=${_dateEnd:+"--dateEnd=$_dateEnd"}
@@ -376,7 +376,7 @@ done
 
 #postpare
 if ((_cmdCode & (_cmdCodeDoDailyHomework|_cmdCodePackDailyData) )) ; then
-    tar -uvf .HotData.tar StockData/.HotData && rm StockData/.HotData/*
+    tar -uvf .HotData.tar ~/StockData/.HotData && rm ~/StockData/.HotData/*
 fi
 
 if ((_cmdCode & _cmdCodeGenRelationshipData)) ; then

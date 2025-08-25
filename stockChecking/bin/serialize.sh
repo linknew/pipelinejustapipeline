@@ -1,6 +1,29 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
+
+
+#@ for example:
+
+#@ before serialize
+# a    x x x
+# a    x x x
+# a    x x x
+# b    x x x
+# b    x x x
+# c    x x x
+# c    x x x
+# c    x x x
+
+#@ after serialize
+# a    x x x
+# a-1  x x x
+# a-2  x x x
+# b    x x x
+# b-1  x x x
+# c    x x x
+# c-1  x x x
+# c-2  x x x
 
 
 echo -ne "*executing $0($$)\n" >&2

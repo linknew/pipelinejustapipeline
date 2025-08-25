@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 echo -ne "*executing $0($$)\n" >&2
 
@@ -78,7 +78,7 @@ awk '
                 }else{
                     avrgUpP[seed] = "-inf" ;
                 }
-                cntUpP[seed] = _cnt ;
+#               cntUpP[seed] = _cnt ;
             }
 
             #process UpN
@@ -96,7 +96,7 @@ awk '
                 }else{
                     avrgUpN[seed] = "inf" ;
                 }
-                cntUpN[seed] = _cnt ;
+#               cntUpN[seed] = _cnt ;
             }
 
             #process DnP
@@ -114,7 +114,7 @@ awk '
                 }else{
                     avrgDnP[seed] = "-inf" ;
                 }
-                cntDnP[seed] = _cnt ;
+#               cntDnP[seed] = _cnt ;
             }
 
             #process DnN
@@ -132,7 +132,7 @@ awk '
                 }else{
                     avrgDnN[seed] = "inf" ;
                 }
-                cntDnN[seed] = _cnt ;
+#               cntDnN[seed] = _cnt ;
             }
 
             #process DurAmpP
@@ -150,7 +150,7 @@ awk '
                 }else{
                     avrgDurAmpP[seed] = "-inf" ;
                 }
-                cntDurAmpP[seed] = _cnt ;
+#               cntDurAmpP[seed] = _cnt ;
             }
 
             #process DurAmpN
@@ -168,7 +168,7 @@ awk '
                 }else{
                     avrgDurAmpN[seed] = "inf" ;
                 }
-                cntDurAmpN[seed] = _cnt ;
+#               cntDurAmpN[seed] = _cnt ;
             }
 
             #fix inf and -inf
@@ -184,14 +184,14 @@ awk '
 
         for(i in cnt) printf("%06d  UP/UN=%5.2f  UP=%06d(%5.2f%%)  UN=%06d(%5.2f%%)  DP=%06d(%5.2f%%)  DN=%06d(%5.2f%%)  AP/AN=%5.2f  AP=%06d(%5.2f%%)  AN=%06d(%5.2f%%)  %s\n",
                             cnt[i],
-                            (cntUpN[i] ? cntUpP[i]/cntUpN[i] : "inf") ,
-                            cntUpP[i], (i in avrgUpP) ? avrgUpP[i] : "-inf" ,
-                            cntUpN[i], (i in avrgUpN) ? avrgUpN[i] : "inf" ,
-                            cntDnP[i], (i in avrgDnP) ? avrgDnP[i] : "-inf" ,
-                            cntDnN[i], (i in avrgDnN) ? avrgDnN[i] : "inf" ,
-                            (cntDurAmpN[i] ? cntDurAmpP[i]/cntDurAmpN[i] : "inf") ,
-                            cntDurAmpP[i], (i in avrgDurAmpP) ? avrgDurAmpP[i] : "-inf" ,
-                            cntDurAmpN[i], (i in avrgDurAmpN) ? avrgDurAmpN[i] : "inf" ,
+                            (cntUpN[i] ? cntUpP[i]/cntUpN[i] : cnt[i]) ,                #equals roughly cnt[i]
+                            cntUpP[i], (i in avrgUpP) ? avrgUpP[i] : -99999 ,
+                            cntUpN[i], (i in avrgUpN) ? avrgUpN[i] : 99999 ,
+                            cntDnP[i], (i in avrgDnP) ? avrgDnP[i] : -99999 ,
+                            cntDnN[i], (i in avrgDnN) ? avrgDnN[i] : 99999 ,
+                            (cntDurAmpN[i] ? cntDurAmpP[i]/cntDurAmpN[i] : cnt[i]) ,    #equals roughly cnt[i]
+                            cntDurAmpP[i], (i in avrgDurAmpP) ? avrgDurAmpP[i] : -99999 ,
+                            cntDurAmpN[i], (i in avrgDurAmpN) ? avrgDurAmpN[i] : 99999 ,
                             i) ;
     }
     '

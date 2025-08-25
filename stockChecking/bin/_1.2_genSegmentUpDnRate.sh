@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 defDur=3
 defOffset=1

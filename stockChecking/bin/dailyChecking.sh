@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 # the data of input must be .hot data
 function programForgettingAvgTTandVolUpVolDnValUpValDn()
@@ -224,12 +224,12 @@ if [[ $1 == 3 ]] ; then
     #display stock name
     stockId=${2:-300340}
     daysFunc3=${3:-10}
-    grep $stockId stock.list >&2
+    grep $stockId ~/StockData/stock.list >&2
 
     #_start=$(getActualDate ${_start:-1970-01-01})
     _gap=$(cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -n1) | awk 'END{print int($4/3)/100}')
-    cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -n$daysFunc3) StockData/*$stockId.html.org.hot  |
-    #cat StockData/*$stockId.html.org.hot  |
+    cat $(ls  tmp/StockData/.HotData/*$stockId* | tail -n$daysFunc3) ~/StockData/*$stockId.html.org.hot  |
+    #cat ~/StockData/*$stockId.html.org.hot  |
     analizeAmpStatus.sh --seed='$4' --weight='$12' --gap=$_gap  --data --details  --top=40
 
 elif [[ $1 == 1 ]] ; then
@@ -239,7 +239,7 @@ elif [[ $1 == 1 ]] ; then
 
     #display stock name
     stockId=${2:-300340}
-    grep $stockId stock.list >&2
+    grep $stockId ~/StockData/stock.list >&2
 
     printDataOnly=${3:-0}
 
@@ -276,7 +276,7 @@ elif [[ $1 == 2 ]] ; then
 
     #display stock name
     stockId=${2:-300340}
-    grep $stockId stock.list >&2
+    grep $stockId ~/StockData/stock.list >&2
 
     extractLastNdaysDailyData=${3:-1}
     printDataOnly=${4:-0}
@@ -311,10 +311,10 @@ elif [[ $1 == 2 ]] ; then
         [[ -n $content ]] && echo "$content" > .dailyChecking.$stockId.$(date +%Y-%m-%d)
     fi
 
-    if [[ -f StockData/$stockId.html.org.hot ]]; then
+    if [[ -f ~/StockData/$stockId.html.org.hot ]]; then
         #extract data from hotData
         lastUpdate=$(
-            cat StockData/$stockId.html.org.hot | programForgettingAvgTTandVolUpVolDnValUpValDn
+            cat ~/StockData/$stockId.html.org.hot | programForgettingAvgTTandVolUpVolDnValUpValDn
         )
         dateLastUpdate=${lastUpdate##* }
 
@@ -382,8 +382,8 @@ elif [[ $1 == 4 ]] ; then
                     tail=$2 ;
                 }
                 END{
-                    if($2==min && tail<=secondTail) system("grep " stockId " stock.list") ;
-#                    if(tail<secondTail) system("grep " stockId " stock.list") ;
+                    if($2==min && tail<=secondTail) system("grep " stockId " ~/StockData/stock.list") ;
+#                    if(tail<secondTail) system("grep " stockId " ~/StockData/stock.list") ;
                 }
             '
     done

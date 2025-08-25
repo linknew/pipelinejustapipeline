@@ -1,6 +1,6 @@
 #! /bin/bash 
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 doStart
 
@@ -39,7 +39,7 @@ do
         --checkingLiveValue
 
     Notice:
-        \033[1;31mthis routing use StockData/xxx/xxx.pakage.data if --hotData does NOT present.\033[0m
+        \033[1;31mthis routing use ~/StockData/xxx/xxx.pakage.data if --hotData does NOT present.\033[0m
 
     default:
         --days=$_days 
@@ -102,7 +102,7 @@ do
     if [[ $_hotData -eq 1 ]] ; then 
         checkingData=$(echo $x | playStockList.sh --hotData --print)
     else
-        checkingData=$(cat StockData/${x:1}.data || grep "^$i" StockData/${x:0:6}-.package.data)
+        checkingData=$(cat ~/StockData/${x:1}.data || grep "^$i" ~/StockData/${x:0:6}-.package.data)
     fi
     [[ $(echo "$checkingData" | wc -l | awk '{print $1}') -lt $_age ]] && continue ;
 

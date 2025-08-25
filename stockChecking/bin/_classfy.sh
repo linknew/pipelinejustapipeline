@@ -1,5 +1,5 @@
 #! /bin/bash
-source comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 _gap=1
 _seed='$1'

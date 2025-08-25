@@ -1,33 +1,38 @@
 
 #! /bin/bash
 
-. ~/tools/lib/comm.lib
+source $(dirname $0)/../lib/comm.lib
 
 doStart
 
-doForecastDef=1
+doForecastDef=0
 durDef=3
-genRawDef=0
 genSegmentDef=0
 genCountingDef=0
 verifyDef=0
 buyFixDef=0
 selFixDef=-0.03
 oprtB4Exit="cd $BKD"
+serialLvlDef=1
 
-function Help
+SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
+GEN_KLINK_RAWDATA=_1.1_genKLineSortingRawData.sh;  command -v $GEN_KLINK_RAWDATA     >&2 || doExit -2 "echo cannot find $GEN_KLINK_RAWDATA >&2"
+GEN_SEGMENT_UPDN_RATE=_1.2_genSegmentUpDnRate.sh;  command -v $GEN_SEGMENT_UPDN_RATE >&2 || doExit -3 "echo cannot find $GEN_SEGMENT_UPDN_RATE >&2"
+GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_DATA >&2 || doExit -4 "echo cannot find $GEN_COUNTING_SEG_DATA >&2"
+
+Help()
 {
     echo -ne "
-    Usage: ${0} [--dur=<N>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genRaw] [--genSegment] [--genCounting] [--doForecast] [--verify [--buyFix=<N>] [--selFix=<N>]] [--help] list
+    Usage: ${0} [--dur=<n>] [--serialLvl=<n>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genSegment] [--genCounting] [--doForecast] /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/ [--help] list
 
-        --dur, duration for segment data
-        --start, limited the range when generate segment
-        --end, limited the range when generate segment
-        --genRaw, generate raw data
-        --genSegment, generate segment data from raw data
-        --genCounting, gencounting data from segment data
-        --build, is the abbrevation of --genRaw --genSegment --genCounting --doForecast=0
-        --doForecast, forecast ...
+        --dur, forecast duration
+        --serialLvl, signal width for forecast, please check the example in serialize2.sh
+        --start, input data range
+        --end, input data range
+        --genSegment, generate segment data
+        --genCounting, gencounting data
+        --build, is the abbrevation of --genSegment --genCounting
+        --doForecast, forecast, will set --doForecast to 1 and set --genSegment=1
         --verify, do verifications
             -- buyFix=N, set buy price plus N
             -- selFix=N, set sell price pus N
@@ -42,44 +47,44 @@ function Help
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help && doExit 0 "$oprtB4Exit"
+    [[ ${i} == "--help" ]] && Help >&2 && doExit 0 "$oprtB4Exit"
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
-    [[ ${i%%=*} == "--doForecast" ]] && doForecast=1 && continue
+    [[ ${i%%=*} == "--serialLvl" ]] && { serialLvl=${i##*=}; continue; }
+    [[ ${i%%=*} == "--doForecast" ]] && { doForecast=1; genSegment=1; continue; }
     [[ ${i%%=*} == "--verify" ]] && verify=1 && continue
     [[ ${i%%=*} == "--buyFix" ]] && buyFix=${i##*=} && continue
     [[ ${i%%=*} == "--selFix" ]] && selFix=${i##*=} && continue
-    [[ ${i} == "--genRaw" ]] && genRaw=1 && continue
     [[ ${i} == "--genSegment" ]] && genSegment=1 && continue
     [[ ${i} == "--genCounting" ]] && genCounting=1 && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
-    [[ ${i} == "--build" ]] && genRaw=1 && genSegment=1 && genCounting=1 && doForecast=1 && continue
+    [[ ${i} == "--build" ]] && { genSegment=1; genCounting=1; continue; }
     [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$oprtB4Exit"
     [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$oprtB4Exit"
     list=$i
 done
 
 [[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1 "$oprtB4Exit"
-codes=$( awk '($1 !~ "#"){print $1}' $list )
+codes=$( awk '($1 !~ "#"){print $1}' $list | sort -u)
 codeNum=$(echo "$codes" | wc -w)
 [[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$oprtB4Exit"
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
 dur=${dur:-$durDef}
+serialLvl=${serialLvl:-$serialLvlDef}
 doForecast=${doForecast:-$doForecastDef}
-genRaw=${genRaw:-$genRawDef}
 genSegment=${genSegment:-$genSegmentDef}
 genCounting=${genCounting:-$genCountingDef}
 verify=${verify:-$verifyDef}
 buyFix=${buyFix:-$buyFixDef}
 selFix=${selFix:-$selFixDef}
-segData=.t$dur.segData
-cntgData=.t$dur.counting
+segData=.t$dur.segData.lvl$serialLvl
+cntgData=.t$dur.counting.lvl$serialLvl
 forecastData=.t$dur.forecast$postFilename${start:+.from.$start}${end:+.to.$end}
 
 echo     *dur="$dur" >&2
+echo     *serialLvl="$serialLvl" >&2
 echo     *start="$start" >&2
 echo     *end="$end" >&2
-echo     *genRaw="$genRaw"  >&2
 echo     *genSegment="$genSegment"   >&2
 echo     *genCounting="$genCounting" >&2
 echo     *doForecast="$doForecast"   >&2
@@ -94,23 +99,23 @@ fi
 if [[ $genSegment -eq 1 ]] ; then
     rm -rf $segData 
     [[ $? -ne 0 ]] && echo *! Cannot remove $segData >&2 && doExit -1 "$oprtB4Exit"
+    [[ $doForecast -eq 1 && $genCounting -ne 1 ]] && checkLastN=$((dur+serialLvl)) || checkLastN=400
 
     for i in $codes
     do
-        ~/tools/bin/playStockList.sh --printLastN=400 <<< $i |
-        ./1_genKLineSortingRawData.sh $i |
-        ./2_genSegmentUpDnRate.sh --dur=$dur --offset=1 $i >> "$segData" &&
+        playStockList.sh --printLastN=$checkLastN <<< $i |
+        $GEN_KLINK_RAWDATA $i |
+        $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i >> "$segData" || doExit -1
         echo *Append $i\'s data to "$segData" >&2
-        echo "----"
-        #[[ $genRaw -eq 1 ]] && ./1_genKLineSortingRawData.sh $i > sorting-raw/$i.raw
-        #[[ $genSegment -eq 1 ]] && ./2_genSegmentUpDnRate.sh --dur=$dur --offset=1 --sortingRaw=sorting-raw/$i.raw $i >> "$segData" && echo *Append $i\'s data to "$segData" >&2
-        #[[ $genRaw -eq 1 || $genSegment -eq 1 ]] && echo "----"
+        echo "----" >&2
     done
+    $SERIALIZE_2 --serialLvl=$serialLvl --typeIdx=14 --seedIdx=1 --noAbb $segData > ${segData}.t || doExit -1
+    mv ${segData}.t $segData || doExit -1
 fi
 #endif
 
 #generate counting data
-#if 1
+#if 2
 if [[ $genCounting -eq 1 ]]; then
     echo "*NOTE, only the item which in the code list will be procceed in counting" >&2
     echo "#start=$start end=$end" > "$cntgData"
@@ -137,7 +142,7 @@ if [[ $genCounting -eq 1 ]]; then
                 }
             }
             ' - $segData    |
-        ./3_countingSegMentData.sh >> "$cntgData"
+        $GEN_COUNTING_SEG_DATA >> "$cntgData"
 
     echo *Save counting data to "$cntgData" >&2
 fi
@@ -145,7 +150,7 @@ fi
 
 
 #generate seed-code-date info
-#if 1
+#if 3
 if [[ $doForecast == 1 ]] ; then
     echo $codes | 
     awk ${start:+ -v start=$start}  \
@@ -185,7 +190,7 @@ fi
 #endif
 
 
-#if 1
+#if 4
 if [[ $verify -eq 1 ]] ; then
 
     #generate processing table
