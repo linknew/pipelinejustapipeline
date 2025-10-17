@@ -39,9 +39,7 @@ _stockData=~/StockData
 _fixType=${_fixType:=B}
 _classFile=${_classFile:='stock.list.class.tmp'}
 _stockName=$(grep ${_stockCode:1} ~/StockData/stock.list | sed 's/^.*\s//') 
-set -x; set -x;
 _stockFile=.t.$$ && grep "'${_stockCode:1}" $_stockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >$_stockFile && cp $_stockFile .t.test
-set +x
 
 while true 
 do
@@ -50,8 +48,6 @@ do
     [[ -f $_stockFile ]] && _hisCnt=$(wc -l $_stockFile | awk '{print $1}') || _hisCnt=0
     [[ -f $_stockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l $_stockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
 
-set -x
-set -x
     stockChecking     \
         $_print         \
         ${_fixType:+--fixType $_fixType}    \
@@ -64,7 +60,6 @@ set -x
         $_hisCnt    \
         $_stockData/$_stockCode.html.org.hot   \
         $_hotCnt
-set +x
 
     if [[ -z $_silent ]] ; then
         echo "
