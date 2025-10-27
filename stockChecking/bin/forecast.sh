@@ -23,7 +23,7 @@ GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_
 Help()
 {
     echo -ne "
-    Usage: ${0} [--dur=<n>] [--serialLvl=<n>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genSegment] [--genCounting] [--doForecast] /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/ [--help] list
+    Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genSegment] [--genCounting] [--doForecast] /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/ [--help] list
 
         --dur, forecast duration
         --serialLvl, signal width for forecast, please check the example in serialize2.sh

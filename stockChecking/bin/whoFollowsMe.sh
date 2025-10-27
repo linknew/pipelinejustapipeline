@@ -1,11 +1,16 @@
 #! /bin/bash
 
 usage() {
-    echo -en "Usage:\n\t$(basename $0) <shift_days> <rated_data_file> <leader_lst_file> <follower_lst_file>\n\n"
-    echo -en "\texamples:\n"
+    echo -en "\tUsage:\n"
+    echo -en "\t  $(basename $0) <shift_days> <rated_data_file> <leader_lst_file> <follower_lst_file>\n\n"
+    echo -en "\tExamples:\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data <(echo 002780) <(echo 000880)\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data <(echo)        <(echo 000880)\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data\n"
+    echo -en "\n"
+    echo -en "\tNotes:\n"
+    echo -en "\t  rated_data_file can be generated with \"playStock.sh --update --printLastN=100 StockData/stock.list\"\n"
+    echo -en "\t  and the format is: \"600001 -0.38\"\n"
     echo -en "\n"
 }
 
@@ -19,6 +24,7 @@ followers=${4:+$(cat $4)}
 awk -v shift_days=$shift_days   \
     -v leaders="$leaders"       \
     -v followers="$followers"   \
+    -v dbg=$dbg                 \
     '                           \
     function print_last(        \
         code,                   \
@@ -51,15 +57,19 @@ awk -v shift_days=$shift_days   \
 #       asr(n_code1 = n_code2);
         for(i=1; i<=len-shift_right_code1; i++) {
             if(and(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1])) {
-#               printf("Y %.2f %.2f %.2f %.2f\n",
-#                       pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
-#                       pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
+                if(dbg) {
+                    printf("Y %.2f %.2f %.2f %.2f\n",
+                            pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
+                            pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
+                }
                 cnt ++;
             }
             else {
-#               printf("N %.2f %.2f %.2f %.2f\n",
-#                       pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
-#                       pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
+                if(dbg) {
+                    printf("N %.2f %.2f %.2f %.2f\n",
+                            pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
+                            pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
+                }
             }
         }
         printf("%s (shift_right %02d) followed by %s, length %d, rate %.2f\n",
@@ -116,7 +126,9 @@ awk -v shift_days=$shift_days   \
             pfr_abs = 0;    #(...)
         }
         pfrsV[code][idx] = pfr_abs;
-#       pfrsV_dbg[code][idx] = pfr;
+        if(dbg) {
+            pfrsV_dbg[code][idx] = pfr;
+        }
         idx ++;
     }
 
