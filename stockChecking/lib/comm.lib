@@ -331,7 +331,8 @@ function getActualDate()
         [[ $(($_actWorkingDays%5)) -gt $(($_weekDay-1)) ]] && let _fix+=2
         let _actWorkingDays=$(( $_actWorkingDays/5*7 + $_actWorkingDays%5 + $_fix ))
         [[ _actWorkingDays -lt 0 ]] && let _actWorkingDays=0
-        echo $(date -v -${_actWorkingDays}d -d $_baseDate "+%Y-%m-%d") 	#echo $(date -j -v -${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+#       echo $(date -v -${_actWorkingDays}d -d $_baseDate "+%Y-%m-%d") 	#echo $(date -j -v -${_actWorkingDays}d -f "%Y-%m-%d" $_baseDate "+%Y-%m-%d")
+        echo $(date -d "$_baseDate $_actWorkingDays days ago" "+%Y-%m-%d")
     elif [[ ${1:0:1} == '+' ]] ; then
         let _actWorkingDays=$1
         if [[ $_weekDay -eq 6 ]] ; then

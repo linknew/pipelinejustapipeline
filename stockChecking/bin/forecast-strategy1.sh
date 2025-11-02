@@ -103,10 +103,10 @@ awk -v verbose=$verbose                 \
         lose_codes[code] += lose_;
 
         if(verbose) {
-#           printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
-#                   seed, earn, fcstStart, fcstEnd, tax1+tax2, profit_seeds[seed]);
-#           printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
-#                   code, earn, fcstStart, fcstEnd, tax1+tax2, profit_codes[code]);
+            printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
+                    seed, earn, fcstStart, fcstEnd, tax1+tax2, profit_seeds[seed]);
+            printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
+                    code, earn, fcstStart, fcstEnd, tax1+tax2, profit_codes[code]);
         }
     }
 

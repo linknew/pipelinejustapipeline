@@ -71,7 +71,7 @@ codeNum=$(echo "$codes" | wc -w)
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
 dur=${dur:-$durDef}
 serialLvl=${serialLvl:-$serialLvlDef}
-[[ $doForecast == 1 && -z $start ]] && start=$(getActualDate -$((dur+serialLvl+14)) ) #@ back more 2 weeks
+[[ $doForecast == 1 && -z $start ]] && start=$(getActualDate -$dur)
 start=${start:-1970-01-01}
 end=${end:-2178-01-05}
 doForecast=${doForecast:-$doForecastDef}
@@ -116,9 +116,7 @@ if [[ $genSegment -eq 1 ]] ; then
                 ) || checkLastN=${checkLastN:-400}
 
     #@ make sure the start serial_seed is correct
-    checkLastN=$((checkLastN+60))
-
-    echo $checkLastN; exit
+    checkLastN=$((checkLastN+180))
 
     for i in $codes
     do
