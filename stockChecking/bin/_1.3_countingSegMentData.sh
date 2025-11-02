@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source $(dirname $0)/../lib/comm.lib
+source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 echo -ne "*executing $0($$)\n" >&2
 

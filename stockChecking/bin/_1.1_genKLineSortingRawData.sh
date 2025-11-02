@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source $(dirname $0)/../lib/comm.lib
+source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 Usage() {
     echo -en "
@@ -61,7 +61,7 @@ rawData=$(
         {
             if($1 ~ "#") next ;
 
-            $33 = $16/$15 ;
+            $33 = ($15==0)? $2 : $16/$15 ;
             split2($0,a," ") ;
             for(i=0;i<idxs;i++) b[i]=sortIdxs[i] ;
 

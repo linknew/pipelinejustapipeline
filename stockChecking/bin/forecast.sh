@@ -1,7 +1,7 @@
 
 #! /bin/bash
 
-source $(dirname $0)/../lib/comm.lib
+source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 doStart
 
@@ -12,8 +12,8 @@ genCountingDef=0
 verifyDef=0
 buyFixDef=0
 selFixDef=-0.03
-oprtB4Exit="cd $BKD"
-serialLvlDef=1
+atexit="cd $BKD"
+serialLvlDef=3
 
 SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
 GEN_KLINK_RAWDATA=_1.1_genKLineSortingRawData.sh;  command -v $GEN_KLINK_RAWDATA     >&2 || doExit -2 "echo cannot find $GEN_KLINK_RAWDATA >&2"
@@ -41,13 +41,13 @@ Help()
     Note:
         If only one codeNum in the list file, generate the output filename according the codeNum.
 
-    Default: --dur=$durDef --doForecast
+    Default: --dur=$durDef --serialLvl=$serialLvlDef
 \n"
 }
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help >&2 && doExit 0 "$oprtB4Exit"
+    [[ ${i} == "--help" ]] && Help >&2 && doExit 0 "$atexit"
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
     [[ ${i%%=*} == "--serialLvl" ]] && { serialLvl=${i##*=}; continue; }
     [[ ${i%%=*} == "--doForecast" ]] && { doForecast=1; genSegment=1; continue; }
@@ -59,18 +59,21 @@ do
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
     [[ ${i} == "--build" ]] && { genSegment=1; genCounting=1; continue; }
-    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$oprtB4Exit"
-    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$oprtB4Exit"
+    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$atexit"
+    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$atexit"
     list=$i
 done
 
-[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1 "$oprtB4Exit"
+[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1 "$atexit"
 codes=$( awk '($1 !~ "#"){print $1}' $list | sort -u)
 codeNum=$(echo "$codes" | wc -w)
-[[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$oprtB4Exit"
+[[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$atexit"
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
 dur=${dur:-$durDef}
 serialLvl=${serialLvl:-$serialLvlDef}
+[[ $doForecast == 1 && -z $start ]] && start=$(getActualDate -$((dur+serialLvl+14)) ) #@ back more 2 weeks
+start=${start:-1970-01-01}
+end=${end:-2178-01-05}
 doForecast=${doForecast:-$doForecastDef}
 genSegment=${genSegment:-$genSegmentDef}
 genCounting=${genCounting:-$genCountingDef}
@@ -97,9 +100,25 @@ fi
 #generate rawData and segment data
 #if 1
 if [[ $genSegment -eq 1 ]] ; then
-    rm -rf $segData 
-    [[ $? -ne 0 ]] && echo *! Cannot remove $segData >&2 && doExit -1 "$oprtB4Exit"
-    [[ $doForecast -eq 1 && $genCounting -ne 1 ]] && checkLastN=$((dur+serialLvl)) || checkLastN=400
+    rm -rf $segData || { echo *! Cannot remove $segData >&2; doExit -1 "$atexit"; }
+
+    #@ caculate the number of data needs to print, default is all
+    checkLastN=$(playStockList.sh --print <<< 000001 |
+                    awk -v start=$start -v end=$end '
+                        {
+                            if($18 > end) exit
+                            if($18 >= start && !first_line) first_line=NR;
+                        }
+                        END {
+                            print first_line? NR-first_line+1 : 0;
+                        }
+                        '
+                ) || checkLastN=${checkLastN:-400}
+
+    #@ make sure the start serial_seed is correct
+    checkLastN=$((checkLastN+60))
+
+    echo $checkLastN; exit
 
     for i in $codes
     do
@@ -141,7 +160,7 @@ if [[ $genCounting -eq 1 ]]; then
                     for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;    #@ fix me
                 }
             }
-            ' - $segData    |
+            ' - $segData    |   #cat > .tt; exit
         $GEN_COUNTING_SEG_DATA >> "$cntgData"
 
     echo *Save counting data to "$cntgData" >&2
@@ -454,4 +473,4 @@ if [[ $verify -eq 1 ]] ; then
 fi
 #endif
 
-doExit 0 "$oprtB4Exit"
+doExit 0 "$atexit"

@@ -2251,6 +2251,7 @@ void _doRefreshView(void)
     {
         int             i ;
         stringstream    s ;
+        int             text_hi = 16;
 
         /* show stock name & code & data-fix status */
         s.str("");
@@ -2280,39 +2281,39 @@ void _doRefreshView(void)
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+1*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+1*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show line info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "*Lines:" : s << " Lines:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+2*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+2*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
             if( GET_SWITCHER_STATUS(linesSwitchers,i) ){
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+3*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+3*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show index info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncIndexFilter) ? s << "*Indexs:" : s << " Indexs:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+4*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+4*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < NUMBERS_OF_DATA_TYPE - DATA_TYPE_RSI6; i++ ){
             if( GET_SWITCHER_STATUS(indexSwitchers,i) ){
                 s << i + 1 << '/' ;
             }
         }
-        putText( gLeftDetailsView, s.str(), Point(20,54+5*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+5*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show scale info */
         s.str("");
         (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "*Scale:" : s << " Scale:" ;
-        putText( gLeftDetailsView, s.str(), Point(0,54+6*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(0,54+6*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("") ;
         s << scale ;
-        putText( gLeftDetailsView, s.str(), Point(20,54+7*14), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
+        putText( gLeftDetailsView, s.str(), Point(20,54+7*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
 
         /* show details info */
         if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
@@ -2329,70 +2330,70 @@ void _doRefreshView(void)
             _l = (long)(gDateData.at<double>(0,dtlsIdxOnMainView)) ;
             _color = Scalar(255,255,255) ;
             s << (_l/(12*31)+1970) << "-" << ((_l%(12*31)/31)+1) << "-" << ((_l%31)+1);
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k0 (today) */
             _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
             _color = Scalar(255,80,80) ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(1,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k1 (a week) */
             _d = gLinesData.at<double>(1,dtlsIdxOnMainView);
             _color = lineColors[1] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(41,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k2 (a month) */
             _d = gLinesData.at<double>(2,dtlsIdxOnMainView);
             _color = lineColors[2] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(82,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(112,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k3 (a quarter) */
             _d = gLinesData.at<double>(3,dtlsIdxOnMainView);
             _color = lineColors[3] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(1,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k4 (hlaf year) */
             _d = gLinesData.at<double>(4,dtlsIdxOnMainView);
             _color = lineColors[4] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(41,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k5 (a year) */
             _d = gLinesData.at<double>(5,dtlsIdxOnMainView);
             _color = lineColors[5] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(82,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(112,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k6 (high) */
             _d = gLinesData.at<double>(6,dtlsIdxOnMainView);
             _color = lineColors[6] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(1,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k7 (average) */
             _d = gLinesData.at<double>(7,dtlsIdxOnMainView);
             _color = lineColors[7] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(41,120+(_idx)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k8 (low) */
             _d = gLinesData.at<double>(8,dtlsIdxOnMainView);
             _color = lineColors[8] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
-            putText( gLeftDetailsView, s.str(), Point(82,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(112,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             _idx++ ;
             /* volume */
@@ -2400,21 +2401,21 @@ void _doRefreshView(void)
             _d = gVolData.at<double>(0,dtlsIdxOnMainView)/10000 ;    // use 10'thousand(hand) for the unit
             _color = Scalar(200,200,200);
             s << " VOL=" << setprecision(2) << abs(_d) << "W";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* value */
             s.str("");
             _d = gValData.at<double>(0,dtlsIdxOnMainView)/100000 ;    // use 1 Million yuan for the unit
             _color = Scalar(200,200,200);
             s << " VAL=" << abs(_d) << "Y";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* live-value */
             s.str("");
             _d = gLvalData.at<double>(0,dtlsIdxOnMainView)/100/10000 ; // use 10'Million(yuan) for the unit
             _color = Scalar(200,200,200);
             s << " LVal=" << (_d) << "M";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* amplitude */
             s.str("");
@@ -2423,14 +2424,14 @@ void _doRefreshView(void)
                            : (_d==0) ? Scalar(200,200,200)
                                     : Scalar(0,255,0) ;
             s << " AMP=" << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* exchange */
             s.str("");
             _d = gXcgData.at<double>(0,dtlsIdxOnMainView) ;
             _color = Scalar(200,200,200) ;
             s << " Exchg=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << '%' ;
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* power */
             s.str("");
@@ -2439,7 +2440,7 @@ void _doRefreshView(void)
                             : (_d==0) ? Scalar(200,200,200)
                                       : Scalar(0,255,0) ;
             s << " Power=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             _idx ++ ;
 
@@ -2451,7 +2452,7 @@ void _doRefreshView(void)
                               : (_d<=25) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " Eager=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 #endif
 
             /* RSI6(Relative Strongth Index) */
@@ -2461,7 +2462,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " RSI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* RSI12(Relative Strongth Index) */
             s.str("");
@@ -2470,7 +2471,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " RSI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
 #if 0
             /* RSI24(Relative Strongth Index) */
@@ -2480,7 +2481,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " RSI24=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 #endif 
 
             /* PWRI6(Power Index) */
@@ -2490,7 +2491,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " PWRI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* PWR12(Power Index) */
             s.str("");
@@ -2499,7 +2500,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " PWRI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
 #if 0
             /* PWR24(Power Index) */
@@ -2509,7 +2510,7 @@ void _doRefreshView(void)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " PWRI24=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
-            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 #endif
 
             /* indexes-custom */
@@ -2539,28 +2540,28 @@ void _doRefreshView(void)
                    : (gLinesData.at<double>(0,dtlsIdxOnMainView) - gLinesData.at<double>(0,measureIdx))/gLinesData.at<double>(0,measureIdx) * 100 ;
                 _color = (_d>0) ? Scalar(0,0,255) : ((_d<0) ? Scalar(0,255,0) : Scalar(255,255,255)) ;
                 s << " AMP-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << abs(_d) << "%" ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* total_amp-custom */
                 s.str("");
                 _d = (_days>0)? _getTT(gValData.colRange(_dataS,_dataE+1), _m, _days, true, true)/10000000.0 : 0 ;
                 _color = Scalar(255,0,0) ;
                 s << " VALT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* total_exchange-custom */
                 s.str("");
                 _d = (_days>0)? _getTT(gXcgData.colRange(_dataS,_dataE+1), _m, _days, true, true) : 0 ;
                 _color = Scalar(255,0,0) ;
                 s << " XCGT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* average-custom */
                 s.str("");
                 _d = (_days>0)? _getAvg(gLinesData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
                 _color = Scalar(255,0,0) ;
                 s << " AVG-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* rsi-custom */
                 s.str("");
@@ -2569,7 +2570,7 @@ void _doRefreshView(void)
                                   : (_d<=15) ? Scalar(0,255,0)
                                              : Scalar(200,200,200) ;
                 s << " RSI-" << rsiCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* pwri-custom */
                 s.str("");
@@ -2578,7 +2579,7 @@ void _doRefreshView(void)
                                   : (_d<=15) ? Scalar(0,255,0)
                                              : Scalar(200,200,200) ;
                 s << " PWRI-" << pwriCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* xcg-custom */
                 s.str("");
@@ -2587,7 +2588,7 @@ void _doRefreshView(void)
                                   : (_d<=15) ? Scalar(0,255,0)
                                              : Scalar(200,200,200) ;
                 s << " XCG-" << xcgAvgICustom << "="  << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
             }
 
             /* redraw daily keyline info at the left view */
@@ -2599,35 +2600,35 @@ void _doRefreshView(void)
                 _d = gYstdData.at<double>(0,dtlsIdxOnMainView) ;
                 _color = Scalar(200,200,200) ;
                 s << " YstdC=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* open */
                 s.str("");
                 _d = gOpenData.at<double>(0,dtlsIdxOnMainView) ;
                 _color = Scalar(200,200,200) ;
                 s << " Open=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* close */
                 s.str("");
                 _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
                 _color = Scalar(200,200,200) ;
                 s << " Close=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* high */
                 s.str("");
                 _d = gHigData.at<double>(0,dtlsIdxOnMainView) ;
                 _color = Scalar(200,200,200) ;
                 s << " High=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* lower */
                 s.str("");
                 _d = gLowData.at<double>(0,dtlsIdxOnMainView) ;
                 _color = Scalar(200,200,200) ;
                 s << " Lower=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* close, open, max, min, date */
                 {
@@ -2650,9 +2651,10 @@ void _doRefreshView(void)
                     Scalar  _color ;
                     int     _i, _itemsNumber, _basePosX, _basePosY;
                     double  _open, _close, _max, _min, _ystdClose, _floor, _ceiling,  _date ;
+                    int     _amp_win_hi = text_hi*6;
 
                     _itemsNumber = _m.rows ;
-                    normalize(_m.colRange(0,_CNT-1), _n, 0, 14*4, NORM_MINMAX);
+                    normalize(_m.colRange(0,_CNT-1), _n, 0, _amp_win_hi, NORM_MINMAX);
 
                     for( _i = 0 ; _i < _m.rows; _i++ ){
                         _open = _n.at<double>(_i,1) ;
@@ -2665,7 +2667,7 @@ void _doRefreshView(void)
                         _date = _n.at<double>(_i,_CNT-1) ;
                         _color = (_close > _open) ? Scalar(0,0,255) : ( (_close == _open) ? Scalar(200,200,200) : Scalar(0,255,0) ) ;
                         _basePosX = gLeftDetailsView.cols/_itemsNumber * _i + gLeftDetailsView.cols/_itemsNumber/2 - 25;
-                        _basePosY = 120 + (_idx * 14) +14*4;
+                        _basePosY = 160 + (_idx * text_hi) + _amp_win_hi;
 
                         line( gLeftDetailsView, Point(8, _basePosY-_ceiling), Point(gLeftDetailsView.cols-1-58, _basePosY-_ceiling), Scalar(200,200,200), 1, LINE_8) ;
                         line( gLeftDetailsView, Point(8, _basePosY-_ystdClose), Point(gLeftDetailsView.cols-1-58, _basePosY-_ystdClose), Scalar(200,200,200), 1, LINE_8) ;

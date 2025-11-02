@@ -17,7 +17,7 @@
 #store size will only appear in bought item.
 #lock volume will only affect on bought item.
 
-source $(dirname $0)/../lib/comm.lib
+source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 _tmp=''
 _code=''

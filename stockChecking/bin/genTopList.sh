@@ -1,7 +1,7 @@
 #! /bin/bash
 
 
-source $(dirname $0)/../lib/comm.lib
+source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 doStart
 

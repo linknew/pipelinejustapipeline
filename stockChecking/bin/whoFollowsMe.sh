@@ -1,30 +1,50 @@
 #! /bin/bash
 
-usage() {
+Usage() {
     echo -en "\tUsage:\n"
-    echo -en "\t  $(basename $0) <shift_days> <rated_data_file> <leader_lst_file> <follower_lst_file>\n\n"
+    echo -en "\t  $(basename $0) [--revers|-r] [--debug|-d] <shift_days> <rated_data_file> <leader_lst_file> <follower_lst_file>\n\n"
     echo -en "\tExamples:\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data <(echo 002780) <(echo 000880)\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data <(echo)        <(echo 000880)\n"
     echo -en "\t  $(basename $0) 3 last_100_days_rate.data\n"
     echo -en "\n"
     echo -en "\tNotes:\n"
-    echo -en "\t  rated_data_file can be generated with \"playStock.sh --update --printLastN=100 StockData/stock.list\"\n"
-    echo -en "\t  and the format is: \"600001 -0.38\"\n"
+    echo -en "\t  1. rated_data_file can be generated with \"playStock.sh --update --printLastN=100 StockData/stock.list\"\n"
+    echo -en "\t     and the format is: \"600001 -0.38\"\n"
+    echo -en "\t  2. no comparison, if the recoreds number of a follower is not equals to the leader's\n"
+    echo -en "\t  3. no comparison, if the recoreds number of a leader or follower's is less than 20\n"
+    echo -en "\t  4. recoreds with amp==0% are counted as unmatchs even in -revers mode\n"
     echo -en "\n"
 }
 
-[[ $1 == -h ]] && { usage; exit; }
+for i in "${@}"
+do
+    if [[ ${i} == "--help" || ${i} == "-h" ]]; then
+        Usage >&2;
+        exit;
+    elif [[ ${i} == "--revers" || ${i} == "-r" ]]; then
+        revers=1;
+    elif [[ ${i} == "--debug" || ${i} == "-d" ]]; then
+        debug=1;
+    elif [[ ${i:0:1} == "-" ]]; then
+        echo "*! Unknown option:$i" >&2
+        exit;
+    else
+        args[$((argc++))]=$i;
+    fi
+done
 
-shift_days=$1
-rate_data=$2
-leaders=${3:+$(cat $3)}
-followers=${4:+$(cat $4)}
+shift_days=${args[0]}
+rate_data=${args[1]}
+leaders=${args[2]:+$(cat ${args[2]})}
+followers=${args[3]:+$(cat ${args[3]})}
+revers=${revers:-0}
 
 awk -v shift_days=$shift_days   \
     -v leaders="$leaders"       \
     -v followers="$followers"   \
-    -v dbg=$dbg                 \
+    -v dbg=$debug               \
+    -v revers=$revers           \
     '                           \
     function print_last(        \
         code,                   \
@@ -50,26 +70,28 @@ awk -v shift_days=$shift_days   \
         leader,             \
         follower,           \
         shift_right_code1,  \
+        revers,             \
                             \
         i,                  \
-        cnt)
+        cnt,                \
+        is_same)
     {
 #       asr(n_code1 = n_code2);
         for(i=1; i<=len-shift_right_code1; i++) {
-            if(and(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1])) {
-                if(dbg) {
-                    printf("Y %.2f %.2f %.2f %.2f\n",
-                            pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
-                            pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
-                }
-                cnt ++;
+            if(!revers) {
+                is_same = and(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1]);
             }
             else {
-                if(dbg) {
-                    printf("N %.2f %.2f %.2f %.2f\n",
-                            pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
-                            pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
-                }
+                is_same = xor(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1]) &&
+                        pfrsV[leader][i] &&
+                        pfrsV[follower][i+shift_right_code1];
+            }
+            if(is_same) cnt++;
+            if(dbg) {
+                printf("%s %02d %02d %.2f %.2f\n",
+                        is_same? "Y" : "N",
+                        pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
+                        pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
             }
         }
         printf("%s (shift_right %02d) followed by %s, length %d, rate %.2f\n",
@@ -142,7 +164,7 @@ awk -v shift_days=$shift_days   \
                 if(follower_n && !(follower in has_follower)) { continue; }
                 if(sum[leader]["total"] != sum[follower]["total"]) { continue; }
                 if(sum[leader]["total"]-20 <= shift_days) { continue; }
-                comp(sum[leader]["total"], leader, follower, shift_days);
+                comp(sum[leader]["total"], leader, follower, shift_days, revers);
             }
         }
     }
