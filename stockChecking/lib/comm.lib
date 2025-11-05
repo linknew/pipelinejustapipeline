@@ -309,7 +309,7 @@ function getActualDate()
 #    get actual working date
 #Parameters:
 #    $1, adjuster
-#    $2, baseDate
+#    $2, baseDate, support YYYY-MM-DD and YYYYMMDD
 #Output:
 #    YYYY-MM-DD
 #
@@ -321,6 +321,7 @@ function getActualDate()
     [[ $# -lt 1 || $# -gt 2 ]] && echo "only 1 or 2 arguments supported" >&2 && return 1
     [[ $# == 1 ]] && _baseDate=$(date "+%Y-%m-%d")
     [[ $# == 2 ]] && _baseDate=$2
+    [[ ${#_baseDate} == 8 ]] && _baseDate=${_baseDate:0:4}-${_baseDate:4:2}-${_baseDate:6:2}
     _weekDay=$(date -d $_baseDate "+%u") 	#_weekDay=$(date -j -f "%Y-%m-%d" $_baseDate "+%u")
 #
     if [[ ${1:0:1} == '-' || ${1} == '0' ]] ; then

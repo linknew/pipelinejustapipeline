@@ -9,6 +9,8 @@ TAC()
 #$2: start_date_YYYYMMDD
 #$3: end_date_YYYYMMDD
 
+[[ $1 == -login ]] && { exit 0; }
+[[ $1 == -logout ]] && { exit 0; }
 [[ ${#1} -ne 7 || ${#2} -ne 8 || ${#3} -ne 8 ]] && echo "*Error, getHis code7 startYYYYMMDD endYYYYMMDD" >&2 && exit
 
 curl -f http://quotes.money.163.com/service/chddata.html?code=${1}\&start=${2}\&end=${3} 2>/dev/null |

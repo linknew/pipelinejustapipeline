@@ -25,6 +25,7 @@ let _cmdCodeFixType=$((1<<20))
 let _cmdCodeFirstLooking=$((1<<21))
 let _cmdCode=0
 
+_owner=$$
 _classFile="stock.list.class.tmp"
 _anaProg=""
 _anaOpt=""
@@ -138,7 +139,8 @@ doUpdateBKAmpInfo()
 doExit()
 {
     wait
-    [[ -f getStockData.$$.sh ]] && rm -rf ./getStockData.$$.sh 2>/dev/null
+    [[ -p $$.baostock.req ]] && { ./getStockData.$$.sh --logout --owner=$_owner; }
+    [[ -f getStockData.$$.sh ]] && { rm -rf ./getStockData.$$.sh 2>/dev/null; }
     [[ -f .t.$$ ]] && rm -rf .t.$$ 2>/dev/null
     [[ -f $_pipe4Ana ]] && rm -rf $_pipe4Ana 2>/dev/null
     [[ -f $_pipe4Homework ]] && rm -rf $_pipe4Homework 2>/dev/null
@@ -223,7 +225,10 @@ trap "wait
       killHotDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
-cp $(dirname $0)/../bin/getStockData.sh ./getStockData.$$.sh
+cp $(dirname $0)/../bin/getStockData.sh ./getStockData.$$.sh || {
+    showErr "*failed to cp getStockData.sh\n" >&2
+    doExit 0
+}
 
 ((_cmdCode & _cmdCodeShowNext)) && _firstCode=$(tail -n 1 $_classFile | sed 's/ .*//') || _firstCode='.'
 ((_cmdCode & _cmdCodeAnalize)) &&  _pipe4Ana=.out.$$.ana ;
@@ -289,7 +294,8 @@ fi
 
 if (( _cmdCode & (_cmdCodeUpdate|_cmdCodeDownload|_cmdCodeDoDailyHomework|_cmdCodeJustDoit) )) ; then
     showHi "*Download 1000001 for the base of systemSync\n" >&2
-    ./getStockData.$$.sh --update 1000001 2>/dev/null
+    ./getStockData.$$.sh --login --owner=$_owner || doExit 2
+    ./getStockData.$$.sh --update --owner=$_owner 1000001 2>/dev/null
     _dateEnd=$(grep "'000001" ~/StockData/100000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
     _dateEnd=${_dateEnd:-$(date "+%Y%m%d")}
 fi
@@ -311,7 +317,7 @@ do
     ((_cmdCode & _cmdCodeDownload)) &&  _opt+=" --download"
     ((_cmdCode & _cmdCodeUpdate ))  &&  _opt+=" --update"
     ((_cmdCode & _cmdCodeHotData )) &&  _opt+=" --hotData"
-    ((_cmdCode & (_cmdCodeDownload|_cmdCodeUpdate|_cmdCodeHotData) )) && ./getStockData.$$.sh $_opt $_code >&2
+    ((_cmdCode & (_cmdCodeDownload|_cmdCodeUpdate|_cmdCodeHotData) )) && ./getStockData.$$.sh --owner=$_owner $_opt $_code >&2
 
     # show stock
     if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then
@@ -359,7 +365,7 @@ do
 
     #do daily homework
     if ((_cmdCode & _cmdCodeDoDailyHomework)) ; then
-        ./getStockData.$$.sh --update --dateEnd=$_dateEnd $_code
+        ./getStockData.$$.sh --update --owner=$_owner --dateEnd=$_dateEnd $_code
         showHi "*[$_code]update data to $_stockDataPackage\n" >&2
         sed -i'' "/^${_code}/d"  $_stockDataPackage 2>/dev/null
         "showStock.sh" --print $_code >> $_stockDataPackage

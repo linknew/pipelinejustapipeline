@@ -20,7 +20,7 @@ declare -i  _cmdCode=0
 
 _keepRefresh=false
 _opt=''
-_boss=$PPID
+_owner=$PPID
 
 doExit()
 {
@@ -58,6 +58,18 @@ sendSigToDispProc()
     return 0
 }
 
+login()
+{
+    getHis.baostock.sh -login $_owner
+    return $?
+}
+
+logout()
+{
+    getHis.baostock.sh -logout $_owner
+    return $?
+}
+
 getHis() 
 {
     [[ ( ${#1} -ne 6 && ${#1} -ne 7 ) || ${#2} -ne 8 || ${#3} -ne 8 ]] &&
@@ -74,7 +86,7 @@ getHis()
     fi
 
 #@  get history data from **baostock**
-    getHis.baostock.sh $code $dateStart $dateEnd
+    getHis.baostock.sh $code $dateStart $dateEnd $_owner
 
 #@  get history data from **tushare**
 #   getHis.tushare.sh $code $dateStart $dateEnd
@@ -93,19 +105,24 @@ getHis()
 #start the main routing
 #----------------------
 
+#@ login and logout
+[[ $1 == --login ]] && { login $2; exit $?; }
+[[ $1 == --logout ]] && { logout $2; exit $?; }
+
 #parameters checking
 for i in "$@"
 do
     [[ $i == "--help" ]] &&
     echo "
     Usage:
-        $0 [--download] [--update] [--hotData] [--auto] [--boss=pid] [--dateStart=YYYYMMDD] [--dateEnd=YYYYMMDD] stockCode
+        $0 [--download] [--update] [--hotData] [--auto] [--owner=pid] [--dateStart=YYYYMMDD] [--dateEnd=YYYYMMDD] stockCode
 
         --download: download history data (remove the old data first)
         --update: same as --download. Do not remove old data
         --hotData: refresh current data
         --dateStart: get the data from the dateStart
         --dateEnd: get the data till teh dateEnd
+        --owner: the master, the caller, the manager
         --auto: --update + --hotData.
 
     Default:
@@ -118,8 +135,8 @@ do
     [[ $i == "--auto" ]] && ((_cmdCode|=(_cmdCodeUpdate | _cmdCodeHotData) )) && _keepRefresh=true && continue
     [[ ${i%%=*} == "--dateStart" ]] && _dateStart=${i##*=} && continue
     [[ ${i%%=*} == "--dateEnd" ]] && _dateEnd=${i##*=} && continue
+    [[ ${i%%=*} == "--owner" ]] && _owner=${i##*=} && continue
     [[ ${i:0:1} == '-' ]] && showErr "unknown option $i\n" && exit 0
-    #[[ ${i%%=*} == "--boss" ]] && _boss=${i##*=} && continue
     _stockCode=$i
 done
 
@@ -145,7 +162,8 @@ if ((_cmdCode & (_cmdCodeDownload | _cmdCodeUpdate) )) ; then
         _timeStampReq=$(date '+%Y-%m-%d %H:%M:%S')
 
     #@  get history data
-        _dataRcvd=$(getHis.baostock.sh $_stockCode $(($_dateStart+1)) $_dateEnd)
+        _dateStartNext=$(getActualDate +1 $_dateStart | sed 's/-//g')
+        _dataRcvd=$(getHis.baostock.sh $_stockCode $_dateStartNext $_dateEnd $_owner)
 
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
         echo "*[$_stockCode]copy history data to ~/StockData/$_stockCode.html.org" >&2
