@@ -18,9 +18,10 @@
 
 #define  MAX_SUPPORTTED_LENGTH   (365*20)
 #define  MAX_SUPPORTTED_LINES   (64)
+#define  MAX_SCALE              (256)
 
-#define  MAX_WIN_WIDTH  (1280)
-#define  MAX_WIN_HEIGHT (670)
+#define  MAX_WIN_WIDTH  (1920)
+#define  MAX_WIN_HEIGHT (1080)
 
 #define DATA_FIX_TYPE_NONE      (0)
 #define DATA_FIX_TYPE_FORWARD   (1)
@@ -69,14 +70,15 @@ int digtFuncScale( int number, bool& refresh );
 /* define & init */
 /* color-list for lines */
 static Scalar  lineColors[MAX_SUPPORTTED_LINES] = {
-                        Scalar(255,127,0),
-                        Scalar(0,255,0),
+                        Scalar(255,50,50),
+                        Scalar(80,80,150),
                         Scalar(255,255,0),
                         Scalar(255,0,255),
                         Scalar(0,0,255),
                         Scalar(0,255,255),
-                        Scalar(200,200,200),
-                        Scalar(255,255,255)
+                        Scalar(0,255,0),
+                        Scalar(255,125,125),
+                        Scalar(255,255,255),
                     } ;
 static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digital keys) function switch.
                         digtFuncBaselineFilter,
@@ -202,6 +204,7 @@ int importData(
     stringstream    _tmpSS ;
     int             _linesCnt = 0 ;
     int             i = 0 ;
+    static bool     has_err = false;
 
     assert(fileName) ;
 
@@ -217,7 +220,11 @@ int importData(
     while (getline(_file, _tmpStr)){
 
         if(i >= min(linesLen,MAX_SUPPORTTED_LENGTH)){
-            cerr << "out of rang, MAX_SUPPORTTED_LENGTH or linesLen" << '[' << MAX_SUPPORTTED_LENGTH << ',' << linesLen << ']' << endl ;
+            if(!has_err) {
+                cerr << "out of rang, MAX_SUPPORTTED_LENGTH or linesLen" << '[' << MAX_SUPPORTTED_LENGTH << ',' << linesLen << ']' << endl ;
+                cerr << "please note, x_dir is lines and y_dir is length of each lines" << endl;
+                has_err = true;
+            }
             break ;
         }
 
@@ -225,8 +232,17 @@ int importData(
         _tmpSS.str(_tmpStr) ;
 
         /* extract data */
-        for(_linesCnt = 0; _linesCnt < min(linesNum, MAX_SUPPORTTED_LINES); _linesCnt ++){
+        for(_linesCnt = 0; _tmpSS.good() ; _linesCnt ++){
+            if(_linesCnt >= min(linesNum, MAX_SUPPORTTED_LINES)) {
+                if(!has_err) {
+                    cerr << "out of rang, MAX_SUPPORTTED_LINES or linesNum" << '[' << MAX_SUPPORTTED_LINES << ',' << linesNum << ']' << endl ;
+                    cerr << "please note, x_dir is lines and y_dir is length of each lines" << endl;
+                    has_err = true;
+                }
+                break;
+            }
             _tmpSS >> _m.at<double>(_linesCnt, i) ;
+
         }
 
         ++ i ;
@@ -412,7 +428,10 @@ void initColor(int num)
         for(g=1; g<=4; g++)
             for(b=1; b<=4; b++){
                 //cout << r*step << "," << g*step << "," << b*step << endl ;
-                lineColors[i++] = Scalar(r*step,g*step,b*step) ;
+                if(lineColors[i] == Scalar(0,0,0)) {
+                    lineColors[i] = Scalar(r*step,g*step,b*step) ;
+                }
+                i++;
             }
 
     return ;
@@ -493,7 +512,7 @@ int main( int argc, char** argv )
         for(int _i = 1; _i < argc; _i++){
 
             if (string(argv[_i]) == "--help"){
-                cerr << argv[0] << " stockCode filename linesNum linesLength [--help] [--group=N1,N2,...] [--showlines=L1,L2,...] [--focus=N] [--scale=N]" << endl ;
+                cerr << argv[0] << " stockCode filename linesNum linesLength [--help] [--group=NumOfGrp1,NumOfGrp2,...] [--showlines=L1,L2,...] [--focus=N] [--scale=N]" << endl ;
                 return 0 ;
             }
 
@@ -522,7 +541,7 @@ int main( int argc, char** argv )
             }
 
             if (string(argv[_i]).find("--focus=") != string::npos){
-                idxFocusedLine = atoi(argv[_i]+strlen("--focus=")) ;
+                idxFocusedLine = atoi(argv[_i]+strlen("--focus="))-1/*humen*/ ;
                 continue ;
             }
 
@@ -549,7 +568,7 @@ int main( int argc, char** argv )
         assert(_linesNum==_linesData.rows) ;
         assert(_linesLen==_linesData.cols) ;
         assert(idxFocusedLine<_linesNum && idxFocusedLine>=0) ;
-        assert(scale>=1 && scale<=64) ;
+        assert(scale>=1 && scale<=MAX_SCALE) ;
         initColor(_linesNum) ;
     }
 
@@ -853,7 +872,7 @@ int main( int argc, char** argv )
                 break ;
 #else
             case '>':
-                scale=min(64,scale+1) ;
+                scale=min(MAX_SCALE,scale+1) ;
                 refresh = true ;
                 break ;
             case '<':

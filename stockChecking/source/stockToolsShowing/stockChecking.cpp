@@ -2534,11 +2534,17 @@ void _doRefreshView(void)
                 _days = rsiCustom = pwriCustom = xcgAvgICustom = _dataE - _dataS + 1 ;
 
                 /* amp-custom */
-                s.str("");
-                _d = (_days<=0||gLinesData.at<double>(0,measureIdx)<=0)
-                   ? 0 
-                   : (gLinesData.at<double>(0,dtlsIdxOnMainView) - gLinesData.at<double>(0,measureIdx))/gLinesData.at<double>(0,measureIdx) * 100 ;
+                if(_days<=0||gLinesData.at<double>(0,measureIdx)<=0) {
+                    _d = 0;
+                }
+                else {
+                    double a = round(gLinesData.at<double>(0,dtlsIdxOnMainView) * 100);
+                    double b = round(gLinesData.at<double>(0,measureIdx) * 100);
+                    _d = (a-b)/b*100;
+                }
+
                 _color = (_d>0) ? Scalar(0,0,255) : ((_d<0) ? Scalar(0,255,0) : Scalar(255,255,255)) ;
+                s.str("");
                 s << " AMP-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << abs(_d) << "%" ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
@@ -3073,6 +3079,21 @@ void* listener(void* p)
     }
 }
 
+void block_signals()
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGUSR2);
+
+    // 对整个进程的所有线程屏蔽信号（pthread_sigmask比sigprocmask更适合多线程）
+    int ret = pthread_sigmask(SIG_BLOCK, &set, NULL);
+    if (ret != 0) {
+        perror("pthread_sigmask failed");
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main( int argc, char** argv )
 {
 #if 0
@@ -3255,6 +3276,8 @@ int main( int argc, char** argv )
 
 #if THREAD_SUPPORT
     pthread_mutex_init(&gMutex, NULL) ;
+    //cout << "hello " << getpid() << endl;
+    block_signals();
     pthread_create(&_tid, NULL, listener, NULL) ;
 #endif
 
