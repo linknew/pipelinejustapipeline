@@ -20,7 +20,7 @@ GEN_KLINK_RAWDATA=_1.1_genKLineSortingRawData.sh;  command -v $GEN_KLINK_RAWDATA
 GEN_SEGMENT_UPDN_RATE=_1.2_genSegmentUpDnRate.sh;  command -v $GEN_SEGMENT_UPDN_RATE >&2 || doExit -3 "echo cannot find $GEN_SEGMENT_UPDN_RATE >&2"
 GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_DATA >&2 || doExit -4 "echo cannot find $GEN_COUNTING_SEG_DATA >&2"
 
-Help()
+Usage()
 {
     echo -ne "
     Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genSegment] [--genCounting] [--doForecast] /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/ [--help] list
@@ -47,9 +47,9 @@ Help()
 
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Help >&2 && doExit 0 "$atexit"
+    [[ ${i} == "--help" ]] && Usage >&2 && doExit 0 "$atexit"
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
-    [[ ${i%%=*} == "--serialLvl" ]] && { serialLvl=${i##*=}; continue; }
+    [[ ${i%%=*} == "--serialLvl" ]] && { serialDepth=${i##*=}; continue; }
     [[ ${i%%=*} == "--doForecast" ]] && { doForecast=1; genSegment=1; continue; }
     [[ ${i%%=*} == "--verify" ]] && verify=1 && continue
     [[ ${i%%=*} == "--buyFix" ]] && buyFix=${i##*=} && continue
@@ -70,7 +70,7 @@ codeNum=$(echo "$codes" | wc -w)
 [[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$atexit"
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
 dur=${dur:-$durDef}
-serialLvl=${serialLvl:-$serialLvlDef}
+serialDepth=${serialDepth:-$serialLvlDef}
 [[ $doForecast == 1 && -z $start ]] && start=$(getActualDate -$dur)
 start=${start:-1970-01-01}
 end=${end:-2178-01-05}
@@ -80,12 +80,12 @@ genCounting=${genCounting:-$genCountingDef}
 verify=${verify:-$verifyDef}
 buyFix=${buyFix:-$buyFixDef}
 selFix=${selFix:-$selFixDef}
-segData=.t$dur.segData.lvl$serialLvl
-cntgData=.t$dur.counting.lvl$serialLvl
+segData=.t$dur.segData.lvl$serialDepth
+cntgData=.t$dur.counting.lvl$serialDepth
 forecastData=.t$dur.forecast$postFilename${start:+.from.$start}${end:+.to.$end}
 
 echo     *dur="$dur" >&2
-echo     *serialLvl="$serialLvl" >&2
+echo     *serialLvl="$serialDepth" >&2
 echo     *start="$start" >&2
 echo     *end="$end" >&2
 echo     *genSegment="$genSegment"   >&2
@@ -115,8 +115,10 @@ if [[ $genSegment -eq 1 ]] ; then
                         '
                 ) || checkLastN=${checkLastN:-400}
 
-    #@ make sure the start serial_seed is correct
-    checkLastN=$((checkLastN+180))
+    #@ move the start forward $serialDepth-1 days
+    #@ to ensure geting stable serialized_seed, move the start forward more 180 days!!
+    #@ why 180? a living stock cannot keep its kline status unchanged in half year
+    checkLastN=$((checkLastN+$serialDepth-1+180))
 
     for i in $codes
     do
@@ -126,7 +128,7 @@ if [[ $genSegment -eq 1 ]] ; then
         echo *Append $i\'s data to "$segData" >&2
         echo "----" >&2
     done
-    $SERIALIZE_2 --serialLvl=$serialLvl --typeIdx=14 --seedIdx=1 --noAbb $segData > ${segData}.t || doExit -1
+    $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1 --ignore_seedling $segData > ${segData}.t || doExit -1
     mv ${segData}.t $segData || doExit -1
 fi
 #endif
