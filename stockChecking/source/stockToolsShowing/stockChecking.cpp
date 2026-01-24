@@ -69,7 +69,7 @@
 #define  GET_POSITION_BY_VIEW_IDX(index, scale)   ( (index) * (scale) + (scale)/2 + (LINE_MARGIN_L) )
 #define  GET_FIRST_IDX_OF_DATA_ON_VIEW(view,data,scale)   max(0,data.cols-GET_COUNT_OF_VIEW(view.cols,scale))
 
-#define  IS_BIG_DISK(stockId)   ((stockId=="1399001" || stockId=="1399006" || stockId=="0000001" || stockId=="0000300") ? 1 : 0)
+#define  IS_BIG_DISK(stockId)   (stockId=="1399001" || stockId=="1399006" || stockId=="0000001" || stockId=="0000300")
 #define  PRINT_INFO(lastN)                                                                                        \
 {                                                                                                                   \
     /*  (1)stockID,        (2)closePrice,  (3)power,       (4)amplitude,  (5)trueAmplitude,  (6)rsi6           (7)rsi12,      */    \
@@ -262,6 +262,7 @@ static unsigned int     indexSwitchers = ((1<<0)|(1<<4));   // rsi6 & pwri12
 
 static unsigned char    digtFuncIdx = 3 ;
 static int              scale = 1 ;     // for x-coordinates
+static int              idxFocusedLine = 0;
 static int              dataFixType = DATA_FIX_TYPE_BACKWARD ;
 static double           rsiFuture6 = 0.0 ;
 static double           pwriFuture12 = 0.0 ;
@@ -1117,7 +1118,13 @@ int importData(
             _avrgPrice = (_higData + _lowData)/2;
         }
         else {
-            _avrgPrice = _valData / _volData  * 10/*unify the units of val & vol*/;
+            //_avrgPrice = _valData / _volData  * 10/*unify the units of val & vol*/;
+            int len = _avrgPrice.cols;
+            for (i=0; i<len; i++) {
+                _avrgPrice.at<double>(0,i)  = _volData.at<double>(0,i)<=0
+                                            ? (_higData.at<double>(0,i)+_lowData.at<double>(0,i))/2
+                                            : _valData.at<double>(0,i)/_volData.at<double>(0,i)*10/*unify the units of val & vol*/;
+            }
         }
 
         /* caculate average/eager datas*/
@@ -1342,57 +1349,60 @@ int _getLinesFocus (
 }
 #endif
 
-int digtFuncScale(char c)
+int zoom_klines(int scale_)
 {
-    int             _rslt = RSLT_NOTHING ;
+    if(scale_ <= 0) scale_ = 1;
+    if(scale_ == scale) return RSLT_NOTHING;
 
-    switch( c ){
-        case '1' : case '2' : case '3' : case '4' :
-        case '5' : case '6' : case '7' : case '8' : case '9' :
-            if(c=='9')  c = '1' ;   // reset scale, same efficient as '1'
+    /* adjust dtlsIdxOnMainView, dataRangeStart, dataRangeEnd */
+    {
+        int s = dataRangeStart ;
+        int e = dataRangeEnd ;
+        int d = (dtlsIdxOnMainView == IDX_RANGE_UNSET) ? e-1 : dtlsIdxOnMainView ;
+        int dN = d ;
+        int sN = dN - GET_COUNT_OF_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, scale_) + 1 ;
+        int eN = 0 ;
+        int _adjust = 0 ;
 
-            /* adjust dtlsIdxOnMainView, dataRangeStart, dataRangeEnd */
-            {
-                int s = dataRangeStart ;
-                int e = dataRangeEnd ;
-                int d = (dtlsIdxOnMainView == IDX_RANGE_UNSET) ? e-1 : dtlsIdxOnMainView ;
-                int dN = d ;
-                int sN = dN - GET_COUNT_OF_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, c-'0') + 1 ;
-                int eN = 0 ;
-                int _adjust = 0 ;
+        if(sN < 0){
+            sN = 0 ;
+        }
+        eN = min(sN + GET_COUNT_OF_VIEW(gMainView.cols, scale_),gLinesData.cols) ;
+        if(!GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && eN -sN < GET_COUNT_OF_VIEW(gMainView.cols, scale_)){
+            /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
+            _adjust = min(sN, GET_COUNT_OF_VIEW(gMainView.cols, scale_) - (eN-1 - sN + 1)) ;
+            sN -= _adjust ;
+        }
 
-                if(sN < 0){
-                    sN = 0 ;
-                }
-                eN = min(sN + GET_COUNT_OF_VIEW(gMainView.cols, c-'0'),gLinesData.cols) ;
-                if(!GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && eN -sN < GET_COUNT_OF_VIEW(gMainView.cols, c-'0')){
-                    /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
-                    _adjust = min(sN, GET_COUNT_OF_VIEW(gMainView.cols, c-'0') - (eN-1 - sN + 1)) ;
-                    sN -= _adjust ;
-                }
+        dataRangeStart = sN ;
+        dataRangeEnd = eN ;
+        if(dtlsIdxOnMainView != IDX_RANGE_UNSET) dtlsIdxOnMainView = dN ;
 
-                dataRangeStart = sN ;
-                dataRangeEnd = eN ;
-                if(dtlsIdxOnMainView != IDX_RANGE_UNSET) dtlsIdxOnMainView = dN ;
-
-                /*
-                cout << "s=" << s << " d=" << d << " e=" << e << endl ;
-                cout << "sN=" << sN << " dN=" << dN << " eN=" << eN << endl ;
-                */
-            }
-
-            /* adjust scale */
-            scale = c -'0' ;
-            SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
-            _rslt = RSLT_OK ;
-            break ;
-
-        default :
-            _rslt = RSLT_NOTHING ;
-            break ;
+        /*
+        cout << "s=" << s << " d=" << d << " e=" << e << endl ;
+        cout << "sN=" << sN << " dN=" << dN << " eN=" << eN << endl ;
+        */
     }
 
-    return _rslt ;
+    /* adjust scale */
+    scale = scale_;
+    SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+    return RSLT_OK ;
+}
+
+int zoom_klines(char zZ)
+{
+    int scale_ = zZ=='Z'? scale-1 : scale+1;
+    return zoom_klines(scale_);
+}
+
+int digtFuncScale(char c)
+{
+    if(c<='0' || c>'9') {
+        return RSLT_NOTHING;
+    }
+
+    return zoom_klines(c-'0');
 }
 
 int digtFuncIndexFilter(char c)
@@ -2236,9 +2246,9 @@ void _doRefreshView(void)
             /* draw a horizantl line */
             for(int i = LINE_MARGIN_L; i < gMainView.cols-LINE_MARGIN_R; i++){
                 if((i%20)<17){
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(0,dtlsIdxOnMainView-dataRangeStart), i)[0] = 127 ;
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(0,dtlsIdxOnMainView-dataRangeStart), i)[1] = 127 ;
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(0,dtlsIdxOnMainView-dataRangeStart), i)[2] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[0] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[1] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[2] = 127 ;
                 }
             }
 
@@ -2522,6 +2532,7 @@ void _doRefreshView(void)
                 int _dataS = 0 ;
                 int _dataE = 0 ;
                 Mat _m ;
+                Mat _focusLineData = gLinesData.row(DATA_TYPE_CLOSE + idxFocusedLine) ;
 
                 if(dtlsIdxOnMainView > measureIdx){
                     _dataS = measureIdx + 1 ;       // plus 1, not include the first(start) day
@@ -2534,12 +2545,12 @@ void _doRefreshView(void)
                 _days = rsiCustom = pwriCustom = xcgAvgICustom = _dataE - _dataS + 1 ;
 
                 /* amp-custom */
-                if(_days<=0||gLinesData.at<double>(0,measureIdx)<=0) {
+                if(_days<=0||_focusLineData.at<double>(0,measureIdx)<=0) {
                     _d = 0;
                 }
                 else {
-                    double a = round(gLinesData.at<double>(0,dtlsIdxOnMainView) * 100);
-                    double b = round(gLinesData.at<double>(0,measureIdx) * 100);
+                    double a = round(_focusLineData.at<double>(0,dtlsIdxOnMainView) * 100);
+                    double b = round(_focusLineData.at<double>(0,measureIdx) * 100);
                     _d = (a-b)/b*100;
                 }
 
@@ -2564,7 +2575,7 @@ void _doRefreshView(void)
 
                 /* average-custom */
                 s.str("");
-                _d = (_days>0)? _getAvg(gLinesData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
+                _d = (_days>0)? _getAvg(_focusLineData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
                 _color = Scalar(255,0,0) ;
                 s << " AVG-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
@@ -3037,6 +3048,15 @@ int _doDefault(char c)
                 SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             }
             break ;
+        case 'J':
+            {
+                if(GET_SWITCHER_STATUS(sysSwitchers, LOCK_SCREEN)) {
+                    int last_idx = DATA_TYPE_LOW - DATA_TYPE_CLOSE;
+                    if (++idxFocusedLine > last_idx) idxFocusedLine = 0;
+                    SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+                }
+            }
+            break;
         case 'j':   // switch the 0~9 keys function
             digtFuncIdx = ( digtFuncIdx + 1 ) % ( sizeof( digtFuncList )/sizeof( digtFuncPt ) );
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
@@ -3047,6 +3067,10 @@ int _doDefault(char c)
                         : digtFuncIdx - 1 ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             break ;
+        case 'z':
+        case 'Z':
+            zoom_klines(c);
+            break;
         default:
             break ;
         }
