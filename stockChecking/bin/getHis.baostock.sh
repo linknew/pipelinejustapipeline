@@ -84,7 +84,7 @@ fifo_req=$owner.baostock.req
 fifo_res=$$.baostock.res
 
 [[ -p $fifo_req ]] || {
-    echo "*Error, cannot find named pipe \"$fifo_req\", please try:"
+    echo "*Error, cannot find named pipe \"$fifo_req\", please try:" >&2;
     echo "        $(basename $0) -login <owner_name>" >&2;
     exit 10;
 }
@@ -96,7 +96,8 @@ mkfifo $fifo_res || {
 }
 
 #@ fix code
-if   [[ ${#code} -eq 7 && ${code:0:1} == '0' ]]; then code=sh.${code:1}
+if   [[ ${code} == 000001 || $code == 0000001 ]]; then code=sh.000001   # 沪指
+elif [[ ${#code} -eq 7 && ${code:0:1} == '0' ]]; then code=sh.${code:1}
 elif [[ ${#code} -eq 7 && ${code:0:1} == '1' ]]; then code=sz.${code:1}
 elif [[ ${#code} -eq 6 && ( ${code:0:1} == '6' || ${code:0:1} == '9' ) ]]; then code=sh.${code}
 else code=sz.${code}
@@ -119,7 +120,7 @@ res=$(cat $fifo_res); #echo "$res" > /dev/tty
 
 # covert format
 #  from:  (1)date  (2)code      (3)open  (4)high    (5)low     (6)close   (7)preclose  (8)volume  (9)amount  (10)adjustflag  (11)turn    (12)tradestatus  (13)pctChg    (14)peTTM   (15)psTTM     (16)pcfNcfTTM  (17)pbMRQ  (18)isST
-#  to:    (1)日期  (2)股票代码  (3)名称  (4)收盘价  (5)最高价  (6)最低价  (7)开盘价    (8)前收盘  (9)涨跌额  (10)涨跌幅      (11)换手率  (12)成交量       (13)成交金额  (14)总市值  (15)流通市值  (16)成交笔数              
+#  to:    (1)日期  (2)股票代码  (3)名称  (4)收盘价  (5)最高价  (6)最低价  (7)开盘价    (8)前收盘  (9)涨跌额  (10)涨跌幅      (11)换手率  (12)成交量       (13)成交金额  (14)总市值  (15)流通市值  (16)成交笔数
 
 #@ show and clean
 echo "$res"    \

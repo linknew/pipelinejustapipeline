@@ -4,7 +4,7 @@ source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 for i in "$@"
 do
-    [[ $i == '--help' ]] && 
+    [[ $i == '--help' ]] &&
     echo "
     Usage:
         $0 [--help] [--print | --printLastOne | --printLastN=<N>] [--showDaily|--firstLooking=yyyy-mm-dd] [--silent] [--classFile=classFilename] [--winOrder=N] [--fixType=F/B/N] stockCode
@@ -38,10 +38,10 @@ trap "doExit 1" SIGTERM SIGINT
 _stockData=~/StockData
 _fixType=${_fixType:=B}
 _classFile=${_classFile:='stock.list.class.tmp'}
-_stockName=$(grep ${_stockCode:1} ~/StockData/stock.list | sed 's/^.*\s//') 
+_stockName=$( ( grep ${_stockCode} ~/StockData/stock.list || grep ${_stockCode:1} ~/StockData/stock.list ) | sed 's/^.*\s//')
 _stockFile=.t.$$ && grep "'${_stockCode:1}" $_stockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >$_stockFile && cp $_stockFile .t.test
 
-while true 
+while true
 do
     showMsg "\n*[$_stockCode]$_stockName: showStock $_print --classFile=$_classFile\n" >&2
     [[ -z $_silent ]] && echo save result to $_classFile >&2

@@ -23,6 +23,7 @@ let _cmdCodePackDailyData=$((1<<18))
 let _cmdCodeGenRelationshipData=$((1<<19))
 let _cmdCodeFixType=$((1<<20))
 let _cmdCodeFirstLooking=$((1<<21))
+let _cmdCodeHotDataPeek=$((1<<22))
 let _cmdCode=0
 
 _owner=$$
@@ -32,11 +33,11 @@ _anaOpt=""
 _pipe4Ana=/dev/stdout
 _pipe4Homework=/dev/stdout
 
-killHotDataTask()
+killGetDataTask()
 {
+#   (( _cmdCode & (_cmdCodeHotData | _cmdCodeHotDataPeek) == 0 )) && return 0
     (( _cmdCode & _cmdCodeKeepRefresh )) && return 0
-
-    _pids=`ps | awk '/getStockData.'$$'.sh/{print $1}'`
+    _pids=`ps -aux | awk '/getStockData.'$$'.sh/{print $2}'`
     [[ -n $_pids ]] && kill -s SIGTERM $_pids 2>/dev/null && showMsg "*[$_code]kill hot_data_retriving task\n" >&2
     return 0
 }
@@ -150,7 +151,7 @@ doExit()
 showHelp()
 {
     showMsg "
-    Usage: ${0} [[--update] [--download] [--hotData [--keepRefresh]] [--resetDatabase] \\
+    Usage: $(basename $0)   [ [--update|--download] [--hotDataPeek[|--hotData [--keepRefresh]] ] [--resetDatabase] \\
                               [--show|--showNext|--monit [--showDaily | --firstLooking=yyyy-mm-dd] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
                               [--analize=filename [--analizeOptions='...']] \\
                               [--packDailyData] [--genRelationshipData] [--checkHitRate] \\
@@ -158,7 +159,8 @@ showHelp()
 
         --download, download stock data
         --update, update stock data
-        --hotData, get current data
+        --hotData, get current data and keep refreshing
+        --hotDataPeek, just get current data, dont keep refreshing
         --keepRefresh, after program complete, keep refresh current data (does not stop data-retrieve job), this option must use under --hotData.
         --print, print stock infos(date,amplitude,power,etc.)
         --printLastOne, print the last item of stock infos(date,amplitude,power,etc.)
@@ -193,6 +195,7 @@ do
     [[ $i == --update ]]   && ((_cmdCode |=_cmdCodeUpdate)) && continue
     [[ $i == --download ]] && ((_cmdCode |=_cmdCodeDownload)) && continue
     [[ $i == --hotData ]]  && ((_cmdCode |=_cmdCodeHotData)) && continue
+    [[ $i == --hotDataPeek ]]  && ((_cmdCode |=_cmdCodeHotDataPeek)) && continue
     [[ $i == --keepRefresh ]] && ((_cmdCode |=_cmdCodeKeepRefresh)) && continue
     [[ $i == --print ]]    && ((_cmdCode |=_cmdCodePrint)) && continue
     [[ $i == --printLastOne ]] && ((_cmdCode |=_cmdCodePrintLastN)) && lastN=1 && continue
@@ -221,8 +224,7 @@ do
 done
 
 #prepare
-trap "wait
-      killHotDataTask
+trap "killGetDataTask
       doExit 0" SIGINT SIGTERM SIGQUIT
 
 cp $(dirname $0)/../bin/getStockData.sh ./getStockData.$$.sh || {
@@ -284,7 +286,12 @@ if ((_cmdCode & _cmdCodeJustDoit)) ; then
 fi
 
 if (( (_cmdCode & _cmdCodeKeepRefresh) && (_cmdCode & _cmdCodeHotData) == 0 )) ; then
-    showErr "to enable --keepRefresh, should enable --hotData as same time\n" >&2
+    showErr "--keepRefresh must be used together with --hotData\n" >&2
+    exit 1
+fi
+
+if (( _cmdCode & (_cmdCodeHotData | _cmdCodeHotDataPeek) == (_cmdCodeHotData | _cmdCodeHotDataPeek) )) ; then
+    showErr "--hotData and --hotDataPeek cannot be used together\n" >&2
     exit 1
 fi
 
@@ -305,6 +312,9 @@ while read _code x y
 do
     [[ ${_code:0:1} == '#' ]] && continue
 
+    if [[ ${_code} == 000001 ]]; then   #沪指
+        _code=0000001
+    fi
     if [[ ${#_code} -eq 6 ]] ; then
         [[ ${_code:0:1} == '6' || ${_code:0:1} == '9' ]] && _code="0$_code" || _code="1$_code"
     fi
@@ -317,7 +327,8 @@ do
     ((_cmdCode & _cmdCodeDownload)) &&  _opt+=" --download"
     ((_cmdCode & _cmdCodeUpdate ))  &&  _opt+=" --update"
     ((_cmdCode & _cmdCodeHotData )) &&  _opt+=" --hotData"
-    ((_cmdCode & (_cmdCodeDownload|_cmdCodeUpdate|_cmdCodeHotData) )) && ./getStockData.$$.sh --owner=$_owner $_opt $_code >&2
+    ((_cmdCode & _cmdCodeHotDataPeek )) &&  _opt+=" --hotDataPeek"
+    ((_cmdCode & (_cmdCodeDownload|_cmdCodeUpdate|_cmdCodeHotData|_cmdCodeHotDataPeek) )) && ./getStockData.$$.sh --owner=$_owner $_opt $_code >&2
 
     # show stock
     if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then
@@ -375,7 +386,7 @@ do
     #nothing need to do here
 
     #kill hotData retirving task
-    killHotDataTask
+    killGetDataTask
     showMsg "*[$_code] DONE\n" >&2
 
 done

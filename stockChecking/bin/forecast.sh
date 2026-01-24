@@ -120,8 +120,8 @@ if [[ $genSegment -eq 1 ]] ; then
 
     for i in $codes
     do
-        playStockList.sh --printLastN=$checkLastN <<< $i |
-        $GEN_KLINK_RAWDATA $i |
+        playStockList.sh --printLastN=$checkLastN <<< $i | #tee .t1 |
+        $GEN_KLINK_RAWDATA $i                            | #tee .t2 |
         $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i >> "$segData" || doExit -1
         echo *Append $i\'s data to "$segData" >&2
         echo "----" >&2
@@ -169,7 +169,7 @@ fi
 #generate seed-code-date info
 #if 3
 if [[ $doForecast == 1 ]] ; then
-    echo $codes | 
+    echo $codes |
     awk ${start:+ -v start=$start}  \
         ${end:+ -v end=$end}        \
         '
@@ -212,7 +212,7 @@ if [[ $verify -eq 1 ]] ; then
 
     #generate processing table
 
-    echo $codes | 
+    echo $codes |
     awk ${start:+ -v start=$start}  \
         ${end:+ -v end=$end}        \
         '

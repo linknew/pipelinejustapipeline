@@ -2,6 +2,14 @@
 
 # 停牌计为lose
 
+usage()
+{
+    echo -en "Usage\n\t$(basename $0) <verbose> <taxPrt> <taxHandFee> <start> <end> <segData> <codeLst> <seedLst>\n\n"
+    echo -en "Examples:\n"
+    echo -en "     \n\t$(basename $0) 1 0.001 0.0003 2025-11-05 2025-11-06 ~/forecast/.t3.segData.lvl3 ~/StockData/stock.list ~/forecast/goodSignals.lst\n\n"
+}
+[[ $1 == -h || $1 == --help || $1 == -help ]] && { usage; exit; }
+
 source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 verbose=$1
@@ -95,7 +103,7 @@ awk -v verbose=$verbose                 \
         tax2 = (20000+earn)*(taxRatPrt+taxRatHandFee);
         profit_ = earn - tax1 - tax2;
         lose_ = (profit_<=0)? 1 : 0;
-        
+
         profit_seeds[seed] += profit_;
         lose_seeds[seed] += lose_;
 
@@ -103,9 +111,9 @@ awk -v verbose=$verbose                 \
         lose_codes[code] += lose_;
 
         if(verbose) {
-            printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
+            printf("#%s earn:%.2f @%s~%s, tax:%.2f, total_profit:%.2f\n",
                     seed, earn, fcstStart, fcstEnd, tax1+tax2, profit_seeds[seed]);
-            printf("#%s earn:%.2f @%s~%s, tax:%.f, total_profit:%.2f\n",
+            printf("#%s earn:%.2f @%s~%s, tax:%.2f, total_profit:%.2f\n",
                     code, earn, fcstStart, fcstEnd, tax1+tax2, profit_codes[code]);
         }
     }
