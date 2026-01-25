@@ -307,7 +307,7 @@ if (( _cmdCode & (_cmdCodeUpdate|_cmdCodeDownload|_cmdCodeDoDailyHomework|_cmdCo
     _dateEnd=${_dateEnd:-$(date "+%Y%m%d")}
 fi
 
-awk '{if($1~/'$_firstCode'/) _start=1; if(_start) print $1; }' $_list |            # do not use "$_list" (because $_list can be empty)
+awk '{if($1~/'${_firstCode:1}'/) _start=1; if(_start) print $1; }' $_list |            # do not use "$_list" (because $_list can be empty)
 while read _code x y
 do
     [[ ${_code:0:1} == '#' ]] && continue

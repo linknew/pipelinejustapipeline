@@ -71,7 +71,7 @@ do
         5.wait to up
         6.need focus
         r.replay
-        x.others" >/dev/tty
+        q.others" >/dev/tty
         read -s -n1 x </dev/tty
         echo "---" >/dev/tty
         [[ $x == r ]] && continue

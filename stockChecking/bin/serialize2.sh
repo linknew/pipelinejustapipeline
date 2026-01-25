@@ -82,7 +82,7 @@ do
     [[ ${i%%=*} == "--seed_idx" ]]      &&  seed_idx=${i#*=} && continue
     [[ ${i%%=*} == "--sort_idx" ]]      &&  sort_idx=${i#*=} && continue
     [[ ${i} == "--ignore_seedling" ]]   &&  ignore_seedling=1 && continue
-    [[ ${i} == "--abb" ]]               &&  Abb=1 && continue
+    [[ ${i} == "--abb" ]]               &&  abb=1 && continue
     [[ ${i:0:1} == "-" ]]               &&  { echo "** unknown option:$i">&2; doExit -1; }
     [[ -n $fn ]]                        &&  { echo "** Multipule file specified">&2; doExit -1; }
     fn=$i

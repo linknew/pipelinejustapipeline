@@ -129,7 +129,15 @@ if [[ $genSegment -eq 1 ]] ; then
         echo "----" >&2
     done
     $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1 --ignore_seedling $segData > ${segData}.t || doExit -1
-    mv ${segData}.t $segData || doExit -1
+    awk -v start=$start -v end=$end '
+        {
+            if($1 ~ "#") {
+                print;
+                next;
+            }
+            if($9 > end) exit;
+            if($9 >= start) print;
+        } ' ${segData}.t > $segData  || doExit -1
 fi
 #endif
 
