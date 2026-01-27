@@ -103,10 +103,10 @@ if [[ $genSegment -eq 1 ]] ; then
     rm -rf $segData || { echo *! Cannot remove $segData >&2; doExit -1 "$atexit"; }
 
     #@ caculate the number of data needs to print, default is all
-    checkLastN=$(playStockList.sh --print <<< 000001 |
+    checkLastN=$(playStockList.sh --print <<< 0000001 |
                     awk -v start=$start -v end=$end '
                         {
-                            if($18 > end) exit
+                        #   if($18 > end) exit
                             if($18 >= start && !first_line) first_line=NR;
                         }
                         END {
@@ -116,28 +116,34 @@ if [[ $genSegment -eq 1 ]] ; then
                 ) || checkLastN=${checkLastN:-400}
 
     #@ move the start forward $serialDepth-1 days
-    #@ to ensure geting stable serialized_seed, move the start forward more 180 days!!
-    #@ why 180? a living stock cannot keep its kline status unchanged in half year
-    checkLastN=$((checkLastN+$serialDepth-1+180))
+    #@ to ensure geting stable serialized_seed, move the start forward more 264(the YEAR kline) days!!
+    #@ why 264? a living stock cannot keep its kline status unchanged in half year
+    checkLastN=$((checkLastN+$serialDepth-1+264))
 
     for i in $codes
     do
-        playStockList.sh --printLastN=$checkLastN <<< $i | #tee .t1 |
-        $GEN_KLINK_RAWDATA $i                            | #tee .t2 |
-        $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i >> "$segData" || doExit -1
+        playStockList.sh --printLastN=$checkLastN --fixType=F <<< $i    | #tee .o1 |
+        $GEN_KLINK_RAWDATA $i                                           | #tee .o2 |
+        $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i >> "$segData"  || doExit -1
         echo *Append $i\'s data to "$segData" >&2
         echo "----" >&2
     done
-    $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1 --ignore_seedling $segData > ${segData}.t || doExit -1
+    $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1 --ignore_seedling $segData > ${segData}.t || doExit -1 #doExit
     awk -v start=$start -v end=$end '
         {
             if($1 ~ "#") {
                 print;
                 next;
             }
-            if($9 > end) exit;
-            if($9 >= start) print;
-        } ' ${segData}.t > $segData  || doExit -1
+            code = $NF;
+            if($9 > end) next;
+
+            #@ skip first 263 items as there may be no data in k264 at this time
+            counter[code] ++;
+            if($9 >= start && counter[code]>=263) print;
+
+        } ' ${segData}.t > $segData  && rm ${segData}.t || doExit -1
+    echo "*generate segment data \"$segData\"" >&2
 fi
 #endif
 

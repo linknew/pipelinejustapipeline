@@ -3,22 +3,35 @@
 
 source $(dirname $(readlink -f $0))/../lib/comm.lib
 
-source=$1
-target=$2
-abb_cvt=/tmp/.abb.cvt.$$
+Usage()
+{
+    echo -ne "
+    Usage: $(basename $0) <source> <target>
 
-function doExit()
+        --source, source segment data file
+        --target, target segment data file
+        --help
+    \n"
+}
+
+doExit()
 {
     rm $abb_cvt >& /dev/null;
     exit $1;
 }
 
+source=$1
+target=$2
+abb_cvt=/tmp/.abb.cvt.$$
+
+[[ $1 == --help || $1 == -h ]] && { Usage; doExit 0; }
 [[ ! -r $source ]] && { echo "** failed to open source file \"$source\"" >&2; doExit 1; }
 [[ ! -r $target ]] && { echo "** failed to open source file \"$target\"" >&2; doExit 1; }
-
 touch $abb_cvt
 
 #merge get merged abbrevation map
+echo "* extract abbrevation maps from \"$source\" and \"$target\"" >&2
+echo "* merge abbrevation map of \"$source\" into \"$target\"'s" >&2
 awk -v source=$source -v target=$target '
 
     function add_2_seed_abb_map (seed, abb)
@@ -66,6 +79,12 @@ awk -v source=$source -v target=$target '
     }
     ' $target $source > $abb_cvt || doExit 1;   #cat $abb_cvt; doExit 0
 
+
+echo "* extract segment data from \"$target\"" >&2
+echo "* extract segment data from \"$source\"" >&2
+echo "* replace segment data of \"$source\" with merged abbrevation map" >&2
+echo "* merge segment data of \"$source\" into \"$target\"'s" >&2
+echo "* insert merged abbrevation map into the merged segment data" >&2
 awk -v target=$target -v source=$source -v abb_cvt=$abb_cvt '
 
     '"$awkFunction_split2"'
@@ -84,7 +103,6 @@ awk -v target=$target -v source=$source -v abb_cvt=$abb_cvt '
             }
             r = r cvts[a[i]];
         }
-        print n, f, seed > "/dev/tty"
         return f? seed : r;
     }
 

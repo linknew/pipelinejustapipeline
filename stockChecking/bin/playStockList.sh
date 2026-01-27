@@ -312,9 +312,9 @@ while read _code x y
 do
     [[ ${_code:0:1} == '#' ]] && continue
 
-    if [[ ${_code} == 000001 ]]; then   #沪指
-        _code=0000001
-    fi
+#   if [[ ${_code} == 000001 ]]; then   #沪指
+#       _code=0000001
+#   fi
     if [[ ${#_code} -eq 6 ]] ; then
         [[ ${_code:0:1} == '6' || ${_code:0:1} == '9' ]] && _code="0$_code" || _code="1$_code"
     fi
