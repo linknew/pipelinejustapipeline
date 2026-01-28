@@ -13,8 +13,7 @@ genCountingDef=0
 verifyDef=0
 buyFixDef=0
 selFixDef=-0.03
-atexit="rm job_manager;"
-serialLvlDef=3
+serialLvlDef=4
 
 SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
 GEN_KLINK_RAWDATA=_1.1_genKLineSortingRawData.sh;  command -v $GEN_KLINK_RAWDATA     >&2 || doExit -2 "echo cannot find $GEN_KLINK_RAWDATA >&2"
@@ -52,8 +51,8 @@ Usage()
 
 doExit()
 {
-    {fd_manager}>&-
-    rm job_manager
+    [[ -n $fd_manager ]] && exec {fd_manager}>&-
+    rm job_manager >& /dev/null
     eval $2
     exit $1
 }

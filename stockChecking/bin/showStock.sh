@@ -38,7 +38,7 @@ trap "doExit 1" SIGTERM SIGINT
 _stockData=~/StockData
 _fixType=${_fixType:=B}
 _classFile=${_classFile:='stock.list.class.tmp'}
-_stockName=$( ( grep ${_stockCode} ~/StockData/stock.list || grep "^\s*${_stockCode:1}\s" ~/StockData/stock.list ) | sed 's/^.*\s//')
+_stockName=$( ( grep -m1 "^\s*${_stockCode}\s" ~/StockData/{index.lst,stock.list} || grep "^\s*${_stockCode:1}\s" ~/StockData/stock.list ) | awk '{print $2}' )
 _stockFile=.t.$$ && grep "'${_stockCode:1}" $_stockData/${_stockCode:0:6}-.package.html.org 2>/dev/null >$_stockFile && cp $_stockFile .t.test
 
 while true

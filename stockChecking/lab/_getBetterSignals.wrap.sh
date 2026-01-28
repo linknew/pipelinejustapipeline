@@ -18,7 +18,7 @@ Usage()
 year=$1
 forecast_data=${2:-/home/limin/forecast/gold/.t3.segData.lvl4.all.forword}
 top_value=${3:-top566.lst}
-output_prefix=${4:-lvl4}
+output_prefix=${4:-.lvl4}
 better_signals_org=.t3.$year$output_prefix
 better_signals=.dur3.better.signals.$year$output_prefix
 
