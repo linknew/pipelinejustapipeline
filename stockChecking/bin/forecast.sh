@@ -5,6 +5,7 @@ source $(dirname $(readlink -f $0))/../lib/comm.lib
 
 doStart
 
+n_jobs=14
 doForecastDef=0
 durDef=3
 genSegmentDef=0
@@ -12,7 +13,7 @@ genCountingDef=0
 verifyDef=0
 buyFixDef=0
 selFixDef=-0.03
-atexit="cd $BKD"
+atexit="rm job_manager;"
 serialLvlDef=3
 
 SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
@@ -23,7 +24,11 @@ GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_
 Usage()
 {
     echo -ne "
-    Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>] [--start=YYYY-MM-DD] [--end=YYYY-MM-DD] [--build] [--genSegment] [--genCounting] [--doForecast] /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/ [--help] list
+    Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>]                        \\
+        [--start=YYYY-MM-DD] [--end=YYYY-MM-DD]                             \\
+        [--genSegment] [--genCounting] [--doForecast] [--build] [--help]    \\
+        /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/                        \\
+        list
 
         --dur, forecast duration
         --serialLvl, signal width for forecast, please check the example in serialize2.sh
@@ -45,9 +50,17 @@ Usage()
 \n"
 }
 
+doExit()
+{
+    {fd_manager}>&-
+    rm job_manager
+    eval $2
+    exit $1
+}
+
 for i in "${@}"
 do
-    [[ ${i} == "--help" ]] && Usage >&2 && doExit 0 "$atexit"
+    [[ ${i} == "--help" || ${i} == -h ]] && Usage >&2 && doExit 0
     [[ ${i%%=*} == "--dur" ]] && dur=${i##*=} && continue
     [[ ${i%%=*} == "--serialLvl" ]] && { serialDepth=${i##*=}; continue; }
     [[ ${i%%=*} == "--doForecast" ]] && { doForecast=1; genSegment=1; continue; }
@@ -59,15 +72,15 @@ do
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
     [[ ${i} == "--build" ]] && { genSegment=1; genCounting=1; continue; }
-    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1 "$atexit"
-    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1 "$atexit"
+    [[ ${i:0:1} == "-" ]] && echo "*! Unknown option:$i">&2 && doExit -1
+    [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1
     list=$i
 done
 
-[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1 "$atexit"
+[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1
 codes=$( awk '($1 !~ "#"){print $1}' $list | sort -u)
 codeNum=$(echo "$codes" | wc -w)
-[[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0 "$atexit"
+[[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
 dur=${dur:-$durDef}
 serialDepth=${serialDepth:-$serialLvlDef}
@@ -100,7 +113,7 @@ fi
 #generate rawData and segment data
 #if 1
 if [[ $genSegment -eq 1 ]] ; then
-    rm -rf $segData || { echo *! Cannot remove $segData >&2; doExit -1 "$atexit"; }
+    rm -rf $segData || { echo *! Cannot remove $segData >&2; doExit -1; }
 
     #@ caculate the number of data needs to print, default is all
     checkLastN=$(playStockList.sh --print <<< 0000001 |
@@ -120,15 +133,31 @@ if [[ $genSegment -eq 1 ]] ; then
     #@ why 264? a living stock cannot keep its kline status unchanged in half year
     checkLastN=$((checkLastN+$serialDepth-1+264))
 
+    #@ create job_manger and init
+    mkfifo job_manager || { echo "** failed to create job_manager" >&2; doExit 5; }
+    exec {fd_manager}<>job_manager
+    trap "doExit 6;" SIGINT SIGTERM
+    for ((i=0; i<$n_jobs; i++)) { echo $i > job_manager; }
+    rm -rf /tmp/$segData.* 2>/dev/null || { echo "** failed to remove /tmp/$segData.*" >&2; doExit 3; }
+
+    #@ start jobs
     for i in $codes
     do
-        playStockList.sh --printLastN=$checkLastN --fixType=F <<< $i    | #tee .o1 |
-        $GEN_KLINK_RAWDATA $i                                           | #tee .o2 |
-        $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i >> "$segData"  || doExit -1
-        echo *Append $i\'s data to "$segData" >&2
-        echo "----" >&2
+        read -u $fd_manager job_id
+        (
+        echo -en "\n---\n" >&2
+        playStockList.sh --printLastN=$checkLastN --fixType=F <<< $i            | #tee .o1 |
+        $GEN_KLINK_RAWDATA $i                                                   | #tee .o2 |
+        $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i > "/tmp/$segData.$i"    || doExit -1
+        $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1     \
+                     --ignore_seedling /tmp/$segData.$i > /tmp/${segData}.$i.t  || doExit -1
+        echo "*gen segment(serialized) data /tmp/$segData.$i.t" >&2
+        echo $job_id > job_manager
+        ) &
     done
-    $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1 --ignore_seedling $segData > ${segData}.t || doExit -1 #doExit
+
+    wait
+    echo "*cat /tmp/$segData.*.t > $segData.t" >&2; cat /tmp/$segData.*.t > $segData.t
     awk -v start=$start -v end=$end '
         {
             if($1 ~ "#") {
@@ -142,8 +171,9 @@ if [[ $genSegment -eq 1 ]] ; then
             counter[code] ++;
             if($9 >= start && counter[code]>=263) print;
 
-        } ' ${segData}.t > $segData  && rm ${segData}.t || doExit -1
+        } ' ${segData}.t > $segData && rm ${segData}.t || doExit -1
     echo "*generate segment data \"$segData\"" >&2
+    rm -rf /tmp/$segData.* 2>/dev/null || { echo "** failed to remove /tmp/$segData.*" >&2; doExit 4; }
 fi
 #endif
 
@@ -487,4 +517,4 @@ if [[ $verify -eq 1 ]] ; then
 fi
 #endif
 
-doExit 0 "$atexit"
+doExit 0
