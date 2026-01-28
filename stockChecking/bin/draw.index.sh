@@ -27,7 +27,7 @@ list=$(echo '
 from=2009-01-09; to=2999-12-31
 
 
-if  [[ $gen_index_data == -gen* ]]; then
+if  [[ $gen_index_data == true ]]; then
     [[ ! -d index_data ]] && { mkdir index_data || { echo "** error $?"; exit; } }
     playStockList.sh --update --print --output=index_data/{} <(echo "$list")
 fi

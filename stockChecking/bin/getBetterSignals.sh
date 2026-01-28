@@ -63,6 +63,7 @@ awk -v verbose=$verbose                 \
         if(!$0) next;
         codeLst[$1] = 1;
         codeLst["size"] ++;
+        next
     }
 
     (FILENAME==fnSeedLst) {
@@ -70,6 +71,7 @@ awk -v verbose=$verbose                 \
         if(!$0) next;
         seedLst[$1] = 1;
         seedLst["size"] ++;
+        next
     }
 
     /^#seekAbbs/{
@@ -79,7 +81,7 @@ awk -v verbose=$verbose                 \
         next ;
     }
 
-    !/#/{
+    !/^#/{
         fcstStart = $7 ;
         fcstEnd = $8 ;
         curD = $9 ;
@@ -90,7 +92,7 @@ awk -v verbose=$verbose                 \
         seed = $1 ;
         if(seedLst["size"]!=0 && !(seed in seedLst)) next;
 
-        code = substr($14,13,6) ;
+        code = substr($14,13, length($14)-16) ; #@ sorting-raw/0000001.raw, prefix_len 12, suffix_len 4
         if(codeLst["size"] && !(code in codeLst)) next;
 
         ampDur = $6+0;
