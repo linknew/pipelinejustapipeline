@@ -48,6 +48,7 @@ do
     [[ -f $_stockFile ]] && _hisCnt=$(wc -l $_stockFile | awk '{print $1}') || _hisCnt=0
     [[ -f $_stockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l $_stockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
 
+    cmd="
     stockChecking     \
         $_print         \
         ${_fixType:+--fixType $_fixType}    \
@@ -60,6 +61,8 @@ do
         $_hisCnt    \
         $_stockData/$_stockCode.html.org.hot   \
         $_hotCnt
+	"
+    eval $cmd || echo $cmd >/dev/tty
 
     if [[ -z $_silent ]] ; then
         echo "

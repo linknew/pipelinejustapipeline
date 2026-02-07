@@ -65,9 +65,9 @@
 
 #define EAGER_CHECKING_DUR      (12)
 
-#define  GET_COUNT_OF_VIEW(screenWidth,scale) ( (screenWidth <= (LINE_MARGIN_L)+(LINE_MARGIN_R)) ? 0 : max(1,((screenWidth)-(LINE_MARGIN_L)-(LINE_MARGIN_R))/(scale)) )
+#define  N_DATA_OF_CUR_VIEW(screenWidth,scale) ( (screenWidth <= (LINE_MARGIN_L)+(LINE_MARGIN_R)) ? 0 : max(1,((screenWidth)-(LINE_MARGIN_L)-(LINE_MARGIN_R))/(scale)) )
 #define  GET_POSITION_BY_VIEW_IDX(index, scale)   ( (index) * (scale) + (scale)/2 + (LINE_MARGIN_L) )
-#define  GET_FIRST_IDX_OF_DATA_ON_VIEW(view,data,scale)   max(0,data.cols-GET_COUNT_OF_VIEW(view.cols,scale))
+#define  GET_FIRST_IDX_OF_DATA_ON_VIEW(view,data,scale)   max(0,data.cols-N_DATA_OF_CUR_VIEW(view.cols,scale))
 
 #define  IS_BIG_DISK(stockId)   (stockId=="1399001" || stockId=="1399006" || stockId=="0000001" || stockId=="0000300")
 #define  PRINT_INFO(lastN)                                                                                        \
@@ -377,7 +377,7 @@ int paintDataUpDn(
         /* postive vol is INCREASE, use RED color,
            negative vol is DECRES, use GREEN color */
 
-        _idxS=_m.cols-GET_COUNT_OF_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
+        _idxS=_m.cols-N_DATA_OF_CUR_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
         if(_idxS<0) _idxS=0 ;
 
         for(_col=_idxS; _col < _m.cols; _col++){
@@ -399,7 +399,7 @@ int paintDataUpDn(
         int                 _col ;
         Scalar              _color ;
 
-        _idxS=_m.cols-GET_COUNT_OF_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
+        _idxS=_m.cols-N_DATA_OF_CUR_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
         if(_idxS<0) _idxS=0 ;
         _ps = Point( 0*scale + scale/2 +roi.x, roi.height-1 - _m.at<double>(0, _idxS) + roi.y );
 
@@ -446,7 +446,7 @@ int paintData(
         /* postive vol is INCREASE, use RED color,
            negative vol is DECRES, use GREEN color */
 
-        _idxS=_m.cols-GET_COUNT_OF_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
+        _idxS=_m.cols-N_DATA_OF_CUR_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
         if(_idxS<0) _idxS=0 ;
 
         for(_col=_idxS; _col < _m.cols; _col++){
@@ -463,7 +463,7 @@ int paintData(
         double              _t;
         int                 _col ;
 
-        _idxS=_m.cols-GET_COUNT_OF_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
+        _idxS=_m.cols-N_DATA_OF_CUR_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale) ;
         if(_idxS<0) _idxS=0 ;
         _ps = Point( 0*scale + scale/2 +roi.x, roi.height-1 - _m.at<double>(0, _idxS) + roi.y );
 
@@ -1360,17 +1360,17 @@ int zoom_klines(int scale_)
         int e = dataRangeEnd ;
         int d = (dtlsIdxOnMainView == IDX_RANGE_UNSET) ? e-1 : dtlsIdxOnMainView ;
         int dN = d ;
-        int sN = dN - GET_COUNT_OF_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, scale_) + 1 ;
+        int sN = dN - N_DATA_OF_CUR_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, scale_) + 1 ;
         int eN = 0 ;
         int _adjust = 0 ;
 
         if(sN < 0){
             sN = 0 ;
         }
-        eN = min(sN + GET_COUNT_OF_VIEW(gMainView.cols, scale_),gLinesData.cols) ;
-        if(!GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && eN -sN < GET_COUNT_OF_VIEW(gMainView.cols, scale_)){
+        eN = min(sN + N_DATA_OF_CUR_VIEW(gMainView.cols, scale_),gLinesData.cols) ;
+        if(!GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && eN -sN < N_DATA_OF_CUR_VIEW(gMainView.cols, scale_)){
             /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
-            _adjust = min(sN, GET_COUNT_OF_VIEW(gMainView.cols, scale_) - (eN-1 - sN + 1)) ;
+            _adjust = min(sN, N_DATA_OF_CUR_VIEW(gMainView.cols, scale_) - (eN-1 - sN + 1)) ;
             sN -= _adjust ;
         }
 
@@ -1525,11 +1525,11 @@ void _doRefreshView(void)
     /* adjust data range,
        all x-coordinate SHOULD(MUST!!) base on the dataRangeStart(NOT the dataRangeStart) */
     {
-        if(DATA_RANGE_UNSET == dataRangeStart) dataRangeStart = gLinesData.cols - GET_COUNT_OF_VIEW(gMainView.cols,scale) ;
+        if(DATA_RANGE_UNSET == dataRangeStart) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
         if(dataRangeStart < 0) dataRangeStart = 0 ;
         if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
 
-        dataRangeEnd = dataRangeStart + GET_COUNT_OF_VIEW(gMainView.cols,scale) ;
+        dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
         if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
     }
 
@@ -1828,7 +1828,7 @@ void _doRefreshView(void)
             {
                 Mat _view = gDailyPanel.colRange(0,gDailyPanel.cols-70) ;
                 int _idxFstDtOnVu = GET_FIRST_IDX_OF_DATA_ON_VIEW(_view,dailyViewData,scale) ;
-                int _idxLstDtOnVu = _idxFstDtOnVu +  GET_COUNT_OF_VIEW(_view.cols,scale) - 1 ;
+                int _idxLstDtOnVu = _idxFstDtOnVu +  N_DATA_OF_CUR_VIEW(_view.cols,scale) - 1 ;
 
                 for(int i=0;i<gDailyViewHalfHourRefPos.cols;i++){
                     if(0 == gDailyViewHalfHourRefPos.at<short>(0,i)) continue ;
@@ -2714,7 +2714,8 @@ void _doRefreshView(void)
             //destroyWindow("dailyPanel") ;
             setWindowTitle(stockId,stockId) ;
             imshow(stockId,gPanel) ;
-            moveWindow(stockId, gPanelX, gPanelY) ;
+            //moveWindow(stockId, gPanelX, gPanelY) ;
+            //moveWindow(stockId, 100, 100) ;
         }
     }
 
@@ -2805,7 +2806,7 @@ int _doDefault(char c)
                 if(dtlsIdxOnMainView == 0) break ;
 
                 if(dtlsIdxOnMainView == dataRangeStart){
-                    dataRangeStart -= GET_COUNT_OF_VIEW(gMainView.cols,scale) ;
+                    dataRangeStart -= N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
                     dtlsIdxOnMainView = dataRangeStart ;
                 }else{
                     dtlsIdxOnMainView = dataRangeStart ;
@@ -2823,7 +2824,7 @@ int _doDefault(char c)
 
                 if(dtlsIdxOnMainView == dataRangeEnd-1){
                     dataRangeStart = dataRangeEnd ;
-                    dtlsIdxOnMainView += GET_COUNT_OF_VIEW(gMainView.cols,scale) ;
+                    dtlsIdxOnMainView += N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
                     if(dtlsIdxOnMainView > gLinesData.cols-1){
                         dtlsIdxOnMainView = gLinesData.cols-1 ;
                         dataRangeStart = DATA_RANGE_UNSET ;     // trigger range_adjust_opertion
@@ -2834,7 +2835,7 @@ int _doDefault(char c)
             }else{
                 if(dataRangeEnd == gLinesData.cols) break ;
 
-                dataRangeStart = gLinesData.cols - GET_COUNT_OF_VIEW(gMainView.cols,scale) ;
+                dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
             }
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             break ;
@@ -3008,7 +3009,7 @@ int _doDefault(char c)
                     if(dtlsIdxOnMainView == dataRangeEnd-1){
                         dataRangeStart += step ;
                         dtlsIdxOnMainView += step ;
-                        if(dataRangeStart + GET_COUNT_OF_VIEW(gMainView.cols,scale) > gLinesData.cols){
+                        if(dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) > gLinesData.cols){
                             dataRangeStart = DATA_RANGE_UNSET ;
                         }
                     }else{
@@ -3020,7 +3021,7 @@ int _doDefault(char c)
                     if(dataRangeEnd == gLinesData.cols) break ;
 
                     dataRangeStart += step ;
-                    if(dataRangeStart + GET_COUNT_OF_VIEW(gMainView.cols,scale) > gLinesData.cols)
+                    if(dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) > gLinesData.cols)
                         dataRangeStart = DATA_RANGE_UNSET ;
                 }
                 SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
@@ -3295,8 +3296,13 @@ int main( int argc, char** argv )
     stockName = _args[0] ;
     stockId = _args[1] ;
     _hotData = _args[4] ;
+    namedWindow(stockId, WINDOW_AUTOSIZE);
+    setWindowProperty(stockId, WND_PROP_FULLSCREEN, WINDOW_FULLSCREEN);
     SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
     SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+    ////@ removes windows tool frame
+    //string cmd = "xdotool search --sync --name \"" + stockId + "\" windowunmap windowmap --overrideredirect 1";
+    //system(cmd.c_str());
 
 #if THREAD_SUPPORT
     pthread_mutex_init(&gMutex, NULL) ;
@@ -3368,7 +3374,7 @@ int main( int argc, char** argv )
 
             if(_i<gDateData.cols){
                 measureIdx = _i ;
-                dataRangeStart = max(0, measureIdx - GET_COUNT_OF_VIEW(gPanelW-LEFT_VIEW_W-10, scale)/2) ;
+                dataRangeStart = max(0, measureIdx - N_DATA_OF_CUR_VIEW(gPanelW-LEFT_VIEW_W-10, scale)/2) ;
                 SET_SWITCHER_STATUS(&sysSwitchers,MEASURE) ;
                 SET_SWITCHER_STATUS(&sysSwitchers,LOCK_SCREEN) ;
             }else{

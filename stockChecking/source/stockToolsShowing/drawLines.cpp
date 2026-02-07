@@ -54,7 +54,7 @@
 #define GET_SWITCHER_STATUS( switcher, position )           \
         (switcher & (1l << (position) ))
 
-#define  GET_NUMBERS_PER_SCREEN(screenWidth,scale) ( ((screenWidth) - LINE_MARGIN_L - LINE_MARGIN_R) / (scale) )
+#define  N_DATA_OF_CUR_VIEW(screenWidth,scale) ( (screenWidth<=(LINE_MARGIN_L)+(LINE_MARGIN_R)) ? 0 : max(1,((screenWidth)-(LINE_MARGIN_L)-(LINE_MARGIN_R))/(scale)) )
 #define  GET_POSITION_OF_INDEX(index, scale)   ( (index) * (scale) + (scale)/2 + LINE_MARGIN_L)
 #define  RESET_DTLS_INDEX   (-MAX_SUPPORTTED_LENGTH -255)
 
@@ -370,8 +370,8 @@ int digtFuncScale(
         )
 {
     /* adjust dtlsIdxOnMainView */
-    dtlsIdxOnMainView = min(_linesData.cols, GET_NUMBERS_PER_SCREEN(_mainView.cols,number)) -
-                            min(_linesData.cols, GET_NUMBERS_PER_SCREEN(_mainView.cols,scale)) +
+    dtlsIdxOnMainView = min(_linesData.cols, N_DATA_OF_CUR_VIEW(_mainView.cols,number)) -
+                            min(_linesData.cols, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)) +
                             dtlsIdxOnMainView ;
 
     /* adjust scale */
@@ -604,8 +604,8 @@ int main( int argc, char** argv )
                all x-coordinate SHOULD(MUST!!) base on the dataRangeEnd(NOT the dataRangeStart) */
             {
                 dataRangeEnd = min( _linesData.cols, dataRangeEnd) ;
-                dataRangeEnd = max( min(GET_NUMBERS_PER_SCREEN(_mainView.cols,scale), _linesData.cols), dataRangeEnd ) ;
-                dataRangeStart = dataRangeEnd - GET_NUMBERS_PER_SCREEN(_mainView.cols,scale);
+                dataRangeEnd = max( min(N_DATA_OF_CUR_VIEW(_mainView.cols,scale), _linesData.cols), dataRangeEnd ) ;
+                dataRangeStart = dataRangeEnd - N_DATA_OF_CUR_VIEW(_mainView.cols,scale);
                 dataRangeStart = max(0, dataRangeStart) ;
             }
 
@@ -654,7 +654,7 @@ int main( int argc, char** argv )
                     dtlsIdxOnMainView = RESET_DTLS_INDEX ;
                 }else{
                     if(RESET_DTLS_INDEX == dtlsIdxOnMainView ) dtlsIdxOnMainView  = (dataRangeEnd - dataRangeStart + 1)/2 ;
-                    dtlsIdxOnMainView  = min( min( GET_NUMBERS_PER_SCREEN(_mainView.cols,scale) - 1, _linesData.cols - 1 ), dtlsIdxOnMainView ) ;
+                    dtlsIdxOnMainView  = min( min( N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1, _linesData.cols - 1 ), dtlsIdxOnMainView ) ;
                     dtlsIdxOnMainView  = max(0, dtlsIdxOnMainView ) ;
 
                     /* draw a vertical line on the dtlsIdxOnMainView  */
@@ -779,7 +779,7 @@ int main( int argc, char** argv )
         if ('q' == c) break ;
 
         switch(c){
-            static bool b3DM = 0 ;
+            static bool b3DM = 0 ;	//@ 3 digtial mode, when start with 0, the 3 digital mode is on. 001==1, 010==10, 099=99
             static int numRec = 0 ;
             static int step = 0 ;
 
@@ -788,7 +788,7 @@ int main( int argc, char** argv )
                 if(b3DM){
                     step ++ ;
                     numRec = numRec*10 + (c-'0') ;
-                    if(step >= 3){
+                    if(step >= 2){
                         doDigitalFunc( numRec, refresh ) ;
                         b3DM = 0 ;
                         step = 0 ;
@@ -812,7 +812,7 @@ int main( int argc, char** argv )
                     dataRangeEnd = 0 ;
                 } else {
                     (0 == dtlsIdxOnMainView)
-                        ?  dataRangeEnd -= GET_NUMBERS_PER_SCREEN(_mainView.cols,scale)
+                        ?  dataRangeEnd -= N_DATA_OF_CUR_VIEW(_mainView.cols,scale)
                         :  dtlsIdxOnMainView = 0 ;
                 }
                 refresh = true ;
@@ -821,9 +821,9 @@ int main( int argc, char** argv )
                 if(!lockScreen){
                     dataRangeEnd = MAX_SUPPORTTED_LENGTH ;
                 } else {
-                    (GET_NUMBERS_PER_SCREEN(_mainView.cols,scale) -1 == dtlsIdxOnMainView)
-                        ?  dataRangeEnd += GET_NUMBERS_PER_SCREEN(_mainView.cols,scale)
-                        :  dtlsIdxOnMainView = GET_NUMBERS_PER_SCREEN(_mainView.cols,scale) -1 ;
+                    (N_DATA_OF_CUR_VIEW(_mainView.cols,scale) -1 == dtlsIdxOnMainView)
+                        ?  dataRangeEnd += N_DATA_OF_CUR_VIEW(_mainView.cols,scale)
+                        :  dtlsIdxOnMainView = N_DATA_OF_CUR_VIEW(_mainView.cols,scale) -1 ;
                 }
                 refresh = true ;
                 break ;
@@ -891,9 +891,9 @@ int main( int argc, char** argv )
             case 'l':
             case 'L':
                 {
-                    int step = (c == 'l') ? 1 : GET_NUMBERS_PER_SCREEN(_mainView.cols,scale)/20 ;
+                    int step = (c == 'l') ? 1 : N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/20 ;
                     if(lockScreen){
-                        if(GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale) + step*scale > GET_POSITION_OF_INDEX(GET_NUMBERS_PER_SCREEN(_mainView.cols,scale) - 1,scale) ) {
+                        if(GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale) + step*scale > GET_POSITION_OF_INDEX(N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1,scale) ) {
                             dataRangeEnd += step ;
                         }
                         dtlsIdxOnMainView += step ;
@@ -906,7 +906,7 @@ int main( int argc, char** argv )
             case 'h':
             case 'H':
                 {
-                    int step = (c == 'h') ? 1 : GET_NUMBERS_PER_SCREEN(_mainView.cols,scale)/20 ;
+                    int step = (c == 'h') ? 1 : N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/20 ;
 
                     if(lockScreen){
                         if(GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale) - step*scale < GET_POSITION_OF_INDEX(0,scale) ) {

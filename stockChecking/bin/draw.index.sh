@@ -1,8 +1,22 @@
 #! /bin/bash
 
+Usage()
+{
+    echo -en "
+    Usage:
+
+        $(basename $0) [-gen] [-group=<n_group1>,<n_group2>,...]
+
+        -gen:	gen index data
+        -group:	specify each group numbers
+
+    " >&2
+
+}
 
 for i in $@; do
     case $i in 
+		-h|--help) Usage; exit;;
         -gen) gen_index_data=true;;
         -group=*) group=${i#*=};;
         -*) echo "** unknown option: $i"; exit;;
@@ -48,9 +62,12 @@ eval $cmd | sed 's/\(\s[0-9]\+\)-\([0-9]\+\)-\([0-9]\+\)\s*$/\1\2\3/' | column -
 n_lines=$(awk 'END{print NF}' $data)
 length=$(awk  'END{print NR}' $data)
 echo "$list" | nl
+cmd="
 drawLines dummy_code $data $n_lines $length \
     --showlines=$( for ((i=1;i<$n_lines;i++)) { [[ $i -eq 1 ]] && printf $i || printf ",%d" $i; } ) \
     --scale=1   \
     --focus=2   \
     --group=${group:-$((n_lines-1)),1}
+    "
+eval $cmd || echo $cmd
 
