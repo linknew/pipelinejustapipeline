@@ -281,7 +281,7 @@ static int              dataRangeEnd=DATA_RANGE_UNSET;     // NOT include dataRa
 static int              dataRangeStart=DATA_RANGE_UNSET;   // all x-coordinate SHOULD(MUST!!) base on the dataRangeStart
 static int              measureIdx = IDX_RANGE_UNSET ;
 static int              cuttingIdx = IDX_RANGE_UNSET ;
-static int              dtlsIdxOnMainView = IDX_RANGE_UNSET ;
+static int              dtlsIdx = IDX_RANGE_UNSET ;
 static int              gPanelX = 0 ;
 static int              gPanelY = 0 ;
 static int              gPanelW = MAX_WIN_WIDTH ;
@@ -1354,11 +1354,11 @@ int zoom_klines(int scale_)
     if(scale_ <= 0) scale_ = 1;
     if(scale_ == scale) return RSLT_NOTHING;
 
-    /* adjust dtlsIdxOnMainView, dataRangeStart, dataRangeEnd */
+    /* adjust dtlsIdx, dataRangeStart, dataRangeEnd */
     {
         int s = dataRangeStart ;
         int e = dataRangeEnd ;
-        int d = (dtlsIdxOnMainView == IDX_RANGE_UNSET) ? e-1 : dtlsIdxOnMainView ;
+        int d = (dtlsIdx == IDX_RANGE_UNSET) ? e-1 : dtlsIdx ;
         int dN = d ;
         int sN = dN - N_DATA_OF_CUR_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, scale_) + 1 ;
         int eN = 0 ;
@@ -1376,7 +1376,7 @@ int zoom_klines(int scale_)
 
         dataRangeStart = sN ;
         dataRangeEnd = eN ;
-        if(dtlsIdxOnMainView != IDX_RANGE_UNSET) dtlsIdxOnMainView = dN ;
+        if(dtlsIdx != IDX_RANGE_UNSET) dtlsIdx = dN ;
 
         /*
         cout << "s=" << s << " d=" << d << " e=" << e << endl ;
@@ -1483,6 +1483,17 @@ int doDigitalFunc(char c)
     return digtFuncList[ digtFuncIdx ](c) ;
 }
 
+void calc_data_range(bool reset_start, bool reset_dtls)
+{
+    if(reset_start) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
+
+    if(dataRangeStart < 0) dataRangeStart = 0 ;
+    if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
+
+    dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
+    if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
+}
+
 void _doRefreshView(void)
 {
 
@@ -1525,12 +1536,7 @@ void _doRefreshView(void)
     /* adjust data range,
        all x-coordinate SHOULD(MUST!!) base on the dataRangeStart(NOT the dataRangeStart) */
     {
-        if(DATA_RANGE_UNSET == dataRangeStart) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-        if(dataRangeStart < 0) dataRangeStart = 0 ;
-        if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
-
-        dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-        if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
+        calc_data_range(dataRangeStart==DATA_RANGE_UNSET, false/*unused*/);
     }
 
     /* adjust gLinesData & gLinesInfo */
@@ -2186,17 +2192,17 @@ void _doRefreshView(void)
     /* adjust details index line */
     {
         if(!GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
-            dtlsIdxOnMainView = IDX_RANGE_UNSET ;
+            dtlsIdx = IDX_RANGE_UNSET ;
         }else{
-            if(IDX_RANGE_UNSET == dtlsIdxOnMainView ) dtlsIdxOnMainView  = (dataRangeEnd + dataRangeStart-1 + 1)/2 ;
-            if(dtlsIdxOnMainView < 0) dtlsIdxOnMainView = 0 ;
-            if(dtlsIdxOnMainView > dataRangeEnd-1) dtlsIdxOnMainView = dataRangeEnd-1 ;
+            if(IDX_RANGE_UNSET == dtlsIdx ) dtlsIdx  = (dataRangeEnd + dataRangeStart-1 + 1)/2 ;
+            if(dtlsIdx < 0) dtlsIdx = 0 ;
+            if(dtlsIdx > dataRangeEnd-1) dtlsIdx = dataRangeEnd-1 ;
 
             /*
-            cout << "start=" << dataRangeStart << " dtlsIdxOnMainView=" << dtlsIdxOnMainView << " end=" << dataRangeEnd << endl ;
+            cout << "start=" << dataRangeStart << " dtlsIdx=" << dtlsIdx << " end=" << dataRangeEnd << endl ;
             */
 
-            /* draw a vertical line on the dtlsIdxOnMainView  */
+            /* draw a vertical line on the dtlsIdx  */
             Point   _ofs;
             Scalar  _color;
             Size    _orgMatrixSize;
@@ -2205,9 +2211,9 @@ void _doRefreshView(void)
 
             for(int i = 0 ; i < gPanel.rows; i++) {
                 if((i%20)<17){
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdxOnMainView-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdxOnMainView-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdxOnMainView-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
                 }
             }
 
@@ -2222,8 +2228,8 @@ void _doRefreshView(void)
                     int  _pos = 0 ;
 
                     if(IDX_RANGE_UNSET == measureIdx){
-                        measureIdx = dtlsIdxOnMainView ;
-                        _idx = dtlsIdxOnMainView - dataRangeStart ;
+                        measureIdx = dtlsIdx ;
+                        _idx = dtlsIdx - dataRangeStart ;
                     }else{
                         _idx = measureIdx - dataRangeStart ;
                     }
@@ -2246,9 +2252,9 @@ void _doRefreshView(void)
             /* draw a horizantl line */
             for(int i = LINE_MARGIN_L; i < gMainView.cols-LINE_MARGIN_R; i++){
                 if((i%20)<17){
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[0] = 127 ;
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[1] = 127 ;
-                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView-dataRangeStart), i)[2] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[0] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[1] = 127 ;
+                    gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[2] = 127 ;
                 }
             }
 
@@ -2337,69 +2343,69 @@ void _doRefreshView(void)
 
             /* date */
             s.str(" ");
-            _l = (long)(gDateData.at<double>(0,dtlsIdxOnMainView)) ;
+            _l = (long)(gDateData.at<double>(0,dtlsIdx)) ;
             _color = Scalar(255,255,255) ;
             s << (_l/(12*31)+1970) << "-" << ((_l%(12*31)/31)+1) << "-" << ((_l%31)+1);
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k0 (today) */
-            _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gLinesData.at<double>(0,dtlsIdx) ;
             _color = Scalar(255,80,80) ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k1 (a week) */
-            _d = gLinesData.at<double>(1,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(1,dtlsIdx);
             _color = lineColors[1] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k2 (a month) */
-            _d = gLinesData.at<double>(2,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(2,dtlsIdx);
             _color = lineColors[2] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(112,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k3 (a quarter) */
-            _d = gLinesData.at<double>(3,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(3,dtlsIdx);
             _color = lineColors[3] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k4 (hlaf year) */
-            _d = gLinesData.at<double>(4,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(4,dtlsIdx);
             _color = lineColors[4] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k5 (a year) */
-            _d = gLinesData.at<double>(5,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(5,dtlsIdx);
             _color = lineColors[5] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(112,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k6 (high) */
-            _d = gLinesData.at<double>(6,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(6,dtlsIdx);
             _color = lineColors[6] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k7 (average) */
-            _d = gLinesData.at<double>(7,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(7,dtlsIdx);
             _color = lineColors[7] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
             putText( gLeftDetailsView, s.str(), Point(56,120+(_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* k8 (low) */
-            _d = gLinesData.at<double>(8,dtlsIdxOnMainView);
+            _d = gLinesData.at<double>(8,dtlsIdx);
             _color = lineColors[8] ;
             s.str("");
             s << setiosflags(ios::fixed) << setprecision(_precision) << _d ;
@@ -2408,28 +2414,28 @@ void _doRefreshView(void)
             _idx++ ;
             /* volume */
             s.str("");
-            _d = gVolData.at<double>(0,dtlsIdxOnMainView)/10000 ;    // use 10'thousand(hand) for the unit
+            _d = gVolData.at<double>(0,dtlsIdx)/10000 ;    // use 10'thousand(hand) for the unit
             _color = Scalar(200,200,200);
             s << " VOL=" << setprecision(2) << abs(_d) << "W";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* value */
             s.str("");
-            _d = gValData.at<double>(0,dtlsIdxOnMainView)/100000 ;    // use 1 Million yuan for the unit
+            _d = gValData.at<double>(0,dtlsIdx)/100000 ;    // use 1 Million yuan for the unit
             _color = Scalar(200,200,200);
             s << " VAL=" << abs(_d) << "Y";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* live-value */
             s.str("");
-            _d = gLvalData.at<double>(0,dtlsIdxOnMainView)/100/10000 ; // use 10'Million(yuan) for the unit
+            _d = gLvalData.at<double>(0,dtlsIdx)/100/10000 ; // use 10'Million(yuan) for the unit
             _color = Scalar(200,200,200);
             s << " LVal=" << (_d) << "M";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* amplitude */
             s.str("");
-            _d = gAmpData.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gAmpData.at<double>(0,dtlsIdx) ;
             _color = (_d>0) ? Scalar(0,0,255)
                            : (_d==0) ? Scalar(200,200,200)
                                     : Scalar(0,255,0) ;
@@ -2438,14 +2444,14 @@ void _doRefreshView(void)
 
             /* exchange */
             s.str("");
-            _d = gXcgData.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gXcgData.at<double>(0,dtlsIdx) ;
             _color = Scalar(200,200,200) ;
             s << " Exchg=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << '%' ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
             /* power */
             s.str("");
-            _d = gPwrData.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gPwrData.at<double>(0,dtlsIdx) ;
             _color = (_d>0) ? Scalar(0,0,255)
                             : (_d==0) ? Scalar(200,200,200)
                                       : Scalar(0,255,0) ;
@@ -2457,7 +2463,7 @@ void _doRefreshView(void)
 #if 0
             /* eager to buy */
             s.str("");
-            _d = gEgrData.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gEgrData.at<double>(0,dtlsIdx) ;
             _color = (_d>=75) ? Scalar(0,0,255)
                               : (_d<=25) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2467,7 +2473,7 @@ void _doRefreshView(void)
 
             /* RSI6(Relative Strongth Index) */
             s.str("");
-            _d = gRsi6Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gRsi6Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2476,7 +2482,7 @@ void _doRefreshView(void)
 
             /* RSI12(Relative Strongth Index) */
             s.str("");
-            _d = gRsi12Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gRsi12Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2486,7 +2492,7 @@ void _doRefreshView(void)
 #if 0
             /* RSI24(Relative Strongth Index) */
             s.str("");
-            _d = gRsi24Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gRsi24Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2496,7 +2502,7 @@ void _doRefreshView(void)
 
             /* PWRI6(Power Index) */
             s.str("");
-            _d = gPwri6Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gPwri6Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2505,7 +2511,7 @@ void _doRefreshView(void)
 
             /* PWR12(Power Index) */
             s.str("");
-            _d = gPwri12Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gPwri12Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2515,7 +2521,7 @@ void _doRefreshView(void)
 #if 0
             /* PWR24(Power Index) */
             s.str("");
-            _d = gPwri24Data.at<double>(0,dtlsIdxOnMainView) ;
+            _d = gPwri24Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
@@ -2534,11 +2540,11 @@ void _doRefreshView(void)
                 Mat _m ;
                 Mat _focusLineData = gLinesData.row(DATA_TYPE_CLOSE + idxFocusedLine) ;
 
-                if(dtlsIdxOnMainView > measureIdx){
+                if(dtlsIdx > measureIdx){
                     _dataS = measureIdx + 1 ;       // plus 1, not include the first(start) day
-                    _dataE = dtlsIdxOnMainView ;
+                    _dataE = dtlsIdx ;
                 }else{
-                    _dataS = dtlsIdxOnMainView + 1 ; // plus 1, not include the first(start) day
+                    _dataS = dtlsIdx + 1 ; // plus 1, not include the first(start) day
                     _dataE = measureIdx ;
                 }
 
@@ -2549,7 +2555,7 @@ void _doRefreshView(void)
                     _d = 0;
                 }
                 else {
-                    double a = round(_focusLineData.at<double>(0,dtlsIdxOnMainView) * 100);
+                    double a = round(_focusLineData.at<double>(0,dtlsIdx) * 100);
                     double b = round(_focusLineData.at<double>(0,measureIdx) * 100);
                     _d = (a-b)/b*100;
                 }
@@ -2614,35 +2620,35 @@ void _doRefreshView(void)
 
                 /* pre-close */
                 s.str("");
-                _d = gYstdData.at<double>(0,dtlsIdxOnMainView) ;
+                _d = gYstdData.at<double>(0,dtlsIdx) ;
                 _color = Scalar(200,200,200) ;
                 s << " YstdC=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* open */
                 s.str("");
-                _d = gOpenData.at<double>(0,dtlsIdxOnMainView) ;
+                _d = gOpenData.at<double>(0,dtlsIdx) ;
                 _color = Scalar(200,200,200) ;
                 s << " Open=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* close */
                 s.str("");
-                _d = gLinesData.at<double>(0,dtlsIdxOnMainView) ;
+                _d = gLinesData.at<double>(0,dtlsIdx) ;
                 _color = Scalar(200,200,200) ;
                 s << " Close=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* high */
                 s.str("");
-                _d = gHigData.at<double>(0,dtlsIdxOnMainView) ;
+                _d = gHigData.at<double>(0,dtlsIdx) ;
                 _color = Scalar(200,200,200) ;
                 s << " High=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* lower */
                 s.str("");
-                _d = gLowData.at<double>(0,dtlsIdxOnMainView) ;
+                _d = gLowData.at<double>(0,dtlsIdx) ;
                 _color = Scalar(200,200,200) ;
                 s << " Lower=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
@@ -2653,15 +2659,15 @@ void _doRefreshView(void)
 
                     double _data[][_CNT] = {
                             {
-                             gLinesData.row(0).at<double>(0,dtlsIdxOnMainView) ,           // do NOT change the position of this line
-                             gOpenData.row(0).at<double>(0,dtlsIdxOnMainView) ,            // do NOT change the position of this line
-                             gHigData.row(0).at<double>(0, dtlsIdxOnMainView) ,            // do NOT change the position of this line
-                             gLowData.row(0).at<double>(0, dtlsIdxOnMainView) ,            // do NOT change the position of this line
-                             gYstdData.row(0).at<double>(0,dtlsIdxOnMainView) ,            // do NOT change the position of this line
-                             gYstdData.row(0).at<double>(0,dtlsIdxOnMainView) * 0.89,      // floor, do NOT change the position of this line
-                             gYstdData.row(0).at<double>(0,dtlsIdxOnMainView) * 1.11,      // ceiling, do NOT change the position of this line
+                             gLinesData.row(0).at<double>(0,dtlsIdx) ,           // do NOT change the position of this line
+                             gOpenData.row(0).at<double>(0,dtlsIdx) ,            // do NOT change the position of this line
+                             gHigData.row(0).at<double>(0, dtlsIdx) ,            // do NOT change the position of this line
+                             gLowData.row(0).at<double>(0, dtlsIdx) ,            // do NOT change the position of this line
+                             gYstdData.row(0).at<double>(0,dtlsIdx) ,            // do NOT change the position of this line
+                             gYstdData.row(0).at<double>(0,dtlsIdx) * 0.89,      // floor, do NOT change the position of this line
+                             gYstdData.row(0).at<double>(0,dtlsIdx) * 1.11,      // ceiling, do NOT change the position of this line
                                                                                            // can add some interesting data here!!
-                             gDateData.row(0).at<double>(0,dtlsIdxOnMainView) , }          // keep this line at end of each data[x]
+                             gDateData.row(0).at<double>(0,dtlsIdx) , }          // keep this line at end of each data[x]
                     };
                     Mat     _m(sizeof(_data)/sizeof(_data[0]),_CNT,CV_64F,(void*)(&_data[0][0])) ;
                     Mat     _n ;
@@ -2802,14 +2808,15 @@ int _doDefault(char c)
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             break ;
         case '0':
+        case '^':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
-                if(dtlsIdxOnMainView == 0) break ;
+                if(dtlsIdx == 0) break ;
 
-                if(dtlsIdxOnMainView == dataRangeStart){
+                if(dtlsIdx == dataRangeStart){
                     dataRangeStart -= N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-                    dtlsIdxOnMainView = dataRangeStart ;
+                    dtlsIdx = dataRangeStart ;
                 }else{
-                    dtlsIdxOnMainView = dataRangeStart ;
+                    dtlsIdx = dataRangeStart ;
                 }
             }else{
                 if(dataRangeStart == 0) break ;
@@ -2820,17 +2827,17 @@ int _doDefault(char c)
             break ;
         case '$':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
-                if(dtlsIdxOnMainView == gLinesData.cols-1) break ;
+                if(dtlsIdx == gLinesData.cols-1) break ;
 
-                if(dtlsIdxOnMainView == dataRangeEnd-1){
+                if(dtlsIdx == dataRangeEnd-1){
                     dataRangeStart = dataRangeEnd ;
-                    dtlsIdxOnMainView += N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-                    if(dtlsIdxOnMainView > gLinesData.cols-1){
-                        dtlsIdxOnMainView = gLinesData.cols-1 ;
+                    dtlsIdx += N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
+                    if(dtlsIdx > gLinesData.cols-1){
+                        dtlsIdx = gLinesData.cols-1 ;
                         dataRangeStart = DATA_RANGE_UNSET ;     // trigger range_adjust_opertion
                     }
                 }else{
-                    dtlsIdxOnMainView = dataRangeEnd - 1 ;
+                    dtlsIdx = dataRangeEnd - 1 ;
                 }
             }else{
                 if(dataRangeEnd == gLinesData.cols) break ;
@@ -2854,7 +2861,7 @@ int _doDefault(char c)
             dataRangeStart = DATA_RANGE_UNSET ;
             RESET_SWITCHER_STATUS(&sysSwitchers,LOCK_SCREEN) ;
             RESET_SWITCHER_STATUS(&sysSwitchers,SHOW_DAILY) ;
-            dtlsIdxOnMainView = IDX_RANGE_UNSET;
+            dtlsIdx = IDX_RANGE_UNSET;
             rsiCustom = 0 ;
             pwriCustom = 0 ;
             xcgAvgICustom = 0 ;
@@ -2870,7 +2877,7 @@ int _doDefault(char c)
             break ;
         case 'r':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && GET_SWITCHER_STATUS(sysSwitchers, SHOW_FORECAST)){
-                int _i = dtlsIdxOnMainView-forecastIdx ;
+                int _i = dtlsIdx-forecastIdx ;
                 if(_i < 0 || _i >= FORECAST_DATA_DAYS) _i = 0 ;
                 for(; _i<FORECAST_DATA_DAYS; _i++){
                     forecastCoefficients[_i] = 1.0 ;
@@ -2926,7 +2933,7 @@ int _doDefault(char c)
         case 'c':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
                 SET_SWITCHER_STATUS(&sysSwitchers, CUTTING_HISTORY) ;
-                cuttingIdx = dtlsIdxOnMainView ;
+                cuttingIdx = dtlsIdx ;
                 SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
             }
             break ;
@@ -2939,7 +2946,7 @@ int _doDefault(char c)
         case 'n':
         case 'N':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN) && GET_SWITCHER_STATUS(sysSwitchers, SHOW_FORECAST)){
-                int _i = dtlsIdxOnMainView-forecastIdx ;
+                int _i = dtlsIdx-forecastIdx ;
                 if(_i < 0 || _i >= FORECAST_DATA_DAYS) _i = 0 ;
                 forecastCoefficients[_i] += (c=='N') ? 0.005 : -0.005 ;
                 SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
@@ -3004,17 +3011,17 @@ int _doDefault(char c)
             {
                 if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
                     int step = (c == 'l') ? 1 : MONTH_DAYS ;
-                    if(dtlsIdxOnMainView == gLinesData.cols-1) break ;
+                    if(dtlsIdx == gLinesData.cols-1) break ;
 
-                    if(dtlsIdxOnMainView == dataRangeEnd-1){
+                    if(dtlsIdx == dataRangeEnd-1){
                         dataRangeStart += step ;
-                        dtlsIdxOnMainView += step ;
+                        dtlsIdx += step ;
                         if(dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) > gLinesData.cols){
                             dataRangeStart = DATA_RANGE_UNSET ;
                         }
                     }else{
-                        dtlsIdxOnMainView += step ;
-                        if(dtlsIdxOnMainView > dataRangeEnd-1)   dtlsIdxOnMainView = dataRangeEnd-1 ;
+                        dtlsIdx += step ;
+                        if(dtlsIdx > dataRangeEnd-1)   dtlsIdx = dataRangeEnd-1 ;
                     }
                 }else{
                     int step = (c == 'l') ? MONTH_DAYS : SEASON_DAYS ;
@@ -3032,14 +3039,14 @@ int _doDefault(char c)
             {
                 if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
                     int step = (c == 'h') ? 1 : MONTH_DAYS ;
-                    if(dtlsIdxOnMainView == 0) break ;
+                    if(dtlsIdx == 0) break ;
 
-                    if(dtlsIdxOnMainView == dataRangeStart){
+                    if(dtlsIdx == dataRangeStart){
                         dataRangeStart -= step ;
-                        dtlsIdxOnMainView -= step ;
+                        dtlsIdx -= step ;
                     }else{
-                        dtlsIdxOnMainView -= step;
-                        if(dtlsIdxOnMainView < dataRangeStart) dtlsIdxOnMainView = dataRangeStart ;
+                        dtlsIdx -= step;
+                        if(dtlsIdx < dataRangeStart) dtlsIdx = dataRangeStart ;
                     }
                 }else{
                     if(dataRangeStart == 0) break ;

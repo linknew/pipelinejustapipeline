@@ -16,7 +16,7 @@
 #define  DRAW_VOL_TYPE_LINE      (1)
 #define  DRAW_VOL_TYPE_FILLED    (2)
 
-#define  MAX_SUPPORTTED_LENGTH   (365*20)
+#define  MAX_SUPPORTTED_LENGTH   (365*40)
 #define  MAX_SUPPORTTED_LINES   (64)
 #define  MAX_SCALE              (256)
 
@@ -55,17 +55,17 @@
         (switcher & (1l << (position) ))
 
 #define  N_DATA_OF_CUR_VIEW(screenWidth,scale) ( (screenWidth<=(LINE_MARGIN_L)+(LINE_MARGIN_R)) ? 0 : max(1,((screenWidth)-(LINE_MARGIN_L)-(LINE_MARGIN_R))/(scale)) )
-#define  GET_POSITION_OF_INDEX(index, scale)   ( (index) * (scale) + (scale)/2 + LINE_MARGIN_L)
+#define  GET_POSITION_BY_VIEW_IDX(index, scale)   ( (index) * (scale) + (scale)/2 + LINE_MARGIN_L)
 #define  RESET_DTLS_INDEX   (-MAX_SUPPORTTED_LENGTH -255)
 
 using namespace cv;
 using namespace std;
 using namespace cv::dnn;
 
-typedef int(*digtFuncPt)(int number, bool& refresh);
-int digtFuncBaselineFilter( int number, bool& refresh );
-int digtFuncLineFilter( int number, bool& refresh );
-int digtFuncScale( int number, bool& refresh );
+typedef int(*digtFuncPt)(int number, int &refresh);
+int digtFuncBaselineFilter( int number, int &refresh );
+int digtFuncLineFilter( int number, int &refresh );
+int digtFuncScale( int number, int &refresh );
 
 /* define & init */
 /* color-list for lines */
@@ -97,7 +97,7 @@ static bool             lockScreen = false ;
 
 int dataRangeEnd=80000;
 int dataRangeStart=80000;   // all x-coordinate SHOULD(MUST!!) base on the dataRangeEnd(NOT the dataRangeStart)
-int dtlsIdxOnMainView = RESET_DTLS_INDEX ;
+int dtlsIdx = RESET_DTLS_INDEX ;
 int winW = MAX_WIN_WIDTH ;
 int winH = MAX_WIN_HEIGHT ;
 Mat _panel, _mainView, _bottomView, _topStatus_view, _leftDetailsView ;
@@ -364,25 +364,68 @@ int _getLinesFocus (
 }
 #endif
 
-int digtFuncScale(
-        int         number,
-        bool&       refresh
-        )
+int zoom_klines(int scale_)
 {
-    /* adjust dtlsIdxOnMainView */
-    dtlsIdxOnMainView = min(_linesData.cols, N_DATA_OF_CUR_VIEW(_mainView.cols,number)) -
-                            min(_linesData.cols, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)) +
-                            dtlsIdxOnMainView ;
+    if(scale_ <= 0) scale_ = 1;
+    if(scale_ == scale) return 1;
+
+    /* adjust dtlsIdx, dataRangeStart, dataRangeEnd */
+    {
+        int s = dataRangeStart ;
+        int e = dataRangeEnd ;
+        int d = lockScreen? dtlsIdx : e-1;
+        int dN = d ;
+        int sN = dN - N_DATA_OF_CUR_VIEW(GET_POSITION_BY_VIEW_IDX(d-s, scale)+1+(scale-1-scale/2)+LINE_MARGIN_R, scale_) + 1 ;
+        int eN = 0 ;
+        int _adjust = 0 ;
+
+        if(sN < 0){
+            sN = 0 ;
+        }
+        eN = min(sN + N_DATA_OF_CUR_VIEW(_mainView.cols, scale_),_linesData.cols) ;
+        if(!lockScreen && eN -sN < N_DATA_OF_CUR_VIEW(_mainView.cols, scale_)){
+            /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
+            _adjust = min(sN, N_DATA_OF_CUR_VIEW(_mainView.cols, scale_) - (eN-1 - sN + 1)) ;
+            sN -= _adjust ;
+        }
+
+        dataRangeStart = sN ;
+        dataRangeEnd = eN ;
+        dtlsIdx = dN ;
+
+        /*
+        cout << "s=" << s << " d=" << d << " e=" << e << endl ;
+        cout << "sN=" << sN << " dN=" << dN << " eN=" << eN << endl ;
+        */
+    }
 
     /* adjust scale */
-    scale = number ;
-    refresh = true ;
+    scale = scale_;
     return 0 ;
+}
+
+int zoom_klines(char zZ)
+{
+    int scale_ = zZ=='Z'? scale-1 : scale+1;
+    return zoom_klines(scale_);
+}
+
+
+int digtFuncScale(
+        int         number,
+        int         &refresh
+        )
+{
+    if(number<=0 || number>9) {
+        return -1;
+    }
+
+    return zoom_klines(number);
 }
 
 int digtFuncLineFilter(
         int         number,
-        bool&       refresh
+        int         &refresh
         )
 {
     if(number == 0){
@@ -396,7 +439,7 @@ int digtFuncLineFilter(
 
 int digtFuncBaselineFilter(
         int         number,
-        bool&       refresh
+        int         &refresh
         )
 {
     if(number == 0){
@@ -410,7 +453,7 @@ int digtFuncBaselineFilter(
 
 int doDigitalFunc(
         int         number,
-        bool&       refresh     // refresh flag
+        int         &refresh     // refresh flag
         )
 {
     assert( digtFuncIdx < sizeof(digtFuncList)/sizeof(digtFuncPt) );
@@ -435,6 +478,19 @@ void initColor(int num)
             }
 
     return ;
+}
+
+void calc_data_range(bool reset_start, bool reset_dtls)
+{
+    if(reset_start) dataRangeStart = _linesData.cols - N_DATA_OF_CUR_VIEW(_mainView.cols,scale) ;
+    if(dataRangeStart < 0) dataRangeStart = 0 ;
+    if(dataRangeStart > _linesData.cols-1) dataRangeStart = _linesData.cols-1 ;
+    dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(_mainView.cols,scale) ;
+    if(dataRangeEnd > _linesData.cols) dataRangeEnd = _linesData.cols ;
+
+    if(reset_dtls) dtlsIdx = (dataRangeEnd + (dataRangeStart-1) )/2 ;
+    if(dtlsIdx < 0) dtlsIdx = 0 ;
+    if(dtlsIdx > _linesData.cols-1) dtlsIdx = _linesData.cols-1 ;
 }
 
 int main( int argc, char** argv )
@@ -485,8 +541,6 @@ int main( int argc, char** argv )
     }
 #endif
 
-    char        c = 0 ;
-    bool        refresh = true ;
     int         idxFocusedLine = 0 ;
     string      stockCode ;
     vector<int> linesGrpInfo ;
@@ -572,6 +626,12 @@ int main( int argc, char** argv )
         initColor(_linesNum) ;
     }
 
+    char    c = 0 ;
+    int     refresh = 2/* reset calc_data_range*/ ;
+    bool    b3DM = 0 ;  //@ 3 digtial mode, when start with 0, the 3 digital mode is on. 001==1, 010==10, 099=99
+    int     step_b3DM = 0 ;
+    int     numRec = 0 ;
+    int     step_mv_act = 0;
     while (1)
     {
         if( refresh ){
@@ -593,8 +653,10 @@ int main( int argc, char** argv )
                     _mainView   = _panel( Rect(LEFT_VIEW_W, 30, _panel.cols-LEFT_VIEW_W-10, _panel.rows-30-80) );
                     _bottomView = _panel( Rect(LEFT_VIEW_W, _panel.rows - 80, _mainView.cols, 80) ) ;
                 }else{
-                    _mainView   = _panel( Rect(0, 30, _panel.cols-10, _panel.rows-30-80) ) ;
-                    _bottomView = _panel( Rect(0, _panel.rows - 80, _mainView.cols, 80) ) ;
+                    //_mainView   = _panel( Rect(0, 30, _panel.cols-10, _panel.rows-30-80) ) ;
+                    //_bottomView = _panel( Rect(0, _panel.rows - 80, _mainView.cols, 80) ) ;
+                    _mainView   = _panel( Rect(LEFT_VIEW_W, 30, _panel.cols-LEFT_VIEW_W-10, _panel.rows-30-80) );
+                    _bottomView = _panel( Rect(LEFT_VIEW_W, _panel.rows - 80, _mainView.cols, 80) ) ;
                 }
                 _topStatus_view = _panel.rowRange(0, 30) ;
                 _leftDetailsView = _panel.colRange(0, LEFT_VIEW_W) ;
@@ -602,11 +664,8 @@ int main( int argc, char** argv )
 
             /* adjust data range,
                all x-coordinate SHOULD(MUST!!) base on the dataRangeEnd(NOT the dataRangeStart) */
-            {
-                dataRangeEnd = min( _linesData.cols, dataRangeEnd) ;
-                dataRangeEnd = max( min(N_DATA_OF_CUR_VIEW(_mainView.cols,scale), _linesData.cols), dataRangeEnd ) ;
-                dataRangeStart = dataRangeEnd - N_DATA_OF_CUR_VIEW(_mainView.cols,scale);
-                dataRangeStart = max(0, dataRangeStart) ;
+            if (refresh == 2) {
+                calc_data_range(true, false);
             }
 
             /* adjust _linesData & _linesInfo */
@@ -651,13 +710,13 @@ int main( int argc, char** argv )
             /* adjust details index line */
             {
                 if(!lockScreen){
-                    dtlsIdxOnMainView = RESET_DTLS_INDEX ;
+                    //dtlsIdx = RESET_DTLS_INDEX ;
                 }else{
-                    if(RESET_DTLS_INDEX == dtlsIdxOnMainView ) dtlsIdxOnMainView  = (dataRangeEnd - dataRangeStart + 1)/2 ;
-                    dtlsIdxOnMainView  = min( min( N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1, _linesData.cols - 1 ), dtlsIdxOnMainView ) ;
-                    dtlsIdxOnMainView  = max(0, dtlsIdxOnMainView ) ;
+                    //if(RESET_DTLS_INDEX == dtlsIdx ) dtlsIdx  = (dataRangeEnd - dataRangeStart + 1)/2 ;
+                    //dtlsIdx  = min( min( N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1, _linesData.cols - 1 ), dtlsIdx ) ;
+                    //dtlsIdx  = max(0, dtlsIdx ) ;
 
-                    /* draw a vertical line on the dtlsIdxOnMainView  */
+                    /* draw a vertical line on the dtlsIdx  */
                     Point   _ofs;
                     Scalar  _color;
                     Size    _orgMatrixSize;
@@ -666,18 +725,18 @@ int main( int argc, char** argv )
 
                     for(int i = 0 ; i < _panel.rows; i++) {
                         if((i%20)<17){
-                            _panel.at<Vec3b>(i, GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale)+_ofs.x )[0] = 127 ;
-                            _panel.at<Vec3b>(i, GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale)+_ofs.x )[1] = 127 ;
-                            _panel.at<Vec3b>(i, GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale)+_ofs.x )[2] = 127 ;
+                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
+                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
+                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
                         }
                     }
 
                     /* draw a horizantl line */
                     for(int i = LINE_MARGIN_L; i < _mainView.cols-LINE_MARGIN_R; i++){
                         if((i%20)<17){
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView), i)[0] = 127 ;
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView), i)[1] = 127 ;
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdxOnMainView), i)[2] = 127 ;
+                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[0] = 127 ;
+                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[1] = 127 ;
+                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[2] = 127 ;
                         }
                     }
 
@@ -746,7 +805,7 @@ int main( int argc, char** argv )
                     int     _idx = 4 ;
 
                     for(int i = 0; i < _linesData.rows; i++){
-                        _d = _linesData.at<double>(i,dataRangeStart+dtlsIdxOnMainView) ;
+                        _d = _linesData.at<double>(i,dtlsIdx) ;
                         _color = lineColors[i] ;
                         s.str("");
                         s << " line-" << i+1 << "=" << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
@@ -775,56 +834,35 @@ int main( int argc, char** argv )
             }
         }
 
-        c = waitKey(1000) ;
+        c = waitKey(1000000) ;
         if ('q' == c) break ;
 
         switch(c){
-            static bool b3DM = 0 ;	//@ 3 digtial mode, when start with 0, the 3 digital mode is on. 001==1, 010==10, 099=99
-            static int numRec = 0 ;
-            static int step = 0 ;
 
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
                 if(b3DM){
-                    step ++ ;
+                    step_b3DM ++ ;
                     numRec = numRec*10 + (c-'0') ;
-                    if(step >= 2){
+                    if(step_b3DM >= 2){
                         doDigitalFunc( numRec, refresh ) ;
                         b3DM = 0 ;
-                        step = 0 ;
+                        step_b3DM = 0 ;
                         numRec = 0 ;
                     }
                 }else if('0' == c){
                     b3DM = 1 ;
                     numRec = 0 ;
-                    step = 0 ;
+                    step_b3DM = 0 ;
                 }else{
                     doDigitalFunc( c-'0', refresh ) ;
                 }
+                refresh = true;
                 break ;
             case ';':
             case ':':
                 lockScreen = !lockScreen ;
-                refresh = true ;
-                break ;
-            case '^':
-                if(!lockScreen){
-                    dataRangeEnd = 0 ;
-                } else {
-                    (0 == dtlsIdxOnMainView)
-                        ?  dataRangeEnd -= N_DATA_OF_CUR_VIEW(_mainView.cols,scale)
-                        :  dtlsIdxOnMainView = 0 ;
-                }
-                refresh = true ;
-                break ;
-            case '$':
-                if(!lockScreen){
-                    dataRangeEnd = MAX_SUPPORTTED_LENGTH ;
-                } else {
-                    (N_DATA_OF_CUR_VIEW(_mainView.cols,scale) -1 == dtlsIdxOnMainView)
-                        ?  dataRangeEnd += N_DATA_OF_CUR_VIEW(_mainView.cols,scale)
-                        :  dtlsIdxOnMainView = N_DATA_OF_CUR_VIEW(_mainView.cols,scale) -1 ;
-                }
+                calc_data_range(false, true);
                 refresh = true ;
                 break ;
             case 'r':
@@ -834,7 +872,9 @@ int main( int argc, char** argv )
                 digtFuncIdx = 2 ;
                 scale = 1 ;
                 autoFit = false ;
-                lockScreen = false ; dtlsIdxOnMainView  = RESET_DTLS_INDEX;
+                lockScreen = false ;
+                //dtlsIdx = RESET_DTLS_INDEX;
+                calc_data_range(true, true);
                 refresh = true ;
                 break ;
             case 'p':       // print current view info
@@ -871,13 +911,10 @@ int main( int argc, char** argv )
                 refresh = true ;
                 break ;
 #else
-            case '>':
-                scale=min(MAX_SCALE,scale+1) ;
-                refresh = true ;
-                break ;
-            case '<':
-                scale=max(1,scale-1) ;
-                refresh = true ;
+            case 'z':
+            case 'Z':
+                zoom_klines(c);
+                refresh = true;
                 break ;
 #endif
             case '-':
@@ -888,36 +925,61 @@ int main( int argc, char** argv )
                 winH += 10 ;
                 refresh = true ;
                 break ;
-            case 'l':
-            case 'L':
-                {
-                    int step = (c == 'l') ? 1 : N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/20 ;
-                    if(lockScreen){
-                        if(GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale) + step*scale > GET_POSITION_OF_INDEX(N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1,scale) ) {
-                            dataRangeEnd += step ;
-                        }
-                        dtlsIdxOnMainView += step ;
-                    }else{
-                        dataRangeEnd += (step + 9) ;
-                    }
-                    refresh = true ;
-                }
-                break ;
+            case '^':
             case 'h':
             case 'H':
-                {
-                    int step = (c == 'h') ? 1 : N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/20 ;
-
-                    if(lockScreen){
-                        if(GET_POSITION_OF_INDEX(dtlsIdxOnMainView,scale) - step*scale < GET_POSITION_OF_INDEX(0,scale) ) {
-                            dataRangeEnd -= step ;
-                        }
-                        dtlsIdxOnMainView -= step;
-                    }else{
-                        dataRangeEnd -= (step + 9) ;
-                    }
-                    refresh = true ;
+                if(!lockScreen) {
+                    /**/ if(c=='^') step_mv_act = MAX_SUPPORTTED_LENGTH;
+                    else if(c=='h') step_mv_act = 1;
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    dataRangeStart -= step_mv_act ;
                 }
+                else {
+                    /**/ if(c=='^') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale));
+                    else if(c=='h') step_mv_act = 1;
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    if (dtlsIdx -  step_mv_act >= dataRangeStart) {
+                        dtlsIdx -= step_mv_act;
+                    }
+                    else if (dtlsIdx != dataRangeStart) {
+                        dtlsIdx = dataRangeStart;
+                    }
+                    else {
+                        dtlsIdx -= step_mv_act;
+                        dataRangeStart = dtlsIdx;
+                    }
+                }
+                calc_data_range(false, false);
+                refresh = true ;
+                break ;
+            case '$':
+            case 'l':
+            case 'L':
+                if(!lockScreen) {
+                    /**/ if(c=='$') step_mv_act = MAX_SUPPORTTED_LENGTH;
+                    else if(c=='l') step_mv_act = 1;
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    dataRangeStart += step_mv_act;
+                    dataRangeEnd += step_mv_act ;
+                }
+                else {
+                    /**/ if(c=='$') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale));
+                    else if(c=='l') step_mv_act = 1;
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    if (dtlsIdx +  step_mv_act <= dataRangeEnd-1) {
+                        dtlsIdx += step_mv_act;
+                    }
+                    else if (dtlsIdx != dataRangeEnd-1) {
+                        dtlsIdx = dataRangeEnd-1;
+                    }
+                    else {
+                        dtlsIdx += step_mv_act;
+                        dataRangeStart += step_mv_act;
+                        dataRangeEnd += step_mv_act ;
+                    }
+                }
+                calc_data_range(dataRangeEnd > _linesData.cols, false);
+                refresh = true ;
                 break ;
             case 'j':   // switch the 0~9 keys function
                 digtFuncIdx = ( digtFuncIdx + 1 ) % ( sizeof( digtFuncList )/sizeof( digtFuncPt ) );
