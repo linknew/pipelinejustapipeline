@@ -56,7 +56,6 @@
 
 #define  N_DATA_OF_CUR_VIEW(screenWidth,scale) ( (screenWidth<=(LINE_MARGIN_L)+(LINE_MARGIN_R)) ? 0 : max(1,((screenWidth)-(LINE_MARGIN_L)-(LINE_MARGIN_R))/(scale)) )
 #define  GET_POSITION_BY_VIEW_IDX(index, scale)   ( (index) * (scale) + (scale)/2 + LINE_MARGIN_L)
-#define  RESET_DTLS_INDEX   (-MAX_SUPPORTTED_LENGTH -255)
 
 using namespace cv;
 using namespace std;
@@ -95,9 +94,10 @@ static int              dataFixType = DATA_FIX_TYPE_BACKWARD ;
 static int              crntUsedDataFixType = DATA_FIX_TYPE_NOT_SET ;
 static bool             lockScreen = false ;
 
-int dataRangeEnd=80000;
-int dataRangeStart=80000;   // all x-coordinate SHOULD(MUST!!) base on the dataRangeEnd(NOT the dataRangeStart)
-int dtlsIdx = RESET_DTLS_INDEX ;
+int dataRangeStart=MAX_SUPPORTTED_LENGTH;   // all x-coordinate SHOULD(MUST!!) base on the dataRangeStart(NOT the dataRangeEnd)
+int dataRangeEnd=MAX_SUPPORTTED_LENGTH;
+int dtlsIdx = -1;
+int measureIdx = -1;
 int winW = MAX_WIN_WIDTH ;
 int winH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, _bottomView, _topStatus_view, _leftDetailsView ;
@@ -480,7 +480,7 @@ void initColor(int num)
     return ;
 }
 
-void calc_data_range(bool reset_start, bool reset_dtls)
+void calc_data_range(bool reset_start, bool reset_dtls, bool reset_measure)
 {
     if(reset_start) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
     if(dataRangeStart < 0) dataRangeStart = 0 ;
@@ -491,6 +491,8 @@ void calc_data_range(bool reset_start, bool reset_dtls)
     if(reset_dtls) dtlsIdx = (dataRangeEnd + (dataRangeStart-1) )/2 ;
     if(dtlsIdx < 0) dtlsIdx = 0 ;
     if(dtlsIdx > gLinesData.cols-1) dtlsIdx = gLinesData.cols-1 ;
+
+    if(reset_measure) measureIdx = -1;
 }
 
 int main( int argc, char** argv )
@@ -665,7 +667,7 @@ int main( int argc, char** argv )
             /* adjust data range,
                all x-coordinate SHOULD(MUST!!) base on the dataRangeEnd(NOT the dataRangeStart) */
             if (refresh == 2) {
-                calc_data_range(true, false);
+                calc_data_range(true, false, false);
             }
 
             /* adjust gLinesData & _linesInfo */
@@ -710,12 +712,7 @@ int main( int argc, char** argv )
             /* adjust details index line */
             {
                 if(!lockScreen){
-                    //dtlsIdx = RESET_DTLS_INDEX ;
                 }else{
-                    //if(RESET_DTLS_INDEX == dtlsIdx ) dtlsIdx  = (dataRangeEnd - dataRangeStart + 1)/2 ;
-                    //dtlsIdx  = min( min( N_DATA_OF_CUR_VIEW(gMainView.cols,scale) - 1, gLinesData.cols - 1 ), dtlsIdx ) ;
-                    //dtlsIdx  = max(0, dtlsIdx ) ;
-
                     /* draw a vertical line on the dtlsIdx  */
                     Point   _ofs;
                     Scalar  _color;
@@ -728,6 +725,27 @@ int main( int argc, char** argv )
                             gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
                             gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
                             gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
+                        }
+                    }
+
+                    /* draw a vertical line for measure */
+                    {
+                        if (lockScreen && measureIdx>=0) {
+                            int  _idx = 0 ;
+                            int  _pos = 0 ;
+
+                            _idx = measureIdx - dataRangeStart ;
+                            _pos = GET_POSITION_BY_VIEW_IDX(_idx,scale) ;
+
+                            if(_pos >= LINE_MARGIN_L && _pos <= gMainView.cols-1-LINE_MARGIN_R){
+                                for(int i = 0 ; i < gPanel.rows; i++) {
+                                    if((i%20)<17){
+                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[0] = 0 ;
+                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[1] = 0 ;
+                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[2] = 255 ;
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -750,6 +768,7 @@ int main( int argc, char** argv )
             {
                 int             i ;
                 stringstream    s ;
+                int             text_hi = 20;
 
                 /* show stock name & code & data-fix status */
                 s.str("");
@@ -774,42 +793,141 @@ int main( int argc, char** argv )
                         s << i + 1 << '/' ;
                     }
                 }
-                putText( _leftDetailsView, s.str(), Point(20,54+1*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+1*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 /* show line info */
                 s.str("");
                 (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "*Lines:" : s << " Lines:" ;
-                putText( _leftDetailsView, s.str(), Point(0,54+2*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(0,54+2*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
                 s.str("/") ;
                 for( i = 0 ; i < viewData.rows; i++ ){
                     if( GET_SWITCHER_STATUS(linesSwitchers,i) ){
                         s << i + 1 << '/' ;
                     }
                 }
-                putText( _leftDetailsView, s.str(), Point(20,54+3*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+3*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 /* show scale info */
                 s.str("");
                 (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "*Scale:" : s << " Scale:" ;
-                putText( _leftDetailsView, s.str(), Point(0,54+4*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(0,54+4*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
                 s.str("") ;
                 s << scale ;
-                putText( _leftDetailsView, s.str(), Point(20,54+5*14), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+5*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
 #if 1
+                int info_idx = 4 ;
+
                 /* show details info */
                 if(lockScreen){
                     double  _d = 0 ;
                     long    _l = 0 ;
                     Scalar  _color ;
-                    int     _idx = 4 ;
 
                     for(int i = 0; i < gLinesData.rows; i++){
                         _d = gLinesData.at<double>(i,dtlsIdx) ;
                         _color = lineColors[i] ;
                         s.str("");
-                        s << " line-" << i+1 << "=" << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
-                        putText( _leftDetailsView, s.str(), Point(0,120+(_idx++)*14), 0, 0.4, _color, 0, LINE_AA );
+                        s << " line-" << i+1 << " = " << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
+                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+                    }
+                }
+
+                /* show measures */
+                if (measureIdx >= 0) {
+                    assert(lockScreen);
+                    info_idx += 4 ;
+
+                    int _days = 0 ;
+                    int _dataS = 0 ;
+                    int _dataE = 0 ;
+                    double _d = 0 ;
+                    Scalar  _color ;
+                    Mat _m ;
+
+                    if(dtlsIdx > measureIdx){
+                        _dataS = measureIdx + 1 ;       // plus 1, not include the first(start) day
+                        _dataE = dtlsIdx ;
+                    }else{
+                        _dataS = dtlsIdx + 1 ; // plus 1, not include the first(start) day
+                        _dataE = measureIdx ;
+                    }
+                    _days = _dataE - _dataS + 1 ;
+
+                    s.str("");
+                    s << " Dur-" << _days;
+                    putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, Scalar(255,255,255), 0, LINE_AA );
+
+                    for(i=0; i<gLinesData.rows; i++) {
+                        Mat _lineData = gLinesData.row(i) ;
+
+                        /* amp-custom */
+                        if(_days<=0||_lineData.at<double>(0,measureIdx)<=0) {
+                            _d = 0;
+                        }
+                        else {
+                            double a = round(_lineData.at<double>(0,dtlsIdx) * 100);
+                            double b = round(_lineData.at<double>(0,measureIdx) * 100);
+                            _d = (a-b)/b*100;
+                        }
+
+                        _color = lineColors[i] ;
+                        s.str(""); s << " line-" << i+1 << " = ";
+                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        _color = (_d>0) ? Scalar(0,0,255) : ((_d<0) ? Scalar(0,255,0) : Scalar(255,255,255)) ;
+                        s.str(""); s << setiosflags(ios::fixed) << setprecision(2) << abs(_d) << "%" ;
+                        putText( _leftDetailsView, s.str(), Point(80,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+#if 0
+                        /* total_amp-custom */
+                        s.str("");
+                        _d = (_days>0)? _getTT(gValData.colRange(_dataS,_dataE+1), _m, _days, true, true)/10000000.0 : 0 ;
+                        _color = Scalar(255,0,0) ;
+                        s << " VALT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        /* total_exchange-custom */
+                        s.str("");
+                        _d = (_days>0)? _getTT(gXcgData.colRange(_dataS,_dataE+1), _m, _days, true, true) : 0 ;
+                        _color = Scalar(255,0,0) ;
+                        s << " XCGT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        /* average-custom */
+                        s.str("");
+                        _d = (_days>0)? _getAvg(_focusLineData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
+                        _color = Scalar(255,0,0) ;
+                        s << " AVG-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        /* rsi-custom */
+                        s.str("");
+                        _d = (rsiCustom>0) ? _getUpDnRateIndexer(gAmpData.colRange(_dataS,_dataE+1), gRsiCustomData, _dataE - _dataS + 1, false, true) : 0 ;
+                        _color = (_d>=85) ? Scalar(0,0,255)
+                                          : (_d<=15) ? Scalar(0,255,0)
+                                                     : Scalar(200,200,200) ;
+                        s << " RSI-" << rsiCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        /* pwri-custom */
+                        s.str("");
+                        _d = (pwriCustom>0) ? _getUpDnRateIndexer(gPwrData.colRange(_dataS,_dataE+1), gPwriCustomData, _dataE - _dataS + 1, false, true) : 0 ;
+                        _color = (_d>=85) ? Scalar(0,0,255)
+                                          : (_d<=15) ? Scalar(0,255,0)
+                                                     : Scalar(200,200,200) ;
+                        s << " PWRI-" << pwriCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+                        /* xcg-custom */
+                        s.str("");
+                        _d = (xcgAvgICustom>0) ? _getUpDnRateIndexer(gXcgData.colRange(_dataS,_dataE+1), gXcgAvgICustomData, _dataE - _dataS + 1, true, true) : 0 ;
+                        _color = (_d>=85) ? Scalar(0,0,255)
+                                          : (_d<=15) ? Scalar(0,255,0)
+                                                     : Scalar(200,200,200) ;
+                        s << " XCG-" << xcgAvgICustom << "="  << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
+                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+#endif
                     }
                 }
 #endif
@@ -862,21 +980,31 @@ int main( int argc, char** argv )
             case ';':
             case ':':
                 lockScreen = !lockScreen ;
-                calc_data_range(false, true);
+                calc_data_range(false, true, true);
                 refresh = true ;
                 break ;
             case 'r':
-                dataRangeEnd = 0; winH = MAX_WIN_HEIGHT/2; winW = MAX_WIN_WIDTH/2;
+                dtlsIdx = -1;
+                measureIdx = -1;
+                dataRangeStart = 0;
+                dataRangeEnd = 0;
+                winH = MAX_WIN_HEIGHT/2; winW = MAX_WIN_WIDTH/2;
                 CLEAN_SWITCHERS(baseLineSwitchers);
                 SETALL_SWITCHERS(linesSwitchers);
                 digtFuncIdx = 2 ;
                 scale = 1 ;
                 autoFit = false ;
                 lockScreen = false ;
-                //dtlsIdx = RESET_DTLS_INDEX;
-                calc_data_range(true, true);
+                calc_data_range(true, true, true);
                 refresh = true ;
                 break ;
+            case 'M':
+                if (!lockScreen) {
+                    break;
+                }
+                measureIdx = dtlsIdx;
+                refresh = true ;
+                break;
             case 'p':       // print current view info
                 printViewInfo(true);
                 refresh = false ;
@@ -949,7 +1077,7 @@ int main( int argc, char** argv )
                         dataRangeStart = dtlsIdx;
                     }
                 }
-                calc_data_range(false, false);
+                calc_data_range(false, false, false);
                 refresh = true ;
                 break ;
             case '$':
@@ -978,7 +1106,7 @@ int main( int argc, char** argv )
                         dataRangeEnd += step_mv_act ;
                     }
                 }
-                calc_data_range(dataRangeEnd > gLinesData.cols, false);
+                calc_data_range(dataRangeEnd > gLinesData.cols, false, false);
                 refresh = true ;
                 break ;
             case 'j':   // switch the 0~9 keys function
