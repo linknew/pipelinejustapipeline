@@ -100,8 +100,8 @@ int dataRangeStart=80000;   // all x-coordinate SHOULD(MUST!!) base on the dataR
 int dtlsIdx = RESET_DTLS_INDEX ;
 int winW = MAX_WIN_WIDTH ;
 int winH = MAX_WIN_HEIGHT ;
-Mat _panel, _mainView, _bottomView, _topStatus_view, _leftDetailsView ;
-Mat _linesData ;
+Mat gPanel, gMainView, _bottomView, _topStatus_view, _leftDetailsView ;
+Mat gLinesData ;
 
 int drawLines(
         const Mat&      linesData,
@@ -382,10 +382,10 @@ int zoom_klines(int scale_)
         if(sN < 0){
             sN = 0 ;
         }
-        eN = min(sN + N_DATA_OF_CUR_VIEW(_mainView.cols, scale_),_linesData.cols) ;
-        if(!lockScreen && eN -sN < N_DATA_OF_CUR_VIEW(_mainView.cols, scale_)){
+        eN = min(sN + N_DATA_OF_CUR_VIEW(gMainView.cols, scale_),gLinesData.cols) ;
+        if(!lockScreen && eN -sN < N_DATA_OF_CUR_VIEW(gMainView.cols, scale_)){
             /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
-            _adjust = min(sN, N_DATA_OF_CUR_VIEW(_mainView.cols, scale_) - (eN-1 - sN + 1)) ;
+            _adjust = min(sN, N_DATA_OF_CUR_VIEW(gMainView.cols, scale_) - (eN-1 - sN + 1)) ;
             sN -= _adjust ;
         }
 
@@ -482,15 +482,15 @@ void initColor(int num)
 
 void calc_data_range(bool reset_start, bool reset_dtls)
 {
-    if(reset_start) dataRangeStart = _linesData.cols - N_DATA_OF_CUR_VIEW(_mainView.cols,scale) ;
+    if(reset_start) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
     if(dataRangeStart < 0) dataRangeStart = 0 ;
-    if(dataRangeStart > _linesData.cols-1) dataRangeStart = _linesData.cols-1 ;
-    dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(_mainView.cols,scale) ;
-    if(dataRangeEnd > _linesData.cols) dataRangeEnd = _linesData.cols ;
+    if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
+    dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
+    if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
 
     if(reset_dtls) dtlsIdx = (dataRangeEnd + (dataRangeStart-1) )/2 ;
     if(dtlsIdx < 0) dtlsIdx = 0 ;
-    if(dtlsIdx > _linesData.cols-1) dtlsIdx = _linesData.cols-1 ;
+    if(dtlsIdx > gLinesData.cols-1) dtlsIdx = gLinesData.cols-1 ;
 }
 
 int main( int argc, char** argv )
@@ -618,9 +618,9 @@ int main( int argc, char** argv )
         _linesNum = atoi(_args[2]) ;
         _linesLen = atoi(_args[3]) ;
         if(linesGrpInfo.empty()) for(int _i=0; _i<_linesNum; _i++) linesGrpInfo.push_back(1) ;
-        importData(_dataFile, _linesNum, _linesLen, _linesData) ;
-        assert(_linesNum==_linesData.rows) ;
-        assert(_linesLen==_linesData.cols) ;
+        importData(_dataFile, _linesNum, _linesLen, gLinesData) ;
+        assert(_linesNum==gLinesData.rows) ;
+        assert(_linesLen==gLinesData.cols) ;
         assert(idxFocusedLine<_linesNum && idxFocusedLine>=0) ;
         assert(scale>=1 && scale<=MAX_SCALE) ;
         initColor(_linesNum) ;
@@ -647,19 +647,19 @@ int main( int argc, char** argv )
 
             /* adust panle and views */
             {
-                _panel.create(winH,winW,CV_8UC3) ;
-                _panel.setTo(Scalar(0));
+                gPanel.create(winH,winW,CV_8UC3) ;
+                gPanel.setTo(Scalar(0));
                 if(lockScreen){
-                    _mainView   = _panel( Rect(LEFT_VIEW_W, 30, _panel.cols-LEFT_VIEW_W-10, _panel.rows-30-80) );
-                    _bottomView = _panel( Rect(LEFT_VIEW_W, _panel.rows - 80, _mainView.cols, 80) ) ;
+                    gMainView   = gPanel( Rect(LEFT_VIEW_W, 30, gPanel.cols-LEFT_VIEW_W-10, gPanel.rows-30-80) );
+                    _bottomView = gPanel( Rect(LEFT_VIEW_W, gPanel.rows - 80, gMainView.cols, 80) ) ;
                 }else{
-                    //_mainView   = _panel( Rect(0, 30, _panel.cols-10, _panel.rows-30-80) ) ;
-                    //_bottomView = _panel( Rect(0, _panel.rows - 80, _mainView.cols, 80) ) ;
-                    _mainView   = _panel( Rect(LEFT_VIEW_W, 30, _panel.cols-LEFT_VIEW_W-10, _panel.rows-30-80) );
-                    _bottomView = _panel( Rect(LEFT_VIEW_W, _panel.rows - 80, _mainView.cols, 80) ) ;
+                    //gMainView   = gPanel( Rect(0, 30, gPanel.cols-10, gPanel.rows-30-80) ) ;
+                    //_bottomView = gPanel( Rect(0, gPanel.rows - 80, gMainView.cols, 80) ) ;
+                    gMainView   = gPanel( Rect(LEFT_VIEW_W, 30, gPanel.cols-LEFT_VIEW_W-10, gPanel.rows-30-80) );
+                    _bottomView = gPanel( Rect(LEFT_VIEW_W, gPanel.rows - 80, gMainView.cols, 80) ) ;
                 }
-                _topStatus_view = _panel.rowRange(0, 30) ;
-                _leftDetailsView = _panel.colRange(0, LEFT_VIEW_W) ;
+                _topStatus_view = gPanel.rowRange(0, 30) ;
+                _leftDetailsView = gPanel.colRange(0, LEFT_VIEW_W) ;
             }
 
             /* adjust data range,
@@ -668,27 +668,27 @@ int main( int argc, char** argv )
                 calc_data_range(true, false);
             }
 
-            /* adjust _linesData & _linesInfo */
+            /* adjust gLinesData & _linesInfo */
             {
                 int _idx = 0 ;
                 int _linesNum = 0 ;
-                Mat _m = _linesData.clone() ;
+                Mat _m = gLinesData.clone() ;
 
                 for(int i = 0; i < linesGrpInfo.size(); i++){
                     _linesNum = linesGrpInfo[i] ;
 
                     normalize(_m(Range(_idx,_idx+_linesNum), autoFit ? Range(dataRangeStart,dataRangeEnd) : Range::all()),
                               _m(Range(_idx,_idx+_linesNum), autoFit ? Range(dataRangeStart,dataRangeEnd) : Range::all()),
-                              0+1, _mainView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX); /* the upper_30 pixels for _linesInfo */
+                              0+1, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX); /* the upper_30 pixels for _linesInfo */
 
                     _idx += _linesNum ;
 
                 }
-                assert(_idx == _linesData.rows);
+                assert(_idx == gLinesData.rows);
 
                 viewData = _m.colRange(dataRangeStart,dataRangeEnd) ;
-                drawLines(viewData, _mainView, scale,
-                          Rect(LINE_MARGIN_L, LINE_MARGIN_T, _mainView.cols-LINE_MARGIN_L-LINE_MARGIN_R, _mainView.rows-LINE_MARGIN_T-LINE_MARGIN_B) );
+                drawLines(viewData, gMainView, scale,
+                          Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B) );
             }
 
             /* find focus on the lines which switcher is 'ON'.
@@ -703,8 +703,8 @@ int main( int argc, char** argv )
                         _lines.push_back( viewData.row(i) );
                 }
 
-                _getLinesFocus(_lines, _mainView,
-                         Rect(LINE_MARGIN_L, LINE_MARGIN_T, _mainView.cols - LINE_MARGIN_L - LINE_MARGIN_R, _mainView.rows - LINE_MARGIN_T - LINE_MARGIN_B)) ;
+                _getLinesFocus(_lines, gMainView,
+                         Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gMainView.rows - LINE_MARGIN_T - LINE_MARGIN_B)) ;
             }
 
             /* adjust details index line */
@@ -713,7 +713,7 @@ int main( int argc, char** argv )
                     //dtlsIdx = RESET_DTLS_INDEX ;
                 }else{
                     //if(RESET_DTLS_INDEX == dtlsIdx ) dtlsIdx  = (dataRangeEnd - dataRangeStart + 1)/2 ;
-                    //dtlsIdx  = min( min( N_DATA_OF_CUR_VIEW(_mainView.cols,scale) - 1, _linesData.cols - 1 ), dtlsIdx ) ;
+                    //dtlsIdx  = min( min( N_DATA_OF_CUR_VIEW(gMainView.cols,scale) - 1, gLinesData.cols - 1 ), dtlsIdx ) ;
                     //dtlsIdx  = max(0, dtlsIdx ) ;
 
                     /* draw a vertical line on the dtlsIdx  */
@@ -721,22 +721,22 @@ int main( int argc, char** argv )
                     Scalar  _color;
                     Size    _orgMatrixSize;
 
-                    _mainView.locateROI( _orgMatrixSize, _ofs );
+                    gMainView.locateROI( _orgMatrixSize, _ofs );
 
-                    for(int i = 0 ; i < _panel.rows; i++) {
+                    for(int i = 0 ; i < gPanel.rows; i++) {
                         if((i%20)<17){
-                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
-                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
-                            _panel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
                         }
                     }
 
                     /* draw a horizantl line */
-                    for(int i = LINE_MARGIN_L; i < _mainView.cols-LINE_MARGIN_R; i++){
+                    for(int i = LINE_MARGIN_L; i < gMainView.cols-LINE_MARGIN_R; i++){
                         if((i%20)<17){
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[0] = 127 ;
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[1] = 127 ;
-                            _mainView.at<Vec3b>(_mainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[2] = 127 ;
+                            gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[0] = 127 ;
+                            gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[1] = 127 ;
+                            gMainView.at<Vec3b>(gMainView.rows - 1 - LINE_MARGIN_B - viewData.at<double>(idxFocusedLine,dtlsIdx-dataRangeStart), i)[2] = 127 ;
                         }
                     }
 
@@ -804,8 +804,8 @@ int main( int argc, char** argv )
                     Scalar  _color ;
                     int     _idx = 4 ;
 
-                    for(int i = 0; i < _linesData.rows; i++){
-                        _d = _linesData.at<double>(i,dtlsIdx) ;
+                    for(int i = 0; i < gLinesData.rows; i++){
+                        _d = gLinesData.at<double>(i,dtlsIdx) ;
                         _color = lineColors[i] ;
                         s.str("");
                         s << " line-" << i+1 << "=" << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
@@ -816,9 +816,9 @@ int main( int argc, char** argv )
             }
 #endif
 
-            /* show _panel */
+            /* show gPanel */
             {
-                imshow("tmp",_panel) ;
+                imshow("tmp",gPanel) ;
                 moveWindow( "tmp", 0, 0);
                 refresh = false ;
             }
@@ -931,13 +931,13 @@ int main( int argc, char** argv )
                 if(!lockScreen) {
                     /**/ if(c=='^') step_mv_act = MAX_SUPPORTTED_LENGTH;
                     else if(c=='h') step_mv_act = 1;
-                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
                     dataRangeStart -= step_mv_act ;
                 }
                 else {
-                    /**/ if(c=='^') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale));
+                    /**/ if(c=='^') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale));
                     else if(c=='h') step_mv_act = 1;
-                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
                     if (dtlsIdx -  step_mv_act >= dataRangeStart) {
                         dtlsIdx -= step_mv_act;
                     }
@@ -958,14 +958,14 @@ int main( int argc, char** argv )
                 if(!lockScreen) {
                     /**/ if(c=='$') step_mv_act = MAX_SUPPORTTED_LENGTH;
                     else if(c=='l') step_mv_act = 1;
-                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
                     dataRangeStart += step_mv_act;
                     dataRangeEnd += step_mv_act ;
                 }
                 else {
-                    /**/ if(c=='$') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale));
+                    /**/ if(c=='$') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale));
                     else if(c=='l') step_mv_act = 1;
-                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(_mainView.cols,scale)/8);
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
                     if (dtlsIdx +  step_mv_act <= dataRangeEnd-1) {
                         dtlsIdx += step_mv_act;
                     }
@@ -978,7 +978,7 @@ int main( int argc, char** argv )
                         dataRangeEnd += step_mv_act ;
                     }
                 }
-                calc_data_range(dataRangeEnd > _linesData.cols, false);
+                calc_data_range(dataRangeEnd > gLinesData.cols, false);
                 refresh = true ;
                 break ;
             case 'j':   // switch the 0~9 keys function
