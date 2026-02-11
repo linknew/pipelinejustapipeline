@@ -103,6 +103,13 @@ int winH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, _bottomView, _topStatus_view, _leftDetailsView ;
 Mat gLinesData ;
 
+//@ mark mode
+//@ use m<key> to creat a mark with the name <key>
+//@ use '<key> to load the <key>_mark
+bool mark_start = 0;        //@ create a mark with the <key>
+bool load_mark = 0;         //@ load the <key>_mark
+std::map<char, int> mark;   //@ key->dtlsIdx
+
 int drawLines(
         const Mat&      linesData,
         const Mat&      panel,
@@ -495,6 +502,13 @@ void calc_data_range(bool reset_start, bool reset_dtls, bool reset_measure)
     if(reset_measure) measureIdx = -1;
 }
 
+uint64_t get_timestamp_ms()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+}
+
 int main( int argc, char** argv )
 {
 #if 0
@@ -713,39 +727,39 @@ int main( int argc, char** argv )
             {
                 if(!lockScreen){
                 }else{
-                    /* draw a vertical line on the dtlsIdx  */
                     Point   _ofs;
-                    Scalar  _color;
                     Size    _orgMatrixSize;
 
                     gMainView.locateROI( _orgMatrixSize, _ofs );
 
-                    for(int i = 0 ; i < gPanel.rows; i++) {
-                        if((i%20)<17){
-                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
-                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
-                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
+                    /* draw a vertical line for measure */
+                    if (lockScreen && measureIdx>=0) {
+                        int  _idx = 0 ;
+                        int  _pos = 0 ;
+
+                        _idx = measureIdx - dataRangeStart ;
+                        _pos = GET_POSITION_BY_VIEW_IDX(_idx,scale) ;
+
+                        if(_pos >= LINE_MARGIN_L && _pos <= gMainView.cols-1-LINE_MARGIN_R){
+                            for(int i = 0 ; i < gPanel.rows; i++) {
+                                if((i%20)>4){
+                                    gPanel.at<Vec3b>(i, _pos+_ofs.x )[0] = 0 ;
+                                    gPanel.at<Vec3b>(i, _pos+_ofs.x )[1] = 0 ;
+                                    gPanel.at<Vec3b>(i, _pos+_ofs.x )[2] = 255 ;
+                                }
+                            }
                         }
                     }
 
-                    /* draw a vertical line for measure */
-                    {
-                        if (lockScreen && measureIdx>=0) {
-                            int  _idx = 0 ;
-                            int  _pos = 0 ;
-
-                            _idx = measureIdx - dataRangeStart ;
-                            _pos = GET_POSITION_BY_VIEW_IDX(_idx,scale) ;
-
-                            if(_pos >= LINE_MARGIN_L && _pos <= gMainView.cols-1-LINE_MARGIN_R){
-                                for(int i = 0 ; i < gPanel.rows; i++) {
-                                    if((i%20)<17){
-                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[0] = 0 ;
-                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[1] = 0 ;
-                                        gPanel.at<Vec3b>(i, _pos+_ofs.x )[2] = 255 ;
-                                    }
-                                }
-                            }
+                    /* draw a vertical line on the dtlsIdx  */
+                    int     _color_r = (mark_start||load_mark)? 0   : 127;
+                    int     _color_g = (mark_start||load_mark)? 127 : 127;
+                    int     _color_b = (mark_start||load_mark)? 0   : 127;
+                    for(int i = 0 ; i < gPanel.rows; i++) {
+                        if((i%20)<16){
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = _color_b ;
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = _color_g ;
+                            gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = _color_r ;
                         }
                     }
 
@@ -781,6 +795,8 @@ int main( int argc, char** argv )
                         : 1 ;
 #endif
                 if(autoFit) s << " [Auto Fit]" ;
+                if(mark_start) s << " [marking]";
+                if(load_mark) s << " [marker]";
                 putText( _topStatus_view, s.str(), Point(0,22), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 s.str("") ;
@@ -953,9 +969,50 @@ int main( int argc, char** argv )
         }
 
         c = waitKey(1000000) ;
+        static uint64_t last_timestamp = 0;
+        uint64_t now = get_timestamp_ms();
+        uint64_t gap = now - last_timestamp;
+        last_timestamp = now;
+
+        if (mark_start) {
+            assert(lockScreen);
+            if(c>='a' && c<='z') {
+                mark[c] = dtlsIdx;
+            }
+            if(c>0) {
+                mark_start = false;
+                refresh = true ;
+            }
+            continue;
+        }
+
+        if (load_mark) {
+            assert(lockScreen);
+            if(mark.find(c) != mark.end()) {
+                if(mark[c] != dtlsIdx) {
+                    int new_idx = mark[c];
+                    mark['\''] = dtlsIdx;   //@ update last_mark
+                    dtlsIdx = new_idx;
+                    if (dataRangeStart > dtlsIdx) {
+                        dataRangeStart = dtlsIdx;
+                        calc_data_range(false, false, false);
+                    }
+                    if (dataRangeEnd < dtlsIdx+1) {
+                        dataRangeStart += dtlsIdx+1 - dataRangeEnd;
+                        calc_data_range(false, false, false);
+                    }
+                }
+            }
+            if(c>0) {
+                load_mark = false;
+                refresh = true ;
+            }
+            continue;
+        }
+
         if ('q' == c) break ;
 
-        switch(c){
+        switch(c) {
 
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
@@ -998,12 +1055,24 @@ int main( int argc, char** argv )
                 calc_data_range(true, true, true);
                 refresh = true ;
                 break ;
-            case 'M':
-                if (!lockScreen) {
-                    break;
+            case 'm':
+                if(lockScreen) {
+                    mark_start = true;
                 }
-                measureIdx = dtlsIdx;
-                refresh = true ;
+                refresh = true;
+                break;
+            case '\'':
+                if(lockScreen) {
+                    load_mark = true;
+                }
+                refresh = true;
+                break;
+            case 'M':
+                if (lockScreen) {
+                    measureIdx = dtlsIdx;
+                    mark['M'] = dtlsIdx;    //@ auto mark 'M'
+                    refresh = true ;
+                }
                 break;
             case 'p':       // print current view info
                 printViewInfo(true);
@@ -1059,13 +1128,17 @@ int main( int argc, char** argv )
                 if(!lockScreen) {
                     /**/ if(c=='^') step_mv_act = MAX_SUPPORTTED_LENGTH;
                     else if(c=='h') step_mv_act = 1;
-                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
                     dataRangeStart -= step_mv_act ;
                 }
                 else {
                     /**/ if(c=='^') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale));
                     else if(c=='h') step_mv_act = 1;
-                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
+                    else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
+                    if (gap>=3000) {
+                        printf("%ld-----\n", gap);
+                        mark['\''] = dtlsIdx;
+                    }
                     if (dtlsIdx -  step_mv_act >= dataRangeStart) {
                         dtlsIdx -= step_mv_act;
                     }
@@ -1086,14 +1159,18 @@ int main( int argc, char** argv )
                 if(!lockScreen) {
                     /**/ if(c=='$') step_mv_act = MAX_SUPPORTTED_LENGTH;
                     else if(c=='l') step_mv_act = 1;
-                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
                     dataRangeStart += step_mv_act;
                     dataRangeEnd += step_mv_act ;
                 }
                 else {
                     /**/ if(c=='$') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale));
                     else if(c=='l') step_mv_act = 1;
-                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/8);
+                    else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
+                    if (gap>=3000) {
+                        printf("%ld!-----\n", gap);
+                        mark['\''] = dtlsIdx;
+                    }
                     if (dtlsIdx +  step_mv_act <= dataRangeEnd-1) {
                         dtlsIdx += step_mv_act;
                     }
@@ -1109,6 +1186,14 @@ int main( int argc, char** argv )
                 calc_data_range(dataRangeEnd > gLinesData.cols, false, false);
                 refresh = true ;
                 break ;
+            case 'J':
+            case 'K':
+                if(lockScreen) {
+                    idxFocusedLine += c=='J'? 1 : -1;
+                    idxFocusedLine = (idxFocusedLine + gLinesData.rows) % gLinesData.rows;
+                    refresh = true;
+                }
+                break;
             case 'j':   // switch the 0~9 keys function
                 digtFuncIdx = ( digtFuncIdx + 1 ) % ( sizeof( digtFuncList )/sizeof( digtFuncPt ) );
                 refresh = true ;

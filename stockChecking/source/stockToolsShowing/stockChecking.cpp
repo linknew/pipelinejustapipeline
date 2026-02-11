@@ -69,7 +69,7 @@
 #define  GET_POSITION_BY_VIEW_IDX(index, scale)   ( (index) * (scale) + (scale)/2 + (LINE_MARGIN_L) )
 #define  GET_FIRST_IDX_OF_DATA_ON_VIEW(view,data,scale)   max(0,data.cols-N_DATA_OF_CUR_VIEW(view.cols,scale))
 
-#define  IS_BIG_DISK(stockId)   (stockId=="1399001" || stockId=="1399006" || stockId=="0000001" || stockId=="0000300")
+#define  IS_BIG_DISK(stockId)   (stockId=="1399001" || stockId=="1399006" || (stockId.size()==7 && stockId[0]=='0' && stockId[1]=='0') )
 #define  PRINT_INFO(lastN)                                                                                        \
 {                                                                                                                   \
     /*  (1)stockID,        (2)closePrice,  (3)power,       (4)amplitude,  (5)trueAmplitude,  (6)rsi6           (7)rsi12,      */    \
@@ -197,7 +197,9 @@ enum SYS_SWITCH_KEY{
     SHOW_FORECAST,
     LOCK_SCREEN,
     SHOW_DAILY,
-    AUTO_FIT
+    AUTO_FIT,
+    SET_MARK,
+    LOAD_MARK
 } ;
 
 /* declare for daily */
@@ -290,6 +292,12 @@ Mat gPanel, gMainView, gBottomView, gIndexView, gTopStatus_view, gLeftDetailsVie
 Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gAmpData, gXcgData, gVolData, gValData, gLvalData,
     gKLine5, gKLine22, gKLine66, gKLine132, gKLine264,
     gPwrData, gDateData, gEgrData, gRsi6Data, gRsi12Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri12Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
+
+//@ mark mode
+//@ use m<key> to creat a mark with the name <key>
+//@ use '<key> to load the <key>_mark
+std::map<char, int> mark;   //@ key->dtlsIdx
+
 
 #define DAILY_PANEL_W       (MAX_DAILY_CNT+60)
 #define DAILY_PANEL_H_SMALL (MAX_WIN_HEIGHT/4-16)
@@ -1483,15 +1491,21 @@ int doDigitalFunc(char c)
     return digtFuncList[ digtFuncIdx ](c) ;
 }
 
-void calc_data_range(bool reset_start, bool reset_dtls)
+void calc_data_range(bool reset_start, bool reset_dtls, bool reset_measure)
 {
     if(reset_start) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-
     if(dataRangeStart < 0) dataRangeStart = 0 ;
     if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
-
     dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
     if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
+
+#if 0
+    if(reset_dtls) dtlsIdx = (dataRangeEnd + (dataRangeStart-1) )/2 ;
+    if(dtlsIdx < 0) dtlsIdx = 0 ;
+    if(dtlsIdx > gLinesData.cols-1) dtlsIdx = gLinesData.cols-1 ;
+
+    if(reset_measure) measureIdx = -1;
+#endif
 }
 
 void _doRefreshView(void)
@@ -1536,7 +1550,7 @@ void _doRefreshView(void)
     /* adjust data range,
        all x-coordinate SHOULD(MUST!!) base on the dataRangeStart(NOT the dataRangeStart) */
     {
-        calc_data_range(dataRangeStart==DATA_RANGE_UNSET, false/*unused*/);
+        calc_data_range(dataRangeStart==DATA_RANGE_UNSET, false/*unused*/, false/*unused*/);
     }
 
     /* adjust gLinesData & gLinesInfo */
@@ -2202,20 +2216,10 @@ void _doRefreshView(void)
             cout << "start=" << dataRangeStart << " dtlsIdx=" << dtlsIdx << " end=" << dataRangeEnd << endl ;
             */
 
-            /* draw a vertical line on the dtlsIdx  */
             Point   _ofs;
-            Scalar  _color;
             Size    _orgMatrixSize;
 
             gMainView.locateROI( _orgMatrixSize, _ofs );
-
-            for(int i = 0 ; i < gPanel.rows; i++) {
-                if((i%20)<17){
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = 127 ;
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = 127 ;
-                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = 127 ;
-                }
-            }
 
             /* draw a vertical line for measure */
             {
@@ -2237,7 +2241,7 @@ void _doRefreshView(void)
 
                     if(_pos >= LINE_MARGIN_L && _pos <= gMainView.cols-1-LINE_MARGIN_R){
                         for(int i = 0 ; i < gPanel.rows; i++) {
-                            if((i%20)<17){
+                            if((i%20)>4){
                                 gPanel.at<Vec3b>(i, _pos+_ofs.x )[0] = 0 ;
                                 gPanel.at<Vec3b>(i, _pos+_ofs.x )[1] = 0 ;
                                 gPanel.at<Vec3b>(i, _pos+_ofs.x )[2] = 255 ;
@@ -2246,6 +2250,18 @@ void _doRefreshView(void)
                     }
                 }else{
                     measureIdx = IDX_RANGE_UNSET ;
+                }
+            }
+
+            /* draw a vertical line on the dtlsIdx  */
+            int _color_r = (GET_SWITCHER_STATUS(sysSwitchers,SET_MARK)||GET_SWITCHER_STATUS(sysSwitchers,LOAD_MARK))? 0   : 127;
+            int _color_g = (GET_SWITCHER_STATUS(sysSwitchers,SET_MARK)||GET_SWITCHER_STATUS(sysSwitchers,LOAD_MARK))? 127 : 127;
+            int _color_b = (GET_SWITCHER_STATUS(sysSwitchers,SET_MARK)||GET_SWITCHER_STATUS(sysSwitchers,LOAD_MARK))? 0   : 127;
+            for(int i = 0 ; i < gPanel.rows; i++) {
+                if((i%20)<16){
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[0] = _color_b ;
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[1] = _color_g ;
+                    gPanel.at<Vec3b>(i, GET_POSITION_BY_VIEW_IDX(dtlsIdx-dataRangeStart,scale)+_ofs.x )[2] = _color_r ;
                 }
             }
 
@@ -2282,6 +2298,8 @@ void _doRefreshView(void)
                 ? s << " [Backward Fixing]"
                 : 1 ;*/
         if(GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT)) s << " [Auto Fit]" ;
+        if(GET_SWITCHER_STATUS(sysSwitchers,SET_MARK)) s << " [Marking]";
+        if(GET_SWITCHER_STATUS(sysSwitchers,LOAD_MARK)) s << " [Marker]";
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_RSI_CUSTOM - DATA_TYPE_RSI6)) s << " [RSI_CUSTOM:" << rsiCustom <<"]";
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_PWRI_CUSTOM - DATA_TYPE_RSI6)) s << " [PWRI_CUSTOM:" << pwriCustom <<"]";
         if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_XCGI_CUSTOM - DATA_TYPE_RSI6)) s << " [XCGI_CUSTOM:" << xcgAvgICustom <<"]";
@@ -2846,9 +2864,22 @@ int _doDefault(char c)
             }
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             break ;
+        case 'm':
+            if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
+                SET_SWITCHER_STATUS(&sysSwitchers, SET_MARK) ;
+            }
+            SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+            break;
+        case '\'':
+            if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN)){
+                SET_SWITCHER_STATUS(&sysSwitchers, LOAD_MARK) ;
+            }
+            SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+            break;
         case 'M':
             if(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN))
             {
+                mark['M'] = dtlsIdx;    //@ auto mark 'M'
                 TOGGLE_SWITCH(&sysSwitchers, MEASURE) ;
                 SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             }
@@ -2861,6 +2892,8 @@ int _doDefault(char c)
             dataRangeStart = DATA_RANGE_UNSET ;
             RESET_SWITCHER_STATUS(&sysSwitchers,LOCK_SCREEN) ;
             RESET_SWITCHER_STATUS(&sysSwitchers,SHOW_DAILY) ;
+            RESET_SWITCHER_STATUS(&sysSwitchers,SET_MARK) ;
+            RESET_SWITCHER_STATUS(&sysSwitchers,LOAD_MARK) ;
             dtlsIdx = IDX_RANGE_UNSET;
             rsiCustom = 0 ;
             pwriCustom = 0 ;
@@ -3057,10 +3090,13 @@ int _doDefault(char c)
             }
             break ;
         case 'J':
+        case 'K':
             {
                 if(GET_SWITCHER_STATUS(sysSwitchers, LOCK_SCREEN)) {
                     int last_idx = DATA_TYPE_LOW - DATA_TYPE_CLOSE;
-                    if (++idxFocusedLine > last_idx) idxFocusedLine = 0;
+                    idxFocusedLine += c=='J'? 1 : -1;
+                    if (idxFocusedLine > last_idx) idxFocusedLine = 0;
+                    if (idxFocusedLine < 0) idxFocusedLine = last_idx;
                     SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
                 }
             }
@@ -3124,6 +3160,13 @@ void block_signals()
         perror("pthread_sigmask failed");
         exit(EXIT_FAILURE);
     }
+}
+
+uint64_t get_timestamp_ms()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
 }
 
 int main( int argc, char** argv )
@@ -3380,7 +3423,8 @@ int main( int argc, char** argv )
             }
 
             if(_i<gDateData.cols){
-                measureIdx = _i ;
+                measureIdx = _i;
+                mark['M'] = _i;    //@ auto mark 'M'
                 dataRangeStart = max(0, measureIdx - N_DATA_OF_CUR_VIEW(gPanelW-LEFT_VIEW_W-10, scale)/2) ;
                 SET_SWITCHER_STATUS(&sysSwitchers,MEASURE) ;
                 SET_SWITCHER_STATUS(&sysSwitchers,LOCK_SCREEN) ;
@@ -3396,7 +3440,47 @@ int main( int argc, char** argv )
         }
 
         _c = 0 ;
-        _c = waitKey(1000) ;
+        _c = waitKey(1000*100) ;
+        static uint64_t last_timestamp = 0;
+        uint64_t now = get_timestamp_ms();
+        uint64_t gap = now - last_timestamp;
+        last_timestamp = now;
+
+        if (GET_SWITCHER_STATUS(sysSwitchers,SET_MARK)) {
+            assert(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN));
+            if(_c>='a' && _c<='z') {
+                mark[_c] = dtlsIdx;
+            }
+            if(_c > 0) {
+                TOGGLE_SWITCH(&sysSwitchers,SET_MARK) ;
+                SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+            }
+            continue;
+        }
+
+        if (GET_SWITCHER_STATUS(sysSwitchers,LOAD_MARK)) {
+            assert(GET_SWITCHER_STATUS(sysSwitchers,LOCK_SCREEN));
+            if(mark.find(_c) != mark.end()) {
+                if(mark[_c] != dtlsIdx) {
+                    int new_idx = mark[_c];
+                    mark['\''] = dtlsIdx;   //@ update last_mark
+                    dtlsIdx = new_idx;
+                    if (dataRangeStart > dtlsIdx) {
+                        dataRangeStart = dtlsIdx;
+                        calc_data_range(false, false, false);
+                    }
+                    if (dataRangeEnd < dtlsIdx+1) {
+                        dataRangeStart += dtlsIdx+1 - dataRangeEnd;
+                        calc_data_range(false, false, false);
+                    }
+                }
+            }
+            if(_c > 0) {
+                TOGGLE_SWITCH(&sysSwitchers, LOAD_MARK) ;
+                SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+            }
+            continue;
+        }
 
 #if 0
         //preProcess(_c) ;

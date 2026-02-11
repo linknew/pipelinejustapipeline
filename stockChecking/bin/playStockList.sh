@@ -300,10 +300,10 @@ fi
 #star the loop
 
 if (( _cmdCode & (_cmdCodeUpdate|_cmdCodeDownload|_cmdCodeDoDailyHomework|_cmdCodeJustDoit) )) ; then
-    showHi "*Download 1000001 for the base of systemSync\n" >&2
+    showHi "*Download 0000001 for the base of systemSync\n" >&2
     ./getStockData.$$.sh --login --owner=$_owner || doExit 2
-    ./getStockData.$$.sh --update --owner=$_owner 1000001 2>/dev/null
-    _dateEnd=$(grep "'000001" ~/StockData/100000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
+    ./getStockData.$$.sh --update --owner=$_owner 0000001 2>/dev/null
+    _dateEnd=$(grep "'000001" ~/StockData/000000-.package.html.org 2>/dev/null | sed -n '${s/ .*//; s/-//g; p;}')
     _dateEnd=${_dateEnd:-$(date "+%Y%m%d")}
 fi
 

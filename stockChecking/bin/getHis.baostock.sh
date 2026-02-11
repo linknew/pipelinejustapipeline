@@ -96,8 +96,7 @@ mkfifo $fifo_res || {
 }
 
 #@ fix code
-if   [[ ${code} == 000001 || $code == 0000001 ]]; then code=sh.000001   # 沪指
-elif [[ ${#code} -eq 7 && ${code:0:1} == '0' ]]; then code=sh.${code:1}
+if   [[ ${#code} -eq 7 && ${code:0:1} == '0' ]]; then code=sh.${code:1}
 elif [[ ${#code} -eq 7 && ${code:0:1} == '1' ]]; then code=sz.${code:1}
 elif [[ ${#code} -eq 6 && ( ${code:0:1} == '6' || ${code:0:1} == '9' ) ]]; then code=sh.${code}
 else code=sz.${code}

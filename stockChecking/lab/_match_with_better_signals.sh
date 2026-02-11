@@ -1,7 +1,25 @@
+#! /bin/bash
+
+Usage()
+{
+    echo -ne "
+    Usage:
+        $(basename $0) <seg_data> [-|+]<fix> <YYY-MM-DD>
+
+    Examples:
+        $(basename $0) .t3.seg.lvl3  0              # get today's better signal stocks from .t3.seg.lvl4
+        $(basename $0) .t3.seg.lvl3 -1              # get tomorrow's worse signal stocks from .t3.seg.lvl4
+        $(basename $0) .t3.seg.lvl3 +2              # get the day after tomorrow's high risk signal stocks
+        $(basename $0) .t3.seg.lvl3  0  2026-02-10  # get 2026-02-10's better signal stocks 
+        $(basename $0) .t3.seg.lvl3  0  2026-02-.*  # get 2026-02's better signal stocks
+
+    " >&2
+}
 
 seg_data=$1
 fix=${2:-0}                         #@ 0:today 1:tomorrow 2:after_tomorrow ...
 today=${3:-$(date +%Y-%m-%d)}
+today=$(echo $today | sed 's/\./\\S/g')
 
 #better_signals="
 #[1k<5k<22k<66k<264k<132k]-4_[1k<5k<22k<66k<264k<132k]-5_[5k<1k<22k<66k<264k<132k]
@@ -12,13 +30,19 @@ today=${3:-$(date +%Y-%m-%d)}
 #"
 
 better_signals="
-[1k<5k<22k<264k<132k<66k]_[1k<5k<22k<264k<132k<66k]-1_[1k<5k<22k<264k<132k<66k]-2_[5k<1k<22k<264k<132k<66k]         #+15261.59  13  5  0.62
-[1k<5k<22k<66k<264k<132k]-3_[1k<5k<22k<66k<264k<132k]-4_[1k<5k<22k<66k<264k<132k]-5_[5k<1k<22k<66k<264k<132k]       #+10847.42  11  1  0.91
+#[1k<5k<22k<264k<132k<66k]_[1k<5k<22k<264k<132k<66k]-1_[1k<5k<22k<264k<132k<66k]-2_[5k<1k<22k<264k<132k<66k]         #+15261.59  13  5  0.62
+#[1k<5k<22k<66k<264k<132k]-3_[1k<5k<22k<66k<264k<132k]-4_[1k<5k<22k<66k<264k<132k]-5_[5k<1k<22k<66k<264k<132k]       #+10847.42  11  1  0.91
+#
+#[264k<1k<5k<132k<22k<66k]-1_[264k<1k<5k<132k<22k<66k]-2                                                             #+14402.59   208   102        0.51
+[1k<5k<22k<264k<66k<132k]-2_[1k<5k<22k<264k<66k<132k]-3_[1k<5k<22k<264k<66k<132k]-4_[1k<5k<22k<264k<66k<132k]-5_[1k<5k<22k<264k<66k<132k]-6_[1k<5k<22k<264k<66k<132k]-7     #+10767.61  9  3  0.67 .better.signals..t22.segData.lvl6.all.2016
 "
 
 worse_signals="
 [1k<5k<22k<264k<66k<132k]-3_[5k<1k<22k<264k<66k<132k]_[5k<1k<22k<264k<66k<132k]-1_[5k<1k<22k<264k<66k<132k]-2       #-1032.86   5   3  0.40
 [264k<132k<1k<5k<22k<66k]-1_[264k<132k<5k<1k<22k<66k]_[264k<132k<5k<1k<22k<66k]-1_[264k<132k<1k<5k<22k<66k]         #-102.28    10  4  0.60
+#
+[264k<132k<5k<1k<22k<66k]-2_[264k<132k<1k<5k<22k<66k]@-        1947.96    12    7          0.42.dur3.better.signals.2011lvl2
+[66k<22k<5k<1k<132k<264k]-4_[66k<22k<1k<5k<132k<264k]@-        1188.66    5     4          0.20.dur3.better.signals.2020lvl2
 "
 
 high_risk_signals="
@@ -32,6 +56,8 @@ high_risk_signals="
 [1k<5k<22k<66k<132k<264k]-1_[1k<5k<22k<66k<132k<264k]-2_[1k<5k<22k<66k<132k<264k]-3_[1k<5k<22k<66k<132k<264k]-4      #302686.22  1051  506        0.52
 "
 
+[[ $1 == -h || $1 == --help ]] && { Usage; exit; }
+
 if [[ ${fix:0:1} == '-' ]]; then
     fix=${fix:1};
     signals="$worse_signals";
@@ -42,11 +68,11 @@ else
     signals="$better_signals";
 fi
 
-bs=$(echo "$signals" | sed 's/[ \t]*#.*//; /^[ \t]*$/d; s/\(_[^_]*\)\{'$fix'\}$//;')
-bs=$(echo "$bs" | sed 's/\[\|\]/\\&/g; s/$/\\s/;')
+sig_pats=$(echo "$signals" | sed 's/[ \t]*#.*//; /^[ \t]*$/d; s/\(_[^_]*\)\{'$fix'\}$//;')
+sig_pats=$(echo "$sig_pats" | sed 's/\[\|\]/\\&/g; s/$/\\s/;')
 
-echo -en "\n* match $today's stocks in $seg_data with\n$signals---\n$bs\n\n" >&2
-grep -f <(echo "$bs") $seg_data | grep "$today ....[^-]" | awk '{ print $NF, "#"$1, $9;}' | sed 's,^.*/, ,; s,.raw,,;'
+echo -en "\n* match $today's stocks in $seg_data with\n$signals---\n$sig_pats\n\n" >&2
+grep -f <(echo "$sig_pats") $seg_data | grep " $today ....[^-]" | awk '{ print $NF, "#"$1, $9;}' | sed 's,^.*/, ,; s,.raw,,;'
 
 
 

@@ -23,17 +23,18 @@ GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_
 Usage()
 {
     echo -ne "
-    Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>]                        \\
-        [--start=YYYY-MM-DD] [--end=YYYY-MM-DD]                             \\
-        [--genSegment] [--genCounting] [--doForecast] [--build] [--help]    \\
-        /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/                        \\
+    Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>]                             \\
+        [--start=YYYY-MM-DD] [--end=YYYY-MM-DD]                                     \\
+        [--genSegment [--abb]] [--genCounting] [--doForecast] [--build] [--help]    \\
+        /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/                                \\
         list
 
         --dur, forecast duration
         --serialLvl, signal width for forecast, please check the example in serialize2.sh
         --start, input data range
         --end, input data range
-        --genSegment, generate segment data
+        --genSegment, generate segment data. if --abb is present, use abberivation serialized signals
+        --abb, **** FIXME, multiple processes, merge abbs
         --genCounting, gencounting data
         --build, is the abbrevation of --genSegment --genCounting
         --doForecast, forecast, will set --doForecast to 1 and set --genSegment=1
@@ -67,6 +68,7 @@ do
     [[ ${i%%=*} == "--buyFix" ]] && buyFix=${i##*=} && continue
     [[ ${i%%=*} == "--selFix" ]] && selFix=${i##*=} && continue
     [[ ${i} == "--genSegment" ]] && genSegment=1 && continue
+    [[ ${i} == "--abb" ]] && abb=1 && continue
     [[ ${i} == "--genCounting" ]] && genCounting=1 && continue
     [[ ${i%%=*} == "--start" ]] &&  start=${i#*=} && continue ;
     [[ ${i%%=*} == "--end" ]] && end=${i#*=} && continue ;
@@ -148,8 +150,9 @@ if [[ $genSegment -eq 1 ]] ; then
         playStockList.sh --printLastN=$checkLastN --fixType=F <<< $i            | #tee .o1 |
         $GEN_KLINK_RAWDATA $i                                                   | #tee .o2 |
         $GEN_SEGMENT_UPDN_RATE --dur=$dur --offset=1 $i > "/tmp/$segData.$i"    || doExit -1
-        $SERIALIZE_2 --serial_depth=$serialDepth --type_idx=14 --seed_idx=1     \
-                     --ignore_seedling /tmp/$segData.$i > /tmp/${segData}.$i.t  || doExit -1
+        $SERIALIZE_2 --serial_depth=$serialDepth ${abb:+--abb}                  \
+                     --type_idx=14 --seed_idx=1 --ignore_seedling               \
+                     /tmp/$segData.$i > /tmp/${segData}.$i.t                    || doExit -1
         echo "*gen segment(serialized) data /tmp/$segData.$i.t" >&2
         echo $job_id > job_manager
         ) &
