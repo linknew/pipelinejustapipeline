@@ -88,10 +88,10 @@
              << gAmpData.at<double>(0,_i) << " "        /* amplitude */                                             \
              << 100.0*gValData.at<double>(0,_i)/(gVolData.at<double>(0,_i)*gYstdData.at<double>(0,_i)) - 100.0 << " "  /* actual amplitude */ \
              << gRsi6Data.at<double>(0,_i) << " "       /* RSI-6 */                                                 \
-             << gRsi12Data.at<double>(0,_i) << " "       /* RSI-12 */                                               \
+             << gRsi14Data.at<double>(0,_i) << " "       /* RSI-14 */                                               \
              << gRsi24Data.at<double>(0,_i) << " "       /* RSI-24 */                                               \
              << gPwri6Data.at<double>(0,_i) << " "       /* PWRI-6 */                                               \
-             << gPwri12Data.at<double>(0,_i) << " "       /* PWRI-12 */                                             \
+             << gPwri14Data.at<double>(0,_i) << " "       /* PWRI-12 */                                             \
              << gPwri24Data.at<double>(0,_i) << " "       /* PWRI-24 */                                             \
              << ((_i==gAmpData.cols-1) ? rsiFuture6 : 0) << " "  /* RSI-FUTURE-6 */                                 \
              << ((_i==gAmpData.cols-1) ? pwriFuture12 : 0) << " " /* PWRI-FUTURE-12 */                              \
@@ -169,14 +169,19 @@ enum DATA_TYPE{
     DATA_TYPE_LVAL ,
     DATA_TYPE_YSTD ,
     DATA_TYPE_PWR ,
+#if 1                           //@ MACD
+    DATA_TYPE_MACD_DIF,         //@ dont change the order
+    DATA_TYPE_MACD_DEA,         //@ dont change the order
+    DATA_TYPE_MACD,             //@ dont change the order
+#endif
     DATA_TYPE_XCG ,
     DATA_TYPE_DATE ,
     DATA_TYPE_EAGER ,
     DATA_TYPE_RSI6 ,        /* stock index, do not change its position */
-    DATA_TYPE_RSI12 ,       /* stock index, do not change its position */
+    DATA_TYPE_RSI14 ,       /* stock index, do not change its position */
     DATA_TYPE_RSI24 ,       /* stock index, do not change its position */
     DATA_TYPE_PWRI6 ,       /* stock index, do not change its position */
-    DATA_TYPE_PWRI12 ,      /* stock index, do not change its position */
+    DATA_TYPE_PWRI14 ,      /* stock index, do not change its position */
     DATA_TYPE_PWRI24 ,      /* stock index, do not change its position */
     DATA_TYPE_RSI_CUSTOM ,       /* stock index, do not change its position */
     DATA_TYPE_PWRI_CUSTOM ,      /* stock index, do not change its position */
@@ -262,15 +267,15 @@ static unsigned int     baseLineSwitchers = (3<<2) ;        // if (MAX_LINES > s
 static unsigned int     linesSwitchers = (0xffff & (~((1<<1)|(1<<6)|(1<<7)|(1<<8))));   // comments here, same with above line's!!
 static unsigned int     indexSwitchers = ((1<<0)|(1<<4));   // rsi6 & pwri12
 
-static unsigned char    digtFuncIdx = 3 ;
+static unsigned char    digtFuncIdx = 2 ;
 static int              scale = 1 ;     // for x-coordinates
 static int              idxFocusedLine = 0;
 static int              dataFixType = DATA_FIX_TYPE_BACKWARD ;
 static double           rsiFuture6 = 0.0 ;
 static double           pwriFuture12 = 0.0 ;
-static int              rsiCustom=12 ;
-static int              pwriCustom=12 ;
-static int              xcgAvgICustom=12 ;
+static int              rsiCustom=14 ;
+static int              pwriCustom=14 ;
+static int              xcgAvgICustom=14 ;
 static string           stockId("") ;
 static string           stockName("") ;
 static int              forecastIdx = 0 ;
@@ -289,9 +294,9 @@ static int              gPanelY = 0 ;
 static int              gPanelW = MAX_WIN_WIDTH ;
 static int              gPanelH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, gBottomView, gIndexView, gTopStatus_view, gLeftDetailsView, gMessData;
-Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gAmpData, gXcgData, gVolData, gValData, gLvalData,
+Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gCloseData, gAmpData, gXcgData, gVolData, gValData, gLvalData,
     gKLine5, gKLine22, gKLine66, gKLine132, gKLine264,
-    gPwrData, gDateData, gEgrData, gRsi6Data, gRsi12Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri12Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
+    gMACD_DIF, gMACD_DEA, gMACD, gPwrData, gDateData, gEgrData, gRsi6Data, gRsi14Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri14Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
 
 //@ mark mode
 //@ use m<key> to creat a mark with the name <key>
@@ -562,6 +567,59 @@ double _getAvg(const Mat &m, Mat &out, size_t days, bool checkLastOne)
     return (checkLastOne ? _avg : 0) ;
 }
 
+#if 1   //@ macd
+double _getEMA(int period, int n, Mat &m, double preEMA=0)
+{
+    assert(period>1 && n>=0 && n<m.cols);
+
+    double close = m.row(DATA_TYPE_CLOSE).at<double>(0,n) ;
+    if(n==0) {
+        return close;
+    }
+
+    double alpha = 2.0/(period+1);
+    return alpha*close + (1-alpha)*(preEMA? preEMA : _getEMA(period, n-1, m));
+}
+
+void _getEMA(int period, Mat &data, Mat &ema)
+{
+    int n = data.cols;
+    double last = 0;
+
+    for(int i=0; i<n; i++) {
+        last = _getEMA(period, i, data, last);
+        ema.at<double>(0,i) = last;
+    }
+
+    return;
+}
+
+void _getDIF(Mat &m, Mat &dif, int key1=12, int key2=26)
+{
+//  assert(m.cols == dif.cols);
+
+    Mat ema_fast(1, m.cols, CV_64F);
+    Mat ema_slow(1, m.cols, CV_64F);
+
+    _getEMA(key1, m, ema_fast);
+    _getEMA(key2, m, ema_slow);
+    dif = ema_fast - ema_slow;
+
+    return;
+}
+
+void _getDEA(Mat &m, Mat &dea, int key=9)
+{
+    _getEMA(key, m, dea);
+    return;
+}
+
+void _getMACD(Mat &_dif, Mat &_dea, Mat &_macd)
+{
+    _macd = 2*(_dif-_dea);
+}
+#endif
+
 double _getAvgRateIndexer(const Mat &m, Mat &out, size_t days, bool checkLastOne)
 {
     size_t  i = 0 ;
@@ -586,6 +644,48 @@ double _getAvgRateIndexer(const Mat &m, Mat &out, size_t days, bool checkLastOne
     return (checkLastOne ? _rateIndexer : 0) ;
 }
 
+double _getRSI(const Mat &m, Mat &out, size_t days, bool delta, bool checkLastOne)
+{
+    if(checkLastOne && days==0) {
+        return 50;
+    }
+
+    assert(days>0);
+
+    size_t  i = 0 ;
+    size_t  _first = 0 ;
+    double  _last[days]={0}, _t=0, _up=0, _dn=0, _rate=0, _rateIndexer=0 ;
+
+    _first = checkLastOne ? max(0, m.cols - (int)days) : 0 ;
+
+    for (i = _first ; i < m.cols ; i ++){
+
+        int _i = i%days;
+
+        //@ get this item
+        if(delta){
+            _t = (i > 0) ? (m.at<double>(0,i) - m.at<double>(0,i-1) ) : 0 ;
+        }
+
+        //@ add to total
+        (_t > 0) ? _up += _t : _dn -= _t ;
+
+        /* remove the first if out of range */
+        if(i-_first >= days){
+            _last[_i]>0? _up -= _last[_i] : _dn += _last[_i];
+        }
+
+        /* caculate indexer value */
+        _rate = _up / max(_dn,0.000001) ;
+        _rateIndexer = 100.0 - 100.0/(1+_rate) ;
+
+        if(!checkLastOne) out.at<double>(0,i) = _rateIndexer ;
+        _last[_i] = _t;
+    }
+
+    return (checkLastOne ? _rateIndexer : 0) ;
+}
+
 double _getUpDnRateIndexer(const Mat &m, Mat &out, size_t days, bool positiveSrc, bool checkLastOne)
 {
     size_t  i = 0 ;
@@ -597,14 +697,13 @@ double _getUpDnRateIndexer(const Mat &m, Mat &out, size_t days, bool positiveSrc
     for (i = _first ; i < m.cols ; i ++){
         /* add current to total */
         if(positiveSrc){
-
             _t = (i > 0) ? (m.at<double>(0,i) - m.at<double>(0,i-1) ) / max(m.at<double>(0,i-1),0.000001) : 0 ;
         }else{
             _t = m.at<double>(0,i) ;
         }
         (_t > 0) ? _up += _t : _dn -= _t ;
 
-        /* remove the first if it is out of the range */
+        /* remove the first if out of range */
         if(i-_first >= days){
             if(positiveSrc){
                 _t = (i-days > 0) ? (m.at<double>(0,i-days) - m.at<double>(0,i-days-1) ) / max(m.at<double>(0,i-days-1),0.000001) : 0 ;
@@ -702,11 +801,12 @@ int importData(
 
     /* extract history&hot data */
     {
-        Mat _linesData, _dateData, _higData, _lowData, _opnData, _ystdData, _ampData, _xcgData, _volData, _valData, _avrgPrice, _lvalData,
-            _pwrData, _egrData, _rsi6Data, _rsi12Data, _rsi24Data, _pwri6Data, _pwri12Data, _pwri24Data,
-            _xcgAvgICustomData, _rsiCustomData, _pwriCustomData;
+        Mat _linesData, _dateData, _higData, _lowData, _opnData, _clsData, _ystdData, _ampData, _xcgData, _volData, _valData, _avrgPrice, _lvalData,
+            _pwrData, _egrData, _rsi6Data, _rsi14Data, _rsi24Data, _pwri6Data, _pwri14Data, _pwri24Data,
+            _xcgAvgICustomData, _rsiCustomData, _pwriCustomData, _dif, _dea, _macd;
 
         _linesData         = _m.rowRange(DATA_TYPE_CLOSE, DATA_TYPE_LOW+1) ;
+        _clsData           = _m.row(DATA_TYPE_CLOSE) ;
         _dateData          = _m.row(DATA_TYPE_DATE) ;
         _higData           = _m.row(DATA_TYPE_HIG) ;
         _lowData           = _m.row(DATA_TYPE_LOW) ;
@@ -719,12 +819,15 @@ int importData(
         _avrgPrice         = _m.row(DATA_TYPE_AVG) ;
         _lvalData          = _m.row(DATA_TYPE_LVAL) ;
         _pwrData           = _m.row(DATA_TYPE_PWR) ;
+        _dif               = _m.row(DATA_TYPE_MACD_DIF);
+        _dea               = _m.row(DATA_TYPE_MACD_DEA);
+        _macd              = _m.row(DATA_TYPE_MACD);
         _egrData           = _m.row(DATA_TYPE_EAGER) ;
         _rsi6Data          = _m.row(DATA_TYPE_RSI6) ;
-        _rsi12Data         = _m.row(DATA_TYPE_RSI12) ;
+        _rsi14Data         = _m.row(DATA_TYPE_RSI14) ;
         _rsi24Data         = _m.row(DATA_TYPE_RSI24) ;
         _pwri6Data         = _m.row(DATA_TYPE_PWRI6) ;
-        _pwri12Data        = _m.row(DATA_TYPE_PWRI12) ;
+        _pwri14Data        = _m.row(DATA_TYPE_PWRI14) ;
         _pwri24Data        = _m.row(DATA_TYPE_PWRI24) ;
         _xcgAvgICustomData = _m.row(DATA_TYPE_XCGI_CUSTOM) ;
         _rsiCustomData     = _m.row(DATA_TYPE_RSI_CUSTOM) ;
@@ -1172,23 +1275,32 @@ int importData(
             }
         }
 
-        /* caculate RSI */
+        /* caculate RSI(relative strength index) */
         {
-            _getUpDnRateIndexer(_ampData, _rsi6Data,   6, false, false) ;
-            _getUpDnRateIndexer(_ampData, _rsi12Data, 12, false, false) ;
-            _getUpDnRateIndexer(_ampData, _rsi24Data, 24, false, false) ;
+            _getRSI(_clsData, _rsi6Data,   6, true, false) ;
+            _getRSI(_clsData, _rsi14Data, 14, true, false) ;
+            _getRSI(_clsData, _rsi24Data, 24, true, false) ;
+            if (rsiCustom>0) {
+                _getRSI(_clsData, _rsiCustomData, rsiCustom, true, false) ;
+            }
         }
 
-        /* caculate value rate, value/average5_value */
+        //@ MACD(moving average compontial ...)
         {
-            _getAvgRateIndexer(_valData, _pwrData, WEEK_DAYS, false);
+            Mat close = _linesData.row(DATA_TYPE_CLOSE);
+            _getDIF(close, _dif);
+            _getDEA(_dif, _dea);
+            _getMACD(_dif, _dea, _macd);
         }
 
         /* caculate PWRI */
         {
-            _getUpDnRateIndexer(_valData, _pwri6Data,   6, true, false) ;
-            _getUpDnRateIndexer(_valData, _pwri12Data, 12, true, false) ;
-            _getUpDnRateIndexer(_valData, _pwri24Data, 24, true, false) ;
+            //_getUpDnRateIndexer(_valData, _pwri6Data,   6, true, false) ;
+            //_getUpDnRateIndexer(_valData, _pwri14Data, 14, true, false) ;
+            //_getUpDnRateIndexer(_valData, _pwri24Data, 24, true, false) ;
+            _getRSI(_clsData, _pwri6Data,   6, true, false) ;
+            _getRSI(_clsData, _pwri14Data, 14, true, false) ;
+            _getRSI(_clsData, _pwri24Data, 24, true, false) ;
         }
 
         /* caculate rsiFuture6 & pwriFuture12 */
@@ -1582,8 +1694,72 @@ void _doRefreshView(void)
                  Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gMainView.rows - LINE_MARGIN_T - LINE_MARGIN_B)) ;
     }
 
+
+
+    /* draw xcg_n_avg on the bottom view */
+    {
+        int _posY = 0 ;
+        Mat _panel(gBottomView.size(),gBottomView.type(),Scalar::all(0)) ;
+        Mat _xcg_n_avg(2, gXcgData.cols+1/*for reference line*/, CV_64F);
+        Mat _xcg = _xcg_n_avg.row(0);
+        Mat _avg = _xcg_n_avg.row(1);
+
+        //@ init _xcg_n_avg
+        gXcgData.convertTo(_xcg.colRange(0,_xcg_n_avg.cols-1), CV_64F) ;
+        _getAvg(gXcgData, _avg, WEEK_DAYS, false);
+        int n_ignores = min(_avg.cols, SEASON_DAYS);
+        for(int i=0; i<n_ignores-1; i++) {
+            _xcg.at<double>(0,i) = _xcg.at<double>(n_ignores-1);
+            _avg.at<double>(0,i) = _avg.at<double>(n_ignores-1);
+        }
+
+        //@ nromalize
+        if( !GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
+            _xcg_n_avg.at<double>(0, _xcg_n_avg.cols - 1) = _getAvg(gXcgData, _xcg, gXcgData.cols, true);
+            _xcg_n_avg.at<double>(1, _xcg_n_avg.cols - 1) = 0;
+            normalize(_xcg_n_avg, _xcg_n_avg, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _xcg_n_avg.at<double>(0, _xcg_n_avg.cols-1) ;
+            _xcg_n_avg = _xcg_n_avg.colRange(dataRangeStart, dataRangeEnd) ;
+        }else{
+            _xcg_n_avg = _xcg_n_avg.colRange(dataRangeStart, dataRangeEnd+1) ;
+            _xcg_n_avg.at<double>(0, _xcg_n_avg.cols - 1) = _getAvg(gXcgData.colRange(dataRangeStart, dataRangeEnd), _xcg, dataRangeEnd-dataRangeStart, true);
+            _xcg_n_avg.at<double>(1, _xcg_n_avg.cols - 1) = 0;
+            normalize(_xcg_n_avg, _xcg_n_avg, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _xcg_n_avg.at<double>(0, _xcg_n_avg.cols-1) ;
+            //@ remove the item which for reference line
+            _xcg_n_avg = _xcg_n_avg.colRange(0, _xcg_n_avg.cols - 1) ;
+        }
+
+        /* draw */
+        paintData(_xcg_n_avg.row(0),
+                _panel,
+                scale,
+                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                Scalar(255,195,0),
+                //PAINT_TYPE_FILLED_RECT,
+                PAINT_TYPE_LINE,
+                true) ;
+        paintData(_xcg_n_avg.row(1),
+                _panel,
+                scale,
+                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                Scalar(0,60,255),
+                //PAINT_TYPE_FILLED_RECT,
+                PAINT_TYPE_LINE,
+                true) ;
+        addWeighted(_panel,1,gBottomView,0,0,gBottomView);
+
+        #if 0
+        /* draw the line(power = 0) for reference */
+        line(   gBottomView,
+                Point(0+LINE_MARGIN_L, gBottomView.rows -LINE_MARGIN_B -1 -_posY),
+                Point(gBottomView.cols - LINE_MARGIN_R -1, gBottomView.rows -LINE_MARGIN_B -1 -_posY),
+                Scalar(0,0,255), 1, LINE_8 ) ;
+        #endif
+    }
+
 #if 0
-    /* draw _value */
+    /* draw value on the bottom view */
     {
         Mat _m ;
 
@@ -1604,84 +1780,6 @@ void _doRefreshView(void)
     }
 #endif
 
-#if 1
-    /* adjust _pwr */
-    {
-        Mat _t1, _t2;
-        Mat _p(gBottomView.size(),gBottomView.type(),Scalar::all(0)) ;
-        int _posY = 0 ;
-
-        _t2.create(gPwrData.rows, gPwrData.cols+1, CV_16S) ;
-
-        _t1 = gPwrData * 100 ;
-        _t1.convertTo(_t2.colRange(0,_t2.cols-1), CV_16S) ;
-        _t2 += (32767 -20000);  // support to +20000
-        _t2 -= (32767 -20000);
-        _t2 += (-32768+20000);  // support to -20000
-        _t2 -= (-32768+20000);
-
-        if( !GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
-            _t2.at<short int>(0, _t2.cols - 1) = 0 ;
-            normalize(_t2, _t2, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-            _posY = _t2.at<short int>(0, _t2.cols-1) ;
-            _t2 = _t2.colRange(dataRangeStart,dataRangeEnd) ;
-        }else{
-            _t2 = _t2.colRange(dataRangeStart,dataRangeEnd+1) ;
-            _t2.at<short int>(0, _t2.cols - 1) = 0 ;
-            normalize(_t2, _t2, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-            _posY = _t2.at<short int>(0, _t2.cols-1) ;
-            _t2 = _t2.colRange(0, _t2.cols - 1) ;
-        }
-
-        /* finally, we can draw it */
-        paintData(_t2,
-                _p,
-                scale,
-                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
-                Scalar(255,195,0),
-                //PAINT_TYPE_FILLED_RECT,
-                PAINT_TYPE_LINE,
-                true) ;
-        addWeighted(_p,1,gBottomView,0,0,gBottomView);
-
-        /* draw the line(power = 0) for reference */
-        line(   gBottomView,
-                Point(0+LINE_MARGIN_L, gBottomView.rows -LINE_MARGIN_B -1 -_posY),
-                Point(gBottomView.cols - LINE_MARGIN_R -1, gBottomView.rows -LINE_MARGIN_B -1 -_posY),
-                Scalar(0,0,255), 1, LINE_8 ) ;
-    }
-#endif
-
-#if 1
-    /* adjust _xcg */
-    {
-        Mat _t1, _t2, _v;
-        Mat _p(gBottomView.size(),gBottomView.type(),Scalar::all(0)) ;
-
-        _t1 = gXcgData*10 ;
-        _t1.convertTo(_t2, CV_8U) ;
-        _t2 += 55 ;     // support to 20%(because 20*10=200,200+55=255,max of CV_8U is 255)
-        _v = _t2.colRange(dataRangeStart,dataRangeEnd) ;
-
-        if( !GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
-            normalize(_t2, _t2, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-            _t2 = _t2.colRange(dataRangeStart,dataRangeEnd) ;
-        }else{
-            normalize(_v, _t2, 0, gBottomView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-        }
-
-        /* finally, we can draw it */
-        paintData(_t2,
-                _p,
-                scale,
-                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
-                Scalar(0,60,255),
-                PAINT_TYPE_LINE,
-                true) ;
-        addWeighted(_p,1,gBottomView,1,0,gBottomView);
-    }
-#endif
-
 #if 0
     /* draw eager line */
     {
@@ -1699,7 +1797,85 @@ void _doRefreshView(void)
     }
 #endif
 
-    /* draw indexer lines */
+    /* draw MACD on the index view */
+    if (GET_SWITCHER_STATUS(indexSwitchers,4-1/*based on 0*/) ||
+        GET_SWITCHER_STATUS(indexSwitchers,5-1) ) {
+
+        //@ init
+        Mat _dif_n_dea = gMessData.rowRange(DATA_TYPE_MACD_DIF, DATA_TYPE_MACD_DEA+1) ;
+        Mat _macd = gMACD; //gMessData.rowRange(DATA_TYPE_MACD, DATA_TYPE_MACD+1) ;
+        Mat _dnd_nml(_dif_n_dea.rows, _dif_n_dea.cols, CV_64F);
+        Mat _macd_nml(_macd.rows, _macd.cols, CV_64F);
+        int _posY = 0;
+
+        //@ normalize
+        if( !GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ){
+            double first_macd = _macd.at<double>(0,0);
+            _macd.at<double>(0,0) = 0;
+            normalize(_dif_n_dea, _dnd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            normalize(_macd, _macd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _macd_nml.at<double>(0,0) ;
+            _dnd_nml = _dnd_nml.colRange(dataRangeStart, dataRangeEnd);
+            _macd_nml = _macd_nml.colRange(dataRangeStart, dataRangeEnd);
+            _macd.at<double>(0,0) = first_macd;
+        }else{
+            _dif_n_dea = _dif_n_dea.colRange(dataRangeStart, dataRangeEnd);
+            _macd = _macd.colRange(dataRangeStart, dataRangeEnd);
+            _dnd_nml = _dnd_nml.colRange(dataRangeStart, dataRangeEnd);
+            _macd_nml = _macd_nml.colRange(dataRangeStart, dataRangeEnd);
+            double first_macd = _macd.at<double>(0,0);
+            _macd.at<double>(0,0) = 0;
+            normalize(_dif_n_dea, _dnd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            normalize(_macd, _macd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _macd_nml.at<double>(0,0) ;
+            _macd.at<double>(0,0) = first_macd;
+        }
+
+        //@ draw diff and dea
+        Mat _p(gIndexView.size(),gIndexView.type(),Scalar::all(0)) ;
+        if (GET_SWITCHER_STATUS(indexSwitchers,4-1) ) {
+            Mat _dif_nml  = _dnd_nml.row(0);
+            Mat _dea_nml  = _dnd_nml.row(1);
+            paintData(_dif_nml,
+                    _p,
+                    scale,
+                    Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gIndexView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                    Scalar(0,0,255),
+                    //PAINT_TYPE_FILLED_RECT,
+                    PAINT_TYPE_LINE,
+                    true) ;
+            paintData(_dea_nml,
+                    _p,
+                    scale,
+                    Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gIndexView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                    Scalar(0,255,0),
+                    //PAINT_TYPE_FILLED_RECT,
+                    PAINT_TYPE_LINE,
+                    true) ;
+            addWeighted(_p,1,gIndexView,0,0,gIndexView);
+        }
+
+        //@ draw macd
+        if (GET_SWITCHER_STATUS(indexSwitchers,5-1) ) {
+            paintData(_macd_nml,
+                    _p,
+                    scale,
+                    Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gIndexView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                    Scalar(0,255,255),
+                    //PAINT_TYPE_FILLED_RECT,
+                    PAINT_TYPE_LINE,
+                    true) ;
+            addWeighted(_p,1,gIndexView,0,0,gIndexView);
+
+            //@ reference line
+            line(   gIndexView,
+                    Point(0+LINE_MARGIN_L, gIndexView.rows -LINE_MARGIN_B -1 -_posY),
+                    Point(gIndexView.cols - LINE_MARGIN_R -1, gIndexView.rows -LINE_MARGIN_B -1 -_posY),
+                    Scalar(0,0,255), 1, LINE_8 ) ;
+        }
+    }
+
+    /* draw other indexers */
     {
         size_t  i ;
         Mat     _src, _dst ;
@@ -1714,24 +1890,30 @@ void _doRefreshView(void)
                         break ;
                     case 1:
                         _color = Scalar(0,255,0) ;
-                        _src = gRsi12Data ;
+                        _src = gRsi14Data ;
                         break ;
                     case 2:
                         _color = Scalar(0,255,0) ;
                         _src = gRsi24Data ;
                         break ;
                     case 3:
+#if 0
                         _color = Scalar(0,255,255) ;
                         _src = gPwri6Data ;
                         break ;
+#endif
                     case 4:
+#if 0
                         _color = Scalar(0,255,255) ;
-                        _src = gPwri12Data ;
+                        _src = gPwri14Data ;
                         break ;
+#endif
+                        continue;
                     case 5:
                         _color = Scalar(0,255,255) ;
                         _src = gPwri24Data ;
                         break ;
+#if 0
                     case 6:
                         _color = Scalar(0,255,0) ;
                         _src = gRsiCustomData ;
@@ -1744,22 +1926,42 @@ void _doRefreshView(void)
                         _color = Scalar(0,0,255) ;
                         _src = gXcgAvgICustomData;
                         break ;
+#else
+                    case 6:
+                    case 7:
+                    case 8:
+                        continue;
+#endif
                     default:
                         break ;
                 }
 
-                normalize(_src, _dst, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
-                _dst = _dst.colRange(dataRangeStart,dataRangeEnd) ;
-                paintData(_dst,
-                        gIndexView,
-                        scale,
-                        Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B),
-                        _color,
-                        PAINT_TYPE_LINE,
-                        true) ;
+                if (!GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT) ) {
+                    normalize(_src, _dst, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+                    _dst = _dst.colRange(dataRangeStart,dataRangeEnd) ;
+                    paintData(_dst,
+                            gIndexView,
+                            scale,
+                            Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B),
+                            _color,
+                            PAINT_TYPE_LINE,
+                            true) ;
+                }
+                else {
+                    _src = _src.colRange(dataRangeStart, dataRangeEnd);
+                    normalize(_src, _dst, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+                    paintData(_dst,
+                            gIndexView,
+                            scale,
+                            Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B),
+                            _color,
+                            PAINT_TYPE_LINE,
+                            true) ;
+
+                }
             }
 
-#if 1
+#if 0
             {
                 if(GET_SWITCHER_STATUS(indexSwitchers,DATA_TYPE_PWRI_CUSTOM - DATA_TYPE_RSI6)){
                     normalize(gPwriCustomData, _dst, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
@@ -2467,6 +2669,7 @@ void _doRefreshView(void)
             s << " Exchg=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << '%' ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
+#if 0
             /* power */
             s.str("");
             _d = gPwrData.at<double>(0,dtlsIdx) ;
@@ -2475,6 +2678,7 @@ void _doRefreshView(void)
                                       : Scalar(0,255,0) ;
             s << " Power=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+#endif
 
             _idx ++ ;
 
@@ -2498,45 +2702,50 @@ void _doRefreshView(void)
             s << " RSI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
-            /* RSI12(Relative Strongth Index) */
+            /* RSI14(Relative Strongth Index) */
             s.str("");
-            _d = gRsi12Data.at<double>(0,dtlsIdx) ;
-            _color = (_d>=85) ? Scalar(0,0,255)
-                              : (_d<=15) ? Scalar(0,255,0)
+            _d = gRsi14Data.at<double>(0,dtlsIdx) ;
+            _color = (_d>=82) ? Scalar(0,0,255)
+                              : (_d<=18) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
-            s << " RSI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
+            s << " RSI14=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
-#if 0
-            /* RSI24(Relative Strongth Index) */
+            /* RSI24 */
             s.str("");
             _d = gRsi24Data.at<double>(0,dtlsIdx) ;
-            _color = (_d>=85) ? Scalar(0,0,255)
-                              : (_d<=15) ? Scalar(0,255,0)
+            _color = (_d>=80) ? Scalar(0,0,255)
+                              : (_d<=20) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " RSI24=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-#endif 
 
+            //@ MACD
+            s.str("");
+            _d = gMACD.at<double>(0,dtlsIdx) ;
+            _color = Scalar(200, 200, 200);
+            s << " MACD_12_26_9=" << setiosflags(ios::fixed) << setprecision(2) << (_d);
+            putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+
+#if 0
             /* PWRI6(Power Index) */
             s.str("");
-            _d = gPwri6Data.at<double>(0,dtlsIdx) ;
+            _d = gMACD.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
             s << " PWRI6=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
-            /* PWR12(Power Index) */
+            /* PWR14(Power Index) */
             s.str("");
-            _d = gPwri12Data.at<double>(0,dtlsIdx) ;
+            _d = gPwri14Data.at<double>(0,dtlsIdx) ;
             _color = (_d>=85) ? Scalar(0,0,255)
                               : (_d<=15) ? Scalar(0,255,0)
                                          : Scalar(200,200,200) ;
-            s << " PWRI12=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
+            s << " PWRI14=" << setiosflags(ios::fixed) << setprecision(2) << (_d) << "%";
             putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
-#if 0
             /* PWR24(Power Index) */
             s.str("");
             _d = gPwri24Data.at<double>(0,dtlsIdx) ;
@@ -2586,33 +2795,35 @@ void _doRefreshView(void)
                 /* total_amp-custom */
                 s.str("");
                 _d = (_days>0)? _getTT(gValData.colRange(_dataS,_dataE+1), _m, _days, true, true)/10000000.0 : 0 ;
-                _color = Scalar(255,0,0) ;
+                _color = Scalar(200,200,200);
                 s << " VALT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* total_exchange-custom */
                 s.str("");
                 _d = (_days>0)? _getTT(gXcgData.colRange(_dataS,_dataE+1), _m, _days, true, true) : 0 ;
-                _color = Scalar(255,0,0) ;
+                _color = Scalar(200,200,200);
                 s << " XCGT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* average-custom */
                 s.str("");
                 _d = (_days>0)? _getAvg(_focusLineData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
-                _color = Scalar(255,0,0) ;
+                _color = Scalar(200,200,200);
                 s << " AVG-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
                 /* rsi-custom */
                 s.str("");
-                _d = (rsiCustom>0) ? _getUpDnRateIndexer(gAmpData.colRange(_dataS,_dataE+1), gRsiCustomData, _dataE - _dataS + 1, false, true) : 0 ;
+                int _from = max(0, _dataS-1/*RSI caculates the difference from previous day's price*/);
+                _d = (rsiCustom>0) ? _getRSI(gCloseData.colRange(_from,_dataE+1), gRsiCustomData, _dataE - _dataS + 1, true, true) : 0 ;
                 _color = (_d>=85) ? Scalar(0,0,255)
                                   : (_d<=15) ? Scalar(0,255,0)
                                              : Scalar(200,200,200) ;
                 s << " RSI-" << rsiCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
 
+#if 0
                 /* pwri-custom */
                 s.str("");
                 _d = (pwriCustom>0) ? _getUpDnRateIndexer(gPwrData.colRange(_dataS,_dataE+1), gPwriCustomData, _dataE - _dataS + 1, false, true) : 0 ;
@@ -2621,6 +2832,7 @@ void _doRefreshView(void)
                                              : Scalar(200,200,200) ;
                 s << " PWRI-" << pwriCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
                 putText( gLeftDetailsView, s.str(), Point(0,120+(_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+#endif
 
                 /* xcg-custom */
                 s.str("");
@@ -2776,6 +2988,7 @@ void _doRefreshData(
     gHigData           = outputMat.row(DATA_TYPE_HIG) ;
     gLowData           = outputMat.row(DATA_TYPE_LOW) ;
     gOpenData           = outputMat.row(DATA_TYPE_OPEN) ;
+    gCloseData         = outputMat.row(DATA_TYPE_CLOSE);
     gYstdData          = outputMat.row(DATA_TYPE_YSTD) ;
     gAmpData           = outputMat.row(DATA_TYPE_AMP) ;
     gXcgData           = outputMat.row(DATA_TYPE_XCG) ;
@@ -2783,12 +2996,15 @@ void _doRefreshData(
     gValData           = outputMat.row(DATA_TYPE_VAL) ;
     gLvalData          = outputMat.row(DATA_TYPE_LVAL) ;
     gPwrData           = outputMat.row(DATA_TYPE_PWR) ;
+    gMACD_DIF          = outputMat.row(DATA_TYPE_MACD_DIF) ;
+    gMACD_DEA          = outputMat.row(DATA_TYPE_MACD_DEA) ;
+    gMACD              = outputMat.row(DATA_TYPE_MACD) ;
     gEgrData           = outputMat.row(DATA_TYPE_EAGER) ;
     gRsi6Data          = outputMat.row(DATA_TYPE_RSI6) ;
-    gRsi12Data         = outputMat.row(DATA_TYPE_RSI12) ;
+    gRsi14Data         = outputMat.row(DATA_TYPE_RSI14) ;
     gRsi24Data         = outputMat.row(DATA_TYPE_RSI24) ;
     gPwri6Data         = outputMat.row(DATA_TYPE_PWRI6) ;
-    gPwri12Data        = outputMat.row(DATA_TYPE_PWRI12) ;
+    gPwri14Data        = outputMat.row(DATA_TYPE_PWRI14) ;
     gPwri24Data        = outputMat.row(DATA_TYPE_PWRI24) ;
     gXcgAvgICustomData = outputMat.row(DATA_TYPE_XCGI_CUSTOM) ;
     gRsiCustomData     = outputMat.row(DATA_TYPE_RSI_CUSTOM) ;
@@ -2885,7 +3101,7 @@ int _doDefault(char c)
             }
             break ;
         case 'R':
-            digtFuncIdx = 3 ;
+            digtFuncIdx = 2 ;
             scale = 1 ;
             RESET_SWITCHER_STATUS(&sysSwitchers,AUTO_FIT) ;
             gPanelH = MAX_WIN_HEIGHT/2; gPanelW = MAX_WIN_WIDTH/2;
@@ -2895,9 +3111,9 @@ int _doDefault(char c)
             RESET_SWITCHER_STATUS(&sysSwitchers,SET_MARK) ;
             RESET_SWITCHER_STATUS(&sysSwitchers,LOAD_MARK) ;
             dtlsIdx = IDX_RANGE_UNSET;
-            rsiCustom = 0 ;
-            pwriCustom = 0 ;
-            xcgAvgICustom = 0 ;
+            rsiCustom = 14 ;
+            pwriCustom = 14 ;
+            xcgAvgICustom = 14 ;
             for(int _i = 0; _i < FORECAST_DATA_DAYS; _i++){
                 forecastCoefficients[_i] = 1.0 ;
             }
@@ -2952,7 +3168,7 @@ int _doDefault(char c)
                     SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
                 }
                 /* set digtFunc to scale */
-                digtFuncIdx = 3 ;
+                digtFuncIdx = 2 ;
             }
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             break ;

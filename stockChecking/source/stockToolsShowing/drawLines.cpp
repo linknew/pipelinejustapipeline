@@ -797,39 +797,39 @@ int main( int argc, char** argv )
                 if(autoFit) s << " [Auto Fit]" ;
                 if(mark_start) s << " [marking]";
                 if(load_mark) s << " [marker]";
-                putText( _topStatus_view, s.str(), Point(0,22), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _topStatus_view, s.str(), Point(0,22), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 s.str("") ;
                 /* show baseline info */
                 ( digtFuncList[ digtFuncIdx ] == digtFuncBaselineFilter ) ?  s << "*Base:" : s << " Base:" ;
-                putText( _leftDetailsView, s.str(), Point(0,54), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(0,54), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
                 s.str("/") ;
                 for( i = 0 ; i < viewData.rows; i++ ){
                     if( GET_SWITCHER_STATUS(baseLineSwitchers,i) ){
                         s << i + 1 << '/' ;
                     }
                 }
-                putText( _leftDetailsView, s.str(), Point(20,54+1*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+1*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 /* show line info */
                 s.str("");
                 (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "*Lines:" : s << " Lines:" ;
-                putText( _leftDetailsView, s.str(), Point(0,54+2*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(0,54+2*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
                 s.str("/") ;
                 for( i = 0 ; i < viewData.rows; i++ ){
                     if( GET_SWITCHER_STATUS(linesSwitchers,i) ){
                         s << i + 1 << '/' ;
                     }
                 }
-                putText( _leftDetailsView, s.str(), Point(20,54+3*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+3*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
                 /* show scale info */
                 s.str("");
                 (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "*Scale:" : s << " Scale:" ;
-                putText( _leftDetailsView, s.str(), Point(0,54+4*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(0,54+4*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
                 s.str("") ;
                 s << scale ;
-                putText( _leftDetailsView, s.str(), Point(20,54+5*text_hi), 0, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
+                putText( _leftDetailsView, s.str(), Point(20,54+5*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(0, 0, 255), 0, LINE_AA );
 
 #if 1
                 int info_idx = 4 ;
@@ -845,7 +845,7 @@ int main( int argc, char** argv )
                         _color = lineColors[i] ;
                         s.str("");
                         s << " line-" << i+1 << " = " << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
-                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
+                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, _color, 0, LINE_AA );
                     }
                 }
 
@@ -872,8 +872,9 @@ int main( int argc, char** argv )
 
                     s.str("");
                     s << " Dur-" << _days;
-                    putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, Scalar(255,255,255), 0, LINE_AA );
+                    putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(255,255,255), 0, LINE_AA );
 
+                    std::vector<pair<int,double>> sorted;
                     for(i=0; i<gLinesData.rows; i++) {
                         Mat _lineData = gLinesData.row(i) ;
 
@@ -886,64 +887,19 @@ int main( int argc, char** argv )
                             double b = round(_lineData.at<double>(0,measureIdx) * 100);
                             _d = (a-b)/b*100;
                         }
+                        sorted.push_back(make_pair(i,_d));
+                    }
+                    std::sort(sorted.begin(), sorted.end(), [](const pair<int,double> &a, const pair<int,double> &b){ return a.second > b.second; });
+                    for(i=0; i<gLinesData.rows; i++) {
+                        int line_idx = sorted[i].first;
+                        double line_data = sorted[i].second;
+                        _color = lineColors[line_idx] ;
+                        s.str(""); s << " line-" << line_idx+1 << " = ";
+                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx)*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, _color, 0, LINE_AA );
 
-                        _color = lineColors[i] ;
-                        s.str(""); s << " line-" << i+1 << " = ";
-                        putText( _leftDetailsView, s.str(), Point(0,120+(info_idx)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        _color = (_d>0) ? Scalar(0,0,255) : ((_d<0) ? Scalar(0,255,0) : Scalar(255,255,255)) ;
-                        s.str(""); s << setiosflags(ios::fixed) << setprecision(2) << abs(_d) << "%" ;
-                        putText( _leftDetailsView, s.str(), Point(80,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-#if 0
-                        /* total_amp-custom */
-                        s.str("");
-                        _d = (_days>0)? _getTT(gValData.colRange(_dataS,_dataE+1), _m, _days, true, true)/10000000.0 : 0 ;
-                        _color = Scalar(255,0,0) ;
-                        s << " VALT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        /* total_exchange-custom */
-                        s.str("");
-                        _d = (_days>0)? _getTT(gXcgData.colRange(_dataS,_dataE+1), _m, _days, true, true) : 0 ;
-                        _color = Scalar(255,0,0) ;
-                        s << " XCGT-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        /* average-custom */
-                        s.str("");
-                        _d = (_days>0)? _getAvg(_focusLineData.colRange(_dataS,_dataE+1), _m, _days, true) : 0 ;
-                        _color = Scalar(255,0,0) ;
-                        s << " AVG-" << _days << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        /* rsi-custom */
-                        s.str("");
-                        _d = (rsiCustom>0) ? _getUpDnRateIndexer(gAmpData.colRange(_dataS,_dataE+1), gRsiCustomData, _dataE - _dataS + 1, false, true) : 0 ;
-                        _color = (_d>=85) ? Scalar(0,0,255)
-                                          : (_d<=15) ? Scalar(0,255,0)
-                                                     : Scalar(200,200,200) ;
-                        s << " RSI-" << rsiCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        /* pwri-custom */
-                        s.str("");
-                        _d = (pwriCustom>0) ? _getUpDnRateIndexer(gPwrData.colRange(_dataS,_dataE+1), gPwriCustomData, _dataE - _dataS + 1, false, true) : 0 ;
-                        _color = (_d>=85) ? Scalar(0,0,255)
-                                          : (_d<=15) ? Scalar(0,255,0)
-                                                     : Scalar(200,200,200) ;
-                        s << " PWRI-" << pwriCustom << "=" << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-
-                        /* xcg-custom */
-                        s.str("");
-                        _d = (xcgAvgICustom>0) ? _getUpDnRateIndexer(gXcgData.colRange(_dataS,_dataE+1), gXcgAvgICustomData, _dataE - _dataS + 1, true, true) : 0 ;
-                        _color = (_d>=85) ? Scalar(0,0,255)
-                                          : (_d<=15) ? Scalar(0,255,0)
-                                                     : Scalar(200,200,200) ;
-                        s << " XCG-" << xcgAvgICustom << "="  << setiosflags(ios::fixed) << setprecision(2) << (_d) ;
-                        putText( gLeftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), 0, 0.4, _color, 0, LINE_AA );
-#endif
+                        _color = (line_data>0) ? Scalar(0,0,255) : ((line_data<0) ? Scalar(0,255,0) : Scalar(255,255,255)) ;
+                        s.str(""); s << setiosflags(ios::fixed) << setprecision(2) << abs(line_data) << "%" ;
+                        putText( _leftDetailsView, s.str(), Point(80,120+(info_idx++)*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, _color, 0, LINE_AA );
                     }
                 }
 #endif
@@ -1136,7 +1092,7 @@ int main( int argc, char** argv )
                     else if(c=='h') step_mv_act = 1;
                     else if(c=='H') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
                     if (gap>=3000) {
-                        printf("%ld-----\n", gap);
+                        //printf("%ld-----\n", gap);
                         mark['\''] = dtlsIdx;
                     }
                     if (dtlsIdx -  step_mv_act >= dataRangeStart) {
@@ -1168,7 +1124,7 @@ int main( int argc, char** argv )
                     else if(c=='l') step_mv_act = 1;
                     else if(c=='L') step_mv_act = max(1, N_DATA_OF_CUR_VIEW(gMainView.cols,scale)/20);
                     if (gap>=3000) {
-                        printf("%ld!-----\n", gap);
+                        //printf("%ld!-----\n", gap);
                         mark['\''] = dtlsIdx;
                     }
                     if (dtlsIdx +  step_mv_act <= dataRangeEnd-1) {

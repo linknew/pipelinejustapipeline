@@ -70,4 +70,5 @@ drawLines dummy_code $data $n_lines $length \
     --group=${group:-$((n_lines-1)),1}
     "
 eval $cmd || echo $cmd
+#echo $cmd
 

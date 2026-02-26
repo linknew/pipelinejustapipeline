@@ -43,7 +43,7 @@ _stockFile=.t.$$ && grep "'${_stockCode:1}" $_stockData/${_stockCode:0:6}-.packa
 
 while true
 do
-    showMsg "\n*[$_stockCode]$_stockName: showStock $_print --classFile=$_classFile\n" >&2
+    showMsg "\n*[$_stockCode]$_stockName: showStock $_print ${_firstLooking:+--firstLooking=$_firstLooking} --classFile=$_classFile\n" >&2
     [[ -z $_silent ]] && echo save result to $_classFile >&2
     [[ -f $_stockFile ]] && _hisCnt=$(wc -l $_stockFile | awk '{print $1}') || _hisCnt=0
     [[ -f $_stockData/$_stockCode.html.org.hot ]] && _hotCnt=$(wc -l $_stockData/$_stockCode.html.org.hot| awk '{print $1}') || _hotCnt=0
