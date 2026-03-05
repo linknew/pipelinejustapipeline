@@ -222,7 +222,8 @@ awk                             \
                    cnt,dur,offset,
                    durHigCA,durHigFA,durLowCA,durLowFA,dateStart,dateEnd,durOpen,durClose,durAmp,durXchg,durVol,durVal) ;
         for(i=0; i<cnt; i++){
-            srcFile = (FILENAME == "-")? ("sorting-raw/" code ".raw") : FILENAME;   #@ fix me
+#           srcFile = (FILENAME == "-")? ("sorting-raw/" code ".raw") : FILENAME;   #@ fix me
+            srcFile = (FILENAME == "-")? code : FILENAME;
             print content[i],durHigCA[i]"%",durHigFA[i]"%",durLowCA[i]"%",durLowFA[i]"%",durAmp[i],dateStart[i],dateEnd[i],durOpen[i],durClose[i],durXchg[i],durVol[i],durVal[i],srcFile ;
         }
     }

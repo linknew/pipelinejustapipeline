@@ -24,6 +24,7 @@ let _cmdCodeGenRelationshipData=$((1<<19))
 let _cmdCodeFixType=$((1<<20))
 let _cmdCodeFirstLooking=$((1<<21))
 let _cmdCodeHotDataPeek=$((1<<22))
+let _cmdCodeShowCmd=$((1<<23))
 let _cmdCode=0
 
 _owner=$$
@@ -143,6 +144,7 @@ doExit()
     [[ -p $$.baostock.req ]] && { ./getStockData.$$.sh --logout --owner=$_owner; }
     [[ -f getStockData.$$.sh ]] && { rm -rf ./getStockData.$$.sh 2>/dev/null; }
     [[ -f .t.$$ ]] && rm -rf .t.$$ 2>/dev/null
+    [[ -f .$$.lst ]] && rm -rf .$$.lst 2>/dev/null
     [[ -f $_pipe4Ana ]] && rm -rf $_pipe4Ana 2>/dev/null
     [[ -f $_pipe4Homework ]] && rm -rf $_pipe4Homework 2>/dev/null
     exit $1
@@ -155,13 +157,13 @@ showHelp()
                               [--show|--showNext|--monit [--showDaily | --firstLooking=yyyy-mm-dd] [--silent] [--order] [--bg]] [--fixType=F/B/N] \\
                               [--analize=filename [--analizeOptions='...']] \\
                               [--packDailyData] [--genRelationshipData] [--checkHitRate] \\
-                              [(--print | --printLastOne | --printLastN=<n>) [--output=PREFIX{}SUFFIX]] [--classFile=filename] listFile
+                              [(--print | --printLastOne | --printLastN=<n>) [--output=PREFIX{}SUFFIX]] [--classFile=filename] [--showCommand] listFile
 
         --download, download stock data
         --update, update stock data
         --hotData, get current data and keep refreshing
         --hotDataPeek, just get current data, dont keep refreshing
-        --keepRefresh, after program complete, keep refresh current data (does not stop data-retrieve job), this option must use under --hotData.
+        --keepRefresh, keep refresh current data even when this program terminated, this option must use under --hotData.
         --print, print stock infos(date,amplitude,power,etc.)
         --printLastOne, print the last item of stock infos(date,amplitude,power,etc.)
         --printLastN, print the last N_items of stock infos(date,amplitude,power,etc.)
@@ -183,6 +185,7 @@ showHelp()
         --genRelationshipData, generate relationship data.
         --doDailyHomework.  use --update to refresh stock data, find stocks in UP state, find out the possible stock which RSI-6 & PWRI-12 <= 15.
         --justDoIt. monitor stocks which RSI-6 & PWRI-12 <=15, monitor stocks which in UP state.
+        --showCommand, display command line to dev/tty
 
     Default: --show --classFile=stock.list.class.tmp
 \n"
@@ -219,9 +222,11 @@ do
     [[ $i == --doDailyHomework ]] && ((_cmdCode=_cmdCodeDoDailyHomework)) && continue
     [[ $i == --genRelationshipData ]] && ((_cmdCode |=_cmdCodeGenRelationshipData)) && continue
     [[ $i == --justDoIt ]] && ((_cmdCode=_cmdCodeJustDoit)) && continue
+    [[ $i == --showCommand ]] && ((_cmdCode |= _cmdCodeShowCmd)) && continue
     [[ ${i:0:1} == "-" ]] && showErr "unknown option:$i\n" >&2 && exit 0
     _list=$i
 done
+[[ -z $_list ]] && { cat - > .$$.lst; _list=.$$.lst; }
 
 #prepare
 trap "killGetDataTask
@@ -333,18 +338,19 @@ do
     # show stock
     if ((_cmdCode & (_cmdCodeShow|_cmdCodeShowNext) )) ; then
         let _winOrder+=1
-        _showCmd="showStock.sh > $_pipe4Ana --classFile=$_classFile"
-        ((_cmdCode & _cmdCodeShowDaily)) && _showCmd="$_showCmd --showDaily"
-        ((_cmdCode & _cmdCodeSilent)) && _showCmd="$_showCmd --silent"
-        ((_cmdCode & _cmdCodeOrder )) && _showCmd="$_showCmd --winOrder=$_winOrder"
-        ((_cmdCode & _cmdCodeFixType )) && _showCmd="$_showCmd --fixType=$_fixType"
-        ((_cmdCode & _cmdCodeFirstLooking)) && _showCmd="$_showCmd --firstLooking=$_firstLooking"
+        _showStock="showStock.sh > $_pipe4Ana --classFile=$_classFile"
+        ((_cmdCode & _cmdCodeShowDaily)) && _showStock="$_showStock --showDaily"
+        ((_cmdCode & _cmdCodeSilent)) && _showStock="$_showStock --silent"
+        ((_cmdCode & _cmdCodeOrder )) && _showStock="$_showStock --winOrder=$_winOrder"
+        ((_cmdCode & _cmdCodeFixType )) && _showStock="$_showStock --fixType=$_fixType"
+        ((_cmdCode & _cmdCodeFirstLooking)) && _showStock="$_showStock --firstLooking=$_firstLooking"
+        ((_cmdCode & _cmdCodeShowCmd)) && _showStock="$_showStock --showCommand"
         # following cmds must be put at the end of the cmds !!!
-        _showCmd="$_showCmd $_code"
+        _showStock="$_showStock $_code"
         if ((_cmdCode & _cmdCodeBG)) ; then
-            $_showCmd &
+            $_showStock &
         else
-            $_showCmd
+            $_showStock
         fi
     fi
 

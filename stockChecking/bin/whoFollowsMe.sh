@@ -60,7 +60,7 @@ awk -v shift_days=$shift_days   \
                 sum[code]["ucs"]) > ".sum" ;
         printf ("%s", code) > ".sum" ;
         for(i=1; i<=sum[code]["total"]; i++) {
-            printf(" %d", pfrsV[code][i]) > ".sum";
+            printf(" %d", ampsV[code][i]) > ".sum";
         }
         printf("\n") > ".sum" ;
     }
@@ -79,19 +79,19 @@ awk -v shift_days=$shift_days   \
 #       asr(n_code1 = n_code2);
         for(i=1; i<=len-shift_right_code1; i++) {
             if(!revers) {
-                is_same = and(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1]);
+                is_same = and(ampsV[leader][i], ampsV[follower][i+shift_right_code1]);
             }
             else {
-                is_same = xor(pfrsV[leader][i], pfrsV[follower][i+shift_right_code1]) &&
-                        pfrsV[leader][i] &&
-                        pfrsV[follower][i+shift_right_code1];
+                is_same = xor(ampsV[leader][i], ampsV[follower][i+shift_right_code1]) &&
+                        ampsV[leader][i] &&
+                        ampsV[follower][i+shift_right_code1];
             }
             if(is_same) cnt++;
             if(dbg) {
                 printf("%s %02d %02d %.2f %.2f\n",
                         is_same? "Y" : "N",
-                        pfrsV[leader][i], pfrsV[follower][i+shift_right_code1],
-                        pfrsV_dbg[leader][i], pfrsV_dbg[follower][i+shift_right_code1]);
+                        ampsV[leader][i], ampsV[follower][i+shift_right_code1],
+                        ampsV_dbg[leader][i], ampsV_dbg[follower][i+shift_right_code1]);
             }
         }
         printf("%s (shift_right %02d) followed by %s, length %d, rate %.2f\n",
@@ -107,7 +107,7 @@ awk -v shift_days=$shift_days   \
         n_code = 0;
         last_code = "";
 #       sum = ...;
-#       pfrsV = ...;
+#       ampsV = ...;
 #       code_list = ...;
         leader_n = split(leaders, _arry);
         for(i=1; i<=leader_n; i++) {
@@ -124,7 +124,7 @@ awk -v shift_days=$shift_days   \
 
     {
         code = $1;
-        pfr = $2;   # price fluctuation rate
+        amp = $4;
         if(code != last_code) {
             idx = 1;
             n_code ++;
@@ -134,11 +134,11 @@ awk -v shift_days=$shift_days   \
         }
 
         sum[code]["total"] ++;
-        if(pfr > 0) {
+        if(amp > 0) {
             sum[code]["ups"] ++;
             pfr_abs = 1;    #(1<<0)
         }
-        else if(pfr < 0) {
+        else if(amp < 0) {
             sum[code]["dns"] ++;
             pfr_abs = 2;    #(1<<1)
         }
@@ -147,9 +147,9 @@ awk -v shift_days=$shift_days   \
 #           pfr_abs = 3;    #(1&2)
             pfr_abs = 0;    #(...)
         }
-        pfrsV[code][idx] = pfr_abs;
+        ampsV[code][idx] = pfr_abs;
         if(dbg) {
-            pfrsV_dbg[code][idx] = pfr;
+            ampsV_dbg[code][idx] = amp;
         }
         idx ++;
     }

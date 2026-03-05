@@ -5,8 +5,8 @@ better_signal_org=$2
 simple=$3
 
 trades=$(
-grep -F "#$signal " $better_signal_org |
-sed 's/.*@//; s/,.*//; s/\~/ /;' |
+grep -F "#$signal " $better_signal_org  | #cat -; exit
+sed 's/.*@//; s/,.*//; s/\~/ /;'        | #cat -; exit
 awk '
     /^$/ {
         next;
@@ -42,6 +42,7 @@ awk '
     }
     '
 )
+#echo "$trades"; exit
 
 profit=$(
 grep -F "$signal " ${better_signal_org%.org}
@@ -52,7 +53,7 @@ echo "$profit" | awk '{print $2}'
 )
 
 n_max_trades=$(
-echo "$trades" | tail -n1 | awk '{print $1}'
+echo "$trades" | sort -n | tail -n1 | awk '{print $1}'
 )
 
 n_max_investment=$((n_max_trades*20000))
@@ -61,7 +62,7 @@ n_profit_rate=$(
 awk 'BEGIN{printf("%.2f", '$n_profit'/'$n_max_investment'*100);}'
 )
 
-if [[ -n $simple ]]; then
+if [[ -z $simple ]]; then
     echo $profit $n_max_trades*20000 $n_profit_rate%
 else
     cat <<-EOF

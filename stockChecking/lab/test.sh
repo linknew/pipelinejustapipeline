@@ -256,7 +256,8 @@ awk -v skipNewBorn=$skipNewBorn     \
     }
 
     ($1 !~ /#/){
-        code = substr($14,13,6) ;
+#       code = substr($14,13,6) ;
+        code = $14; #@ 7code
         cnt[code]++ ;
         if(cnt[code] <= skipNewBorn) next ;
 

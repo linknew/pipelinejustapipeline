@@ -2,7 +2,6 @@
 
 source $(dirname $(readlink -f $0))/../lib/comm.lib
 
-
 #@ for example: serial_depth=2
 
 #@ before serialize

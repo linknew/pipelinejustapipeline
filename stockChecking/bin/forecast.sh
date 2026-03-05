@@ -7,25 +7,20 @@ doStart
 
 n_jobs=14
 doForecastDef=0
-durDef=3
+durDef=22
 genSegmentDef=0
 genCountingDef=0
 verifyDef=0
 buyFixDef=0
 selFixDef=-0.03
-serialLvlDef=4
-
-SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
-GEN_KLINK_RAWDATA=_1.1_genKLineSortingRawData.sh;  command -v $GEN_KLINK_RAWDATA     >&2 || doExit -2 "echo cannot find $GEN_KLINK_RAWDATA >&2"
-GEN_SEGMENT_UPDN_RATE=_1.2_genSegmentUpDnRate.sh;  command -v $GEN_SEGMENT_UPDN_RATE >&2 || doExit -3 "echo cannot find $GEN_SEGMENT_UPDN_RATE >&2"
-GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_DATA >&2 || doExit -4 "echo cannot find $GEN_COUNTING_SEG_DATA >&2"
+serialLvlDef=6
 
 Usage()
 {
     echo -ne "
     Usage: $(basename $0) [--dur=<n>] [--serialLvl=<n>]                             \\
         [--start=YYYY-MM-DD] [--end=YYYY-MM-DD]                                     \\
-        [--genSegment [--abb]] [--genCounting] [--doForecast] [--build] [--help]    \\
+        [--genSegment [--coder=<coder>] [--abb]] [--genCounting] [--doForecast] [--build] [--help]    \\
         /*[--verify [--buyFix=<N>] [--selFix=<N>]]*/                                \\
         list
 
@@ -33,7 +28,9 @@ Usage()
         --serialLvl, signal width for forecast, please check the example in serialize2.sh
         --start, input data range
         --end, input data range
-        --genSegment, generate segment data. if --abb is present, use abberivation serialized signals
+        --genSegment, generate segment data.
+          if --abb is present, use abberivation serialized signals
+          if --coder is present, use the <coder> to generate the segment data
         --abb, **** FIXME, multiple processes, merge abbs
         --genCounting, gencounting data
         --build, is the abbrevation of --genSegment --genCounting
@@ -67,6 +64,7 @@ do
     [[ ${i%%=*} == "--verify" ]] && verify=1 && continue
     [[ ${i%%=*} == "--buyFix" ]] && buyFix=${i##*=} && continue
     [[ ${i%%=*} == "--selFix" ]] && selFix=${i##*=} && continue
+    [[ ${i%%=*} == "--coder" ]] && segCoder=${i##*=} && continue
     [[ ${i} == "--genSegment" ]] && genSegment=1 && continue
     [[ ${i} == "--abb" ]] && abb=1 && continue
     [[ ${i} == "--genCounting" ]] && genCounting=1 && continue
@@ -77,9 +75,16 @@ do
     [[ -n $list ]] && echo "*! Multipule list specified">&2 && doExit -1
     list=$i
 done
-
-[[ -n $list && ! -f $list ]] && echo "*! Cannot find or open [$list]">&2 && doExit -1
+[[ -z $list ]] && { cat - > .$$.lst; list=.$$.lst; }
 codes=$( awk '($1 !~ "#"){print $1}' $list | sort -u)
+[[ -f .$$.lst ]] && rm .$$.lst
+
+segCoder=${segCoder:-_1.1_genKLineSortingRawData.sh}
+SERIALIZE_2=serialize2.sh;                         command -v $SERIALIZE_2 >&2           || doExit -4 "echo cannot find $SERIALIZE_2 >&2"
+GEN_KLINK_RAWDATA=$segCoder;                       command -v $GEN_KLINK_RAWDATA     >&2 || doExit -2 "echo cannot find $GEN_KLINK_RAWDATA >&2"
+GEN_SEGMENT_UPDN_RATE=_1.2_genSegmentUpDnRate.sh;  command -v $GEN_SEGMENT_UPDN_RATE >&2 || doExit -3 "echo cannot find $GEN_SEGMENT_UPDN_RATE >&2"
+GEN_COUNTING_SEG_DATA=_1.3_countingSegMentData.sh; command -v $GEN_COUNTING_SEG_DATA >&2 || doExit -4 "echo cannot find $GEN_COUNTING_SEG_DATA >&2"
+
 codeNum=$(echo "$codes" | wc -w)
 [[ $codeNum -le 0 ]] && echo "*! No processed item, terminal the program">&2 && doExit 0
 [[ $codeNum -eq 1 ]] && postFilename=$postFilename.$codes
@@ -203,7 +208,8 @@ if [[ $genCounting -eq 1 ]]; then
 
                 }else if("-" == FILENAME){
                     codeNum = split2($0,a," ") ;
-                    for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;    #@ fix me
+#                   for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;    #@ fix me
+                    for(i=0; i<codeNum; i++) files[a[i]] = 1 ;
                 }
             }
             ' - $segData    |   #cat > .tt; exit
@@ -231,7 +237,8 @@ if [[ $doForecast == 1 ]] ; then
                 if(start && $9<start) next ;
                 if(end && $9>end) next ;
                 if($NF in files){
-                    print forecastCont[$1],$9,$11,substr($NF,13,6),$1 ;
+#                   print forecastCont[$1],$9,$11,substr($NF,13,6),$1 ;
+                    print forecastCont[$1],$9,$11,$NF,$1 ;
                 }
             }else if("'"$cntgData"'" == FILENAME){
                 #    1..........................................................................................................................................................NF
@@ -244,7 +251,8 @@ if [[ $doForecast == 1 ]] ; then
                 }
             }else if("-" == FILENAME){
                 codeNum = split2($0,a," ") ;
-                for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+#               for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+                for(i=0; i<codeNum; i++) files[a[i]] = 1 ;
             }
         }
 
@@ -288,7 +296,8 @@ if [[ $verify -eq 1 ]] ; then
                     low = $13+0 ;
                     hig = $12+0 ;
                     date = $9 ;
-                    code = substr($NF,13,6) ;
+#                   code = substr($NF,13,6) ;
+                    code = $NF;
                     seed = $1 ;
                     $0 = forecastCont[seed] ;         # upCnt upAmp dnCnt dnAmp upCnt/unCnt
                     upCnt = $1 ;
@@ -318,7 +327,8 @@ if [[ $verify -eq 1 ]] ; then
             }else if("-" == FILENAME){
 
                 codeNum = split2($0,a," ") ;
-                for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+#               for(i=0; i<codeNum; i++) files["sorting-raw/" a[i] ".raw"] = 1 ;
+                for(i=0; i<codeNum; i++) files[a[i]] = 1 ;
 
             }
         }

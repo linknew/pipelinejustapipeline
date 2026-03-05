@@ -78,6 +78,9 @@ static Scalar  lineColors[MAX_SUPPORTTED_LINES] = {
                         Scalar(0,255,0),
                         Scalar(255,125,125),
                         Scalar(255,255,255),
+                        Scalar(0,0,0),
+                        Scalar(80,80,80),
+                        Scalar(0,0,0),
                     } ;
 static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digital keys) function switch.
                         digtFuncBaselineFilter,
@@ -90,9 +93,17 @@ static unsigned long    baseLineSwitchers = (0) ;     // if (MAX_SUPPORTTED_LINE
 static unsigned long    linesSwitchers = ((1<<6)-1);   // comments here, same with above line's!!
 static bool             autoFit = true ;
 static int              scale = 64 ;     // for x-coordinates
+static int              n_avg = 1;
 static int              dataFixType = DATA_FIX_TYPE_BACKWARD ;
 static int              crntUsedDataFixType = DATA_FIX_TYPE_NOT_SET ;
 static bool             lockScreen = false ;
+
+struct DataInfo {
+    std::string filename;
+    int n_lines;
+    int length;
+};
+DataInfo dataInfo;
 
 int dataRangeStart=MAX_SUPPORTTED_LENGTH;   // all x-coordinate SHOULD(MUST!!) base on the dataRangeStart(NOT the dataRangeEnd)
 int dataRangeEnd=MAX_SUPPORTTED_LENGTH;
@@ -101,7 +112,7 @@ int measureIdx = -1;
 int winW = MAX_WIN_WIDTH ;
 int winH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, _bottomView, _topStatus_view, _leftDetailsView ;
-Mat gLinesData ;
+Mat gLines, gLinesData, gLinesDataAvg ;
 
 //@ mark mode
 //@ use m<key> to creat a mark with the name <key>
@@ -198,14 +209,42 @@ int drawVol(
     return 0;
 }
 
+void _getAvg(const Mat &m, Mat &out, size_t days, bool checkLastOne)
+{
+    size_t  i = 0, j = 0 ;
+    size_t  _first = 0 ;
+
+    _first = checkLastOne ? max(0, m.cols - (int)days) : 0 ;
+
+    for(j=0; j<m.rows; j++) {
+
+        double  _tt = 0, _avg = 0 ;
+
+        for(i = _first; i < m.cols; i++) {
+            _tt += m.at<double>(j,i) ;
+
+            if( i-_first >= days )
+                _tt -= m.at<double>(j,i-days) ;
+
+            _avg = _tt / min(i-_first+1,days) ;
+
+            if(!checkLastOne) out.at<double>(j,i) = _avg ;
+        }
+    }
+
+    return;
+}
+
 int importData(
-        const char* fileName,
-        const int   linesNum,
-        const int   linesLen,
-        Mat&        outputMat
+        const DataInfo  &dataInfo,
+        Mat&            outputMat,
+        Mat&            outputMatAvg
         )
 {
-    Mat             _m ;
+    const char* fileName = dataInfo.filename.c_str();
+    const int   linesNum = dataInfo.n_lines;
+    const int   linesLen = dataInfo.length;
+    Mat             _m, _avg ;
     ifstream        _file ;
     string          _tmpStr ;
     stringstream    _tmpSS ;
@@ -215,8 +254,8 @@ int importData(
 
     assert(fileName) ;
 
-    _m.create(min(MAX_SUPPORTTED_LINES,linesNum), min(MAX_SUPPORTTED_LENGTH, linesLen), CV_64F) ;
-    _m.setTo(Scalar(0)) ;
+    _m.create(min(MAX_SUPPORTTED_LINES,linesNum), min(MAX_SUPPORTTED_LENGTH, linesLen), CV_64F) ; _m.setTo(Scalar(0)) ;
+    _avg.create(min(MAX_SUPPORTTED_LINES,linesNum), min(MAX_SUPPORTTED_LENGTH, linesLen), CV_64F) ; _avg.setTo(Scalar(0)) ;
     _file.open(fileName[0]=='-' ? "/dev/stdin" : fileName, ifstream::in) ;
     if(!_file){
         cerr << "cannot open file " << fileName << endl ;
@@ -257,6 +296,15 @@ int importData(
 
     _file.close();
     outputMat = _m ;
+
+    //@ gen averages
+    Mat _t1 = _avg.rowRange(0, _avg.rows-1);
+    _getAvg(_m.rowRange(0,_m.rows-1), _t1, n_avg, false);
+
+    //@ gen average of last line. actually, the last line is **date**
+    Mat _t2 = _avg.row(_avg.rows-1);
+    _getAvg(_m.row(_m.rows-1), _t2, 1/*no average, just use current data*/, false);
+    outputMatAvg = _avg;
     return 0 ;
 }
 
@@ -389,7 +437,7 @@ int zoom_klines(int scale_)
         if(sN < 0){
             sN = 0 ;
         }
-        eN = min(sN + N_DATA_OF_CUR_VIEW(gMainView.cols, scale_),gLinesData.cols) ;
+        eN = min(sN + N_DATA_OF_CUR_VIEW(gMainView.cols, scale_),gLines.cols) ;
         if(!lockScreen && eN -sN < N_DATA_OF_CUR_VIEW(gMainView.cols, scale_)){
             /* the right part maybe empty. if left part has more data undisplayed, move the view to right to fit the whole panel */
             _adjust = min(sN, N_DATA_OF_CUR_VIEW(gMainView.cols, scale_) - (eN-1 - sN + 1)) ;
@@ -489,15 +537,15 @@ void initColor(int num)
 
 void calc_data_range(bool reset_start, bool reset_dtls, bool reset_measure)
 {
-    if(reset_start) dataRangeStart = gLinesData.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
+    if(reset_start) dataRangeStart = gLines.cols - N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
     if(dataRangeStart < 0) dataRangeStart = 0 ;
-    if(dataRangeStart > gLinesData.cols-1) dataRangeStart = gLinesData.cols-1 ;
+    if(dataRangeStart > gLines.cols-1) dataRangeStart = gLines.cols-1 ;
     dataRangeEnd = dataRangeStart + N_DATA_OF_CUR_VIEW(gMainView.cols,scale) ;
-    if(dataRangeEnd > gLinesData.cols) dataRangeEnd = gLinesData.cols ;
+    if(dataRangeEnd > gLines.cols) dataRangeEnd = gLines.cols ;
 
     if(reset_dtls) dtlsIdx = (dataRangeEnd + (dataRangeStart-1) )/2 ;
     if(dtlsIdx < 0) dtlsIdx = 0 ;
-    if(dtlsIdx > gLinesData.cols-1) dtlsIdx = gLinesData.cols-1 ;
+    if(dtlsIdx > gLines.cols-1) dtlsIdx = gLines.cols-1 ;
 
     if(reset_measure) measureIdx = -1;
 }
@@ -569,10 +617,10 @@ int main( int argc, char** argv )
         size_t              _argCnt = 0 ;
         map<size_t,char*>   _args ;
 
-        /* _args[0], stockCode, 
-         * _args[1], filename, 
-         * _args[2], linesNum, 
-         * _args[3], linesLength 
+        /* _args[0], stockCode,
+         * _args[1], filename,
+         * _args[2], linesNum,
+         * _args[3], linesLength
          *
          * --focus, default is 0
          * --scale, default is 64
@@ -634,9 +682,12 @@ int main( int argc, char** argv )
         _linesNum = atoi(_args[2]) ;
         _linesLen = atoi(_args[3]) ;
         if(linesGrpInfo.empty()) for(int _i=0; _i<_linesNum; _i++) linesGrpInfo.push_back(1) ;
-        importData(_dataFile, _linesNum, _linesLen, gLinesData) ;
-        assert(_linesNum==gLinesData.rows) ;
-        assert(_linesLen==gLinesData.cols) ;
+        dataInfo.filename = _dataFile;
+        dataInfo.n_lines = _linesNum;
+        dataInfo.length = _linesLen;
+        importData(dataInfo, gLinesData, gLinesDataAvg); gLines = gLinesDataAvg; //gLines = gLinesDataAvg;
+        assert(_linesNum==gLines.rows) ;
+        assert(_linesLen==gLines.cols) ;
         assert(idxFocusedLine<_linesNum && idxFocusedLine>=0) ;
         assert(scale>=1 && scale<=MAX_SCALE) ;
         initColor(_linesNum) ;
@@ -684,11 +735,11 @@ int main( int argc, char** argv )
                 calc_data_range(true, false, false);
             }
 
-            /* adjust gLinesData & _linesInfo */
+            /* adjust gLines & _linesInfo */
             {
                 int _idx = 0 ;
                 int _linesNum = 0 ;
-                Mat _m = gLinesData.clone() ;
+                Mat _m = gLines.clone() ;
 
                 for(int i = 0; i < linesGrpInfo.size(); i++){
                     _linesNum = linesGrpInfo[i] ;
@@ -700,7 +751,7 @@ int main( int argc, char** argv )
                     _idx += _linesNum ;
 
                 }
-                assert(_idx == gLinesData.rows);
+                assert(_idx == gLines.rows);
 
                 viewData = _m.colRange(dataRangeStart,dataRangeEnd) ;
                 drawLines(viewData, gMainView, scale,
@@ -786,7 +837,7 @@ int main( int argc, char** argv )
 
                 /* show stock name & code & data-fix status */
                 s.str("");
-                s << stockCode ;
+                s << stockCode << " [AVG-" << n_avg << "]";
 #if 0
                 (dataFixType == DATA_FIX_TYPE_FORWARD)
                     ? s << " [Forward Fixing]"
@@ -840,8 +891,8 @@ int main( int argc, char** argv )
                     long    _l = 0 ;
                     Scalar  _color ;
 
-                    for(int i = 0; i < gLinesData.rows; i++){
-                        _d = gLinesData.at<double>(i,dtlsIdx) ;
+                    for(int i = 0; i < gLines.rows; i++){
+                        _d = gLines.at<double>(i,dtlsIdx) ;
                         _color = lineColors[i] ;
                         s.str("");
                         s << " line-" << i+1 << " = " << setiosflags(ios::fixed) << setprecision(_d>99999?0:2) << _d ;
@@ -875,8 +926,8 @@ int main( int argc, char** argv )
                     putText( _leftDetailsView, s.str(), Point(0,120+(info_idx++)*text_hi), FONT_HERSHEY_SIMPLEX, 0.4, Scalar(255,255,255), 0, LINE_AA );
 
                     std::vector<pair<int,double>> sorted;
-                    for(i=0; i<gLinesData.rows; i++) {
-                        Mat _lineData = gLinesData.row(i) ;
+                    for(i=0; i<gLines.rows; i++) {
+                        Mat _lineData = gLines.row(i) ;
 
                         /* amp-custom */
                         if(_days<=0||_lineData.at<double>(0,measureIdx)<=0) {
@@ -890,7 +941,7 @@ int main( int argc, char** argv )
                         sorted.push_back(make_pair(i,_d));
                     }
                     std::sort(sorted.begin(), sorted.end(), [](const pair<int,double> &a, const pair<int,double> &b){ return a.second > b.second; });
-                    for(i=0; i<gLinesData.rows; i++) {
+                    for(i=0; i<gLines.rows; i++) {
                         int line_idx = sorted[i].first;
                         double line_data = sorted[i].second;
                         _color = lineColors[line_idx] ;
@@ -1139,14 +1190,14 @@ int main( int argc, char** argv )
                         dataRangeEnd += step_mv_act ;
                     }
                 }
-                calc_data_range(dataRangeEnd > gLinesData.cols, false, false);
+                calc_data_range(dataRangeEnd > gLines.cols, false, false);
                 refresh = true ;
                 break ;
             case 'J':
             case 'K':
                 if(lockScreen) {
                     idxFocusedLine += c=='J'? 1 : -1;
-                    idxFocusedLine = (idxFocusedLine + gLinesData.rows) % gLinesData.rows;
+                    idxFocusedLine = (idxFocusedLine + gLines.rows) % gLines.rows;
                     refresh = true;
                 }
                 break;
@@ -1160,6 +1211,14 @@ int main( int argc, char** argv )
                             : digtFuncIdx - 1 ;
                 refresh = true ;
                 break ;
+            case '<':
+                if(n_avg == 1) break;
+            case '>':
+                n_avg += c=='>'? 1 : -1;
+                importData(dataInfo, gLinesData, gLinesDataAvg);
+                gLines = gLinesDataAvg;
+                refresh = true;
+                break;
             default:
                 refresh = false ;
                 break ;

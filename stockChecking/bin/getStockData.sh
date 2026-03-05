@@ -27,9 +27,10 @@ doExit()
 {
     # $1 is exitCode
 
-#   if [[ -n $hot_data_pid ]]; then
-#       kill -0 $hot_data_pid && kill -9 $hot_data_pid
-#   fi
+    #@ will be killed by parent
+    #if [[ -n $hot_data_pid ]]; then
+    #    kill -0 $hot_data_pid && kill -9 $hot_data_pid
+    #fi
 
     if [[ $1 == 0 ]] ; then
         : main task exit
@@ -215,8 +216,8 @@ if ((_cmdCode & (_cmdCodeHotData|_cmdCodeHotDataPeek) )); then
 #       [[ -z $_trapIsOk ]] && trap " doExit 2 " SIGINT SIGTERM SIGQUIT && _trapIsOk=1
 
         _timeStampReq=$(date '+%Y-%m-%d %H:%M:%S')
-#       _dataRcvd=$(getHot.sina.sh $_stockCode)
-        _dataRcvd=$(getHot.eastmoney.sh $_stockCode)
+#       _dataRcvd=$(getHot.eastmoney.sh $_stockCode)
+        _dataRcvd=$(getHot.qt.sh $_stockCode)
 
         echo "[$_timeStampReq] $_dataRcvd" >> .curl
 
@@ -232,10 +233,12 @@ if ((_cmdCode & (_cmdCodeHotData|_cmdCodeHotDataPeek) )); then
         fi
 
         # say ok to parent
-        [[ $_keepRefresh == true ]] && { kill -s SIGUSR2 $PID; sleep 15; } || break
+        [[ $notify_ok != 1 ]] && { notify_ok=1; kill -s SIGUSR2 $PID; }
+
+        sleep 15;
     done& hot_data_pid=$!
 
-    #stay here, wait child processed quit (if $_keepRefresh is "true", wait child proecss send out the message:SIGUSR2)
+    #stay here, wait child quit or send out message:SIGUSR2
     wait
     doExit 1
 

@@ -36,6 +36,7 @@ list=$(echo '
 0000039  #上证信息  2003-12-31  1000  50
 0000040  #上证通信  2003-12-31  1000  33
 0000041  #上证公用  2003-12-31  1000  30
+0000001  #沪指
 ' | sed '/^[ \t]*$/d'
 )
 from=2009-01-09; to=2999-12-31
@@ -67,8 +68,8 @@ drawLines dummy_code $data $n_lines $length \
     --showlines=$( for ((i=1;i<$n_lines;i++)) { [[ $i -eq 1 ]] && printf $i || printf ",%d" $i; } ) \
     --scale=1   \
     --focus=2   \
-    --group=${group:-$((n_lines-1)),1}
+    --group=${group:-$((n_lines-2)),1,1}
     "
 eval $cmd || echo $cmd
-#echo $cmd
+echo $cmd
 

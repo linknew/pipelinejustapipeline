@@ -4,7 +4,7 @@
 
 usage()
 {
-    echo -en "Usage\n\t$(basename $0) <verbose> <taxPrt> <taxHandFee> <start> <end> <segData> <codeLst> <seedLst>\n\n"
+    echo -en "Usage\n\t$(basename $0) <verbose> <taxPrt> <taxHandFee> <start> <end> <segData> <ampIdx> <codeLst> <seedLst>\n\n"
     echo -en "Examples:\n"
     echo -en "     \n\t$(basename $0) 1 0.001 0.0003 2025-11-05 2025-11-06 ~/forecast/.t3.segData.lvl3 ~/StockData/stock.list ~/forecast/goodSignals.lst\n\n"
 }
@@ -18,8 +18,9 @@ taxRatHandFee=$3
 start=$4
 end=$5
 segDate=$6
-fnCodeLst=$7
-fnSeedLst=$8
+ampIdx=$7
+fnCodeLst=$8
+fnSeedLst=$9
 
 awk -v verbose=$verbose                 \
     -v taxRatPrt=$taxRatPrt             \
@@ -27,6 +28,7 @@ awk -v verbose=$verbose                 \
     -v start=$start \
     -v end=$end     \
     -v segDate=$segDate \
+    -v ampIdx=$ampIdx \
     -v fnCodeLst="$fnCodeLst"   \
     -v fnSeedLst="$fnSeedLst"   \
     '
@@ -92,10 +94,12 @@ awk -v verbose=$verbose                 \
         seed = $1 ;
         if(seedLst["size"]!=0 && !(seed in seedLst)) next;
 
-        code = substr($14,13, length($14)-16) ; #@ sorting-raw/0000001.raw, prefix_len 12, suffix_len 4
+#       code = substr($14,13, length($14)-16) ; #@ sorting-raw/0000001.raw, prefix_len 12, suffix_len 4
+        code = $14  #@ 7code
         if(codeLst["size"] && !(code in codeLst)) next;
 
-        ampDur = $6+0;
+        ampDur = $ampIdx+0;
+        upAmpCeiling = $2+0;
 #       clsPrice = $11+0 ;
         cnt_seed[seed]++ ;
         cnt_code[code]++ ;

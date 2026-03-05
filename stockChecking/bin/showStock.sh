@@ -7,10 +7,11 @@ do
     [[ $i == '--help' ]] &&
     echo "
     Usage:
-        $0 [--help] [--print | --printLastOne | --printLastN=<N>] [--showDaily|--firstLooking=yyyy-mm-dd] [--silent] [--classFile=classFilename] [--winOrder=N] [--fixType=F/B/N] stockCode
+        $0 [--help] [--showCommand] [--print | --printLastOne | --printLastN=<N>] [--showDaily|--firstLooking=yyyy-mm-dd] [--silent] [--classFile=classFilename] [--winOrder=N] [--fixType=F/B/N] stockCode
         " >&2 &&
     exit 0
 
+    [[ $i == '--showCommand' ]] && _show_cmd=1 && continue
     [[ $i == '--print' ]] && _print='--print' && _silent=1 && continue
     [[ $i == '--printLastOne' ]] && _print='--printLastOne' && _silent=1 && continue
     [[ ${i%%=*} == '--printLastN' ]] && _print="$i" && _silent=1 && continue
@@ -62,7 +63,8 @@ do
         $_stockData/$_stockCode.html.org.hot   \
         $_hotCnt
 	"
-    eval $cmd || echo $cmd >/dev/tty
+    [[ -n $_show_cmd ]] && echo $cmd >/dev/tty
+    eval $cmd
 
     if [[ -z $_silent ]] ; then
         echo "

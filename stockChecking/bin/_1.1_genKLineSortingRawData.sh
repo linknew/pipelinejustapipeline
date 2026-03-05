@@ -6,11 +6,10 @@ Usage() {
     echo -en "
     Usage:
 
-        $(basename $0) [--segment] [--source= ( <pathname> | -) ]  <code_6>
+        $(basename $0) [--segment] --sourceData=(<pathname>|-) <code_6>
 
-        --segment: do segementation
-        --source:  specify source data file. if no file spedified,
-                   create it according playStock.sh --print <<< \$code
+        --segment:      do segementation
+        --sourceData:   specify a source data file or create from 'playStock.sh --print <<< \$code'
     " >&2
 }
 

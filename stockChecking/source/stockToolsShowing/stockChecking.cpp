@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <signal.h>
 #include <pthread.h>
+#include <thread>
 #include <unistd.h>
 #include "view.hpp"
 
@@ -32,7 +33,7 @@
 #define RSLT_NOTHING            (1)     // current function do not care this key. (main process need to take it)
 #define RSLT_REQ_QUIT           (2)     // request to quit
 
-#define MAX_LINES               (9)
+#define MAX_LINES               (10)
 #define ALL_ITEMS               (-1)
 
 #define GAP_SECOND              (15)    // must be divd by 60
@@ -86,7 +87,7 @@
              << gLinesData.at<double>(0,_i) << " "      /* price of close */                                        \
              << gPwrData.at<double>(0,_i) << " "        /* power */                                                 \
              << gAmpData.at<double>(0,_i) << " "        /* amplitude */                                             \
-             << 100.0*gValData.at<double>(0,_i)/(gVolData.at<double>(0,_i)*gYstdData.at<double>(0,_i)) - 100.0 << " "  /* actual amplitude */ \
+             << 100.0*gValData.at<double>(0,_i)*10/(gVolData.at<double>(0,_i)*gYstdData.at<double>(0,_i)) - 100.0 << " "  /* actual amplitude */ \
              << gRsi6Data.at<double>(0,_i) << " "       /* RSI-6 */                                                 \
              << gRsi14Data.at<double>(0,_i) << " "       /* RSI-14 */                                               \
              << gRsi24Data.at<double>(0,_i) << " "       /* RSI-24 */                                               \
@@ -161,10 +162,17 @@ enum DATA_TYPE{
     DATA_TYPE_AVERAGE_264 ,     /* do not change this index(for kLines), hotkey '6' */
     DATA_TYPE_HIG ,             /* do not change this index(for kLines), hotkey '7' */
     DATA_TYPE_AVG ,             /* do not change this index(for kLines), hotkey '8' */
-    DATA_TYPE_LOW ,             /* do not change this index(for kLines), hotkey '9', must be the last one!! */
-    DATA_TYPE_OPEN ,
+    DATA_TYPE_LOW ,             /* do not change this index(for kLines), hotkey '9', must be the last one?? */
+    DATA_TYPE_OPEN ,            /* do not change this index(for kLines), no hotkey, just for rectangle_kline */
     DATA_TYPE_AMP ,
     DATA_TYPE_VOL ,
+#if 1                           //@ average of vol
+    DATA_TYPE_VOL_AVG_5,
+    DATA_TYPE_VOL_AVG_22,
+    DATA_TYPE_VOL_AVG_66,
+    DATA_TYPE_VOL_AVG_132,
+    DATA_TYPE_VOL_AVG_264,
+#endif
     DATA_TYPE_VAL ,
     DATA_TYPE_LVAL ,
     DATA_TYPE_YSTD ,
@@ -204,7 +212,8 @@ enum SYS_SWITCH_KEY{
     SHOW_DAILY,
     AUTO_FIT,
     SET_MARK,
-    LOAD_MARK
+    LOAD_MARK,
+    DRAW_KLINE                  //@ show kline(open/close/high/low) to instead of smooth kline-0
 } ;
 
 /* declare for daily */
@@ -245,7 +254,7 @@ int digtFuncScale( char c);
 /* color-list for lines */
 static Scalar  lineColors[MAX_LINES] = {
                         Scalar(255,50,50),
-                        Scalar(80,80,150),
+                        Scalar(200,200,200),
                         Scalar(255,255,0),
                         Scalar(255,0,255),
                         Scalar(0,0,255),
@@ -253,6 +262,7 @@ static Scalar  lineColors[MAX_LINES] = {
                         Scalar(0,255,0),
                         Scalar(255,125,125),
                         Scalar(255,255,255),
+                        Scalar(80,80,150),
                     } ;
 static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digital keys) function switch.
                         digtFuncBaselineFilter,
@@ -264,7 +274,7 @@ static digtFuncPt digtFuncList[] = {                // this struct for 0~9(digit
 
 static unsigned int     sysSwitchers = 0 ;
 static unsigned int     baseLineSwitchers = (3<<2) ;        // if (MAX_LINES > sizeof(int)*8), this maybe take you to a fault!!
-static unsigned int     linesSwitchers = (0xffff & (~((1<<1)|(1<<6)|(1<<7)|(1<<8))));   // comments here, same with above line's!!
+static unsigned int     linesSwitchers = (0xffff & (~((1<<1)|(1<<6)|(1<<7)|(1<<8)|(1<<9))));   // comments here, same with above line's!!
 static unsigned int     indexSwitchers = ((1<<0)|(1<<4));   // rsi6 & pwri12
 
 static unsigned char    digtFuncIdx = 2 ;
@@ -294,7 +304,7 @@ static int              gPanelY = 0 ;
 static int              gPanelW = MAX_WIN_WIDTH ;
 static int              gPanelH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, gBottomView, gIndexView, gTopStatus_view, gLeftDetailsView, gMessData;
-Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gCloseData, gAmpData, gXcgData, gVolData, gValData, gLvalData,
+Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gCloseData, gAmpData, gXcgData, gVolData, gVol5, gVol22, gVol66, gVol132, gVol264, gValData, gLvalData,
     gKLine5, gKLine22, gKLine66, gKLine132, gKLine264,
     gMACD_DIF, gMACD_DEA, gMACD, gPwrData, gDateData, gEgrData, gRsi6Data, gRsi14Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri14Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
 
@@ -435,6 +445,55 @@ int paintDataUpDn(
 }
 
 /* return the first displayed index of data */
+int paintKlineData(
+        const Mat&      mOpen,
+        const Mat&      mClose,
+        const Mat&      mHigh,
+        const Mat&      mLow,
+        const Mat&      panel,
+        const int&      scale,
+        const Rect&     roi
+        )
+{
+    if (!GET_SWITCHER_STATUS(sysSwitchers, DRAW_KLINE)) {
+        return -1;
+    }
+
+    int     _idxS ;
+
+    int rect_type;
+    Scalar      color;
+    Point               ps, pe, plt, prb;
+
+    _idxS = max(0, mOpen.cols-N_DATA_OF_CUR_VIEW(roi.width+LINE_MARGIN_L+LINE_MARGIN_R,scale)) ;
+
+    for(int _col = _idxS ; _col < mOpen.cols ; _col++){
+
+        double opn = mOpen.at<double>(0, _col);
+        double cls = mClose.at<double>(0, _col);
+        double hig = mHigh.at<double>(0, _col);
+        double low = mLow.at<double>(0, _col);
+        color = opn>cls? Scalar(200,200,0) : opn<cls? Scalar(0,0,255) : Scalar(255,255,255);
+        rect_type = opn>cls? -1/*FILLED*/ : 0;
+
+        //@ line
+        ps = Point( (_col-_idxS)*scale + scale/2 +roi.x, roi.height-1 - hig + roi.y );
+        pe = Point( (_col-_idxS)*scale + scale/2 +roi.x, roi.height-1 - max(opn,cls) + roi.y );
+        line( panel, ps, pe, color, 1, LINE_AA);
+        ps = Point( (_col-_idxS)*scale + scale/2 +roi.x, roi.height-1 - low + roi.y );
+        pe = Point( (_col-_idxS)*scale + scale/2 +roi.x, roi.height-1 - min(opn,cls) + roi.y );
+        line( panel, ps, pe, color, 1, LINE_AA);
+
+        //@ rectange
+        plt = Point( (_col-_idxS)*scale + scale/2 +roi.x -2, roi.height-1 - opn + roi.y );
+        prb = Point( (_col-_idxS)*scale + scale/2 +roi.x +2, roi.height-1 - cls + roi.y );
+        rectangle (panel, plt, prb, color, rect_type, LINE_8 );
+    }
+
+    return _idxS ;
+}
+
+/* return the first displayed index of data */
 int paintData(
         const Mat&      data,
         const Mat&      panel,
@@ -493,7 +552,7 @@ int paintData(
     return _idxS ;
 }
 
-int drawKLines(
+int drawSoomthKLines(
         const Mat&      linesData,
         const Mat&      panel,
         const int&      scale,
@@ -545,23 +604,36 @@ double _getTT(const Mat &m, Mat &out, size_t days, bool absCalc, bool checkLastO
     return (checkLastOne ? _tt : 0) ;
 }
 
-double _getAvg(const Mat &m, Mat &out, size_t days, bool checkLastOne)
+double _getAvg(const Mat &m, Mat &out, size_t days, bool checkLastOne, bool fill_w_prev_if_0=false)
 {
-    size_t  i = 0 ;
+    size_t  i = 0 , j = 0;
     size_t  _first = 0 ;
-    double  _tt = 0, _avg = 0 ;
+    double _avg = 0;
 
     _first = checkLastOne ? max(0, m.cols - (int)days) : 0 ;
 
-    for(i = _first; i < m.cols; i++){
-        _tt += m.at<double>(0,i) ;
+    for (j=0; j<m.rows; j++) {
+        double  _tt = 0;
 
-        if( i-_first >= days )
-            _tt -= m.at<double>(0,i-days) ;
+        for (i = _first; i < m.cols; i++) {
+            double z = m.at<double>(j, i);
+            if(fill_w_prev_if_0 && z==0 && i>0) {
+                z = m.at<double>(j, i-1);
+            }
+            _tt += z;
 
-        _avg = _tt / min(i-_first+1,days) ;
+            if (i-_first >= days) {
+                double r = m.at<double>(j, i-days);
+                if (fill_w_prev_if_0 && r==0 && i-days>0) {
+                    r = m.at<double>(j, i-days-1);
+                }
+                _tt -= r;
+            }
 
-        if(!checkLastOne) out.at<double>(0,i) = _avg ;
+            _avg = _tt / min(i-_first+1, days) ;
+
+            if(!checkLastOne) out.at<double>(j,i) = _avg ;
+        }
     }
 
     return (checkLastOne ? _avg : 0) ;
@@ -1238,6 +1310,28 @@ int importData(
             }
         }
 
+#if 0
+        //@ caculate average of vol
+        {
+            Mat f = _m.row(DATA_TYPE_VOL);
+
+            Mat t5 = _m.row(DATA_TYPE_VOL_AVG_5);
+            _getAvg(f, t5, WEEK_DAYS, false, true);
+
+            Mat t22 = _m.row(DATA_TYPE_VOL_AVG_22);
+            _getAvg(f, t22, MONTH_DAYS, false, true);
+
+            Mat t66 = _m.row(DATA_TYPE_VOL_AVG_66);
+            _getAvg(f, t66, SEASON_DAYS, false, true);
+
+            Mat t132 = _m.row(DATA_TYPE_VOL_AVG_132);
+            _getAvg(f, t132, HALF_YEAR_DAYS, false, true);
+
+            Mat t264 = _m.row(DATA_TYPE_VOL_AVG_264);
+            _getAvg(f, t264, YEAR_DAYS, false, true);
+        }
+#endif
+
         /* caculate average/eager datas*/
         {
             
@@ -1448,7 +1542,7 @@ int _getLinesFocus (
         _line = linesData.back() ;
         _t1 = 0 ;
         _t2 = 0 ;
-        drawKLines( _line, _t1, scale, roi) ;
+        drawSoomthKLines( _line, _t1, scale, roi) ;
         _t1.copyTo( _t2, _mask) ;
         _hlt += _t2 ;
         _mask += _t1 ;
@@ -1550,8 +1644,23 @@ int digtFuncLineFilter(char c)
     int  _rslt = RSLT_NOTHING ;
 
     switch( c ){
-        case '1' : case '2' : case '3' : case '4' :
-        case '5' : case '6' : case '7' : case '8' : case '9' :
+        case '1' :
+            //@ kline -> line -> none
+            if(GET_SWITCHER_STATUS(sysSwitchers, DRAW_KLINE)) {
+                RESET_SWITCHER_STATUS(&sysSwitchers, DRAW_KLINE);
+                SET_SWITCHER_STATUS(&linesSwitchers, 0);
+            }
+            else if(GET_SWITCHER_STATUS(linesSwitchers, 0)) {
+                RESET_SWITCHER_STATUS(&linesSwitchers, 0);
+            }
+            else {
+                SET_SWITCHER_STATUS(&sysSwitchers, DRAW_KLINE);
+            }
+            SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
+            _rslt = RSLT_OK ;
+            break;
+        case '2' : case '3' : case '4' : case '5' :
+        case '6' : case '7' : case '8' : case '9' :
             TOGGLE_SWITCH(&linesSwitchers,c-'0'-1) ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             _rslt = RSLT_OK ;
@@ -1674,8 +1783,15 @@ void _doRefreshView(void)
             normalize(gLinesData.colRange(dataRangeStart,dataRangeEnd), viewData,
                       0+1, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX); /* the upper_30 pixels for gLinesInfo */
         }
-        drawKLines(viewData, gMainView, scale,
-                  Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B) );
+        drawSoomthKLines(viewData, gMainView, scale,
+            Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B) );
+        paintKlineData(
+            viewData.row(DATA_TYPE_OPEN  - DATA_TYPE_CLOSE),
+            viewData.row(DATA_TYPE_CLOSE - DATA_TYPE_CLOSE),
+            viewData.row(DATA_TYPE_HIG   - DATA_TYPE_CLOSE),
+            viewData.row(DATA_TYPE_LOW   - DATA_TYPE_CLOSE),
+            gMainView, scale,
+            Rect(LINE_MARGIN_L, LINE_MARGIN_T, gMainView.cols-LINE_MARGIN_L-LINE_MARGIN_R, gMainView.rows-LINE_MARGIN_T-LINE_MARGIN_B) );
     }
 
     /* find focus on the lines which switcher is 'ON'.
@@ -2509,7 +2625,7 @@ void _doRefreshView(void)
 
         s.str("") ;
         /* show baseline info */
-        ( digtFuncList[ digtFuncIdx ] == digtFuncBaselineFilter ) ?  s << "*Base:" : s << " Base:" ;
+        ( digtFuncList[ digtFuncIdx ] == digtFuncBaselineFilter ) ?  s << "* Base:" : s << "  Base:" ;
         putText( gLeftDetailsView, s.str(), Point(0,54), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
@@ -2521,7 +2637,7 @@ void _doRefreshView(void)
 
         /* show line info */
         s.str("");
-        (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "*Lines:" : s << " Lines:" ;
+        (digtFuncList[ digtFuncIdx ] == digtFuncLineFilter) ? s << "* Lines:" : s << "  Lines:" ;
         putText( gLeftDetailsView, s.str(), Point(0,54+2*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
@@ -2533,7 +2649,7 @@ void _doRefreshView(void)
 
         /* show index info */
         s.str("");
-        (digtFuncList[ digtFuncIdx ] == digtFuncIndexFilter) ? s << "*Indexs:" : s << " Indexs:" ;
+        (digtFuncList[ digtFuncIdx ] == digtFuncIndexFilter) ? s << "* Indexs:" : s << "  Indexs:" ;
         putText( gLeftDetailsView, s.str(), Point(0,54+4*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("/") ;
         for( i = 0 ; i < NUMBERS_OF_DATA_TYPE - DATA_TYPE_RSI6; i++ ){
@@ -2545,7 +2661,7 @@ void _doRefreshView(void)
 
         /* show scale info */
         s.str("");
-        (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "*Scale:" : s << " Scale:" ;
+        (digtFuncList[ digtFuncIdx ] == digtFuncScale) ? s << "* Scale:" : s << "  Scale:" ;
         putText( gLeftDetailsView, s.str(), Point(0,54+6*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
         s.str("") ;
         s << scale ;
@@ -2978,7 +3094,7 @@ void _doRefreshData(
     )
 {
     importData( historyData, hotData, dataFixType, outputMat, outputDailyMat) ;
-    gLinesData         = outputMat.rowRange(DATA_TYPE_CLOSE, DATA_TYPE_LOW+1) ;
+    gLinesData         = outputMat.rowRange(DATA_TYPE_CLOSE, DATA_TYPE_OPEN+1) ;
     gKLine5            = outputMat.row(DATA_TYPE_AVERAGE_5) ;
     gKLine22            = outputMat.row(DATA_TYPE_AVERAGE_22) ;
     gKLine66            = outputMat.row(DATA_TYPE_AVERAGE_66) ;
@@ -2993,6 +3109,11 @@ void _doRefreshData(
     gAmpData           = outputMat.row(DATA_TYPE_AMP) ;
     gXcgData           = outputMat.row(DATA_TYPE_XCG) ;
     gVolData           = outputMat.row(DATA_TYPE_VOL) ;
+    gVol5              = outputMat.row(DATA_TYPE_VOL_AVG_5);
+    gVol22             = outputMat.row(DATA_TYPE_VOL_AVG_22);
+    gVol66             = outputMat.row(DATA_TYPE_VOL_AVG_66);
+    gVol132            = outputMat.row(DATA_TYPE_VOL_AVG_132);
+    gVol264            = outputMat.row(DATA_TYPE_VOL_AVG_264);
     gValData           = outputMat.row(DATA_TYPE_VAL) ;
     gLvalData          = outputMat.row(DATA_TYPE_LVAL) ;
     gPwrData           = outputMat.row(DATA_TYPE_PWR) ;
@@ -3118,9 +3239,9 @@ int _doDefault(char c)
                 forecastCoefficients[_i] = 1.0 ;
             }
             indexSwitchers = ((1<<0)|(1<<4)) ;
-            RESET_SWITCHER_STATUS(&sysSwitchers, MEASURE) ;
+            RESET_SWITCHER_STATUS(&sysSwitchers, MEASURE) ; RESET_SWITCHER_STATUS(&sysSwitchers, DRAW_KLINE) ;
             CLEAN_SWITCHERS(&baseLineSwitchers); TOGGLE_SWITCH(&baseLineSwitchers,3-1); TOGGLE_SWITCH(&baseLineSwitchers,4-1);
-            SETALL_SWITCHERS(&linesSwitchers); TOGGLE_SWITCH(&linesSwitchers,2-1);
+            SETALL_SWITCHERS(&linesSwitchers); TOGGLE_SWITCH(&linesSwitchers,2-1); TOGGLE_SWITCH(&linesSwitchers,7-1); TOGGLE_SWITCH(&linesSwitchers,8-1); TOGGLE_SWITCH(&linesSwitchers,9-1);
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_VIEW) ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
             break ;
@@ -3338,21 +3459,19 @@ int _doDefault(char c)
         return 0 ;
 }
 
-void* listener(void* p)
+void sigusr1_handle()
 {
     int         sigNum ;
     sigset_t    _set ;
 
     sigemptyset(&_set) ;
     sigaddset(&_set,SIGUSR1) ;
-    sigprocmask(SIG_SETMASK, &_set, NULL) ;
 
     while(1){
         sigwait(&_set, &sigNum) ;
 
         switch(sigNum){
         case SIGUSR1:
-        case SIGUSR2:
             //cout << "main received " << sigNum << endl ;
             SET_SWITCHER_STATUS(&sysSwitchers, REFRESH_DATA) ;
             break ;
@@ -3387,64 +3506,14 @@ uint64_t get_timestamp_ms()
 
 int main( int argc, char** argv )
 {
-#if 0
-    {
-        Range r(7,16) ;
-        cout << r.size() << endl ; 
-        Mat m1(10,10,CV_32F) ;
-        Mat m2(20,20,CV_32F) ;
+#if THREAD_SUPPORT
+    block_signals();
+    std::thread listener(sigusr1_handle);
+    listener.detach();
 
-        cout << m1.size() << endl ;
-        m2.copyTo(m1) ;
-        cout << m1.size() << endl ;
-        float*p1 = m1.ptr<float>(0) ;
-        float*p2 = m2.ptr<float>(0) ;
-        cout << p1 << endl ;
-        cout << p2 << endl ;
-        return 0 ;
-    }
-    { 
-        Mat m1(0,10,CV_8U) ;
-        cout << m1.size() << endl ;
-        cout << m1.empty() << endl ;
-        return 0 ;
-
-        uchar *p ;
-        Mat m(10,10,CV_8U) ;
-        //m.reserve(600) ;
-         p = m.ptr<uchar>(300); cout << p << endl ;
-         p[0]=3 ;
-        m.resize(9) ;
-         p = m.ptr(0); cout << p << endl ;
-        m.resize(4) ;
-         p = m.ptr(0); cout << p << endl ;
-
-        return 0 ;
-    }
-    {
-        Mat m(10,10,CV_8U,Scalar::all(1)) ;
-        uchar* p=m.ptr<uchar>(0) ;
-        if(m.isContinuous()) for(int i=0;i<m.total();i++) p[i]=i ;
-
-
-        Mat o(m,Rect(2,2,5,5)) ;
-        o.resize(8,Scalar(1,2,3)) ;
-        o.at<uchar>(1,1)=233 ;
-        cout << o << endl ;
-        cout << m << endl ;
-        return 0 ;
-    }
-        
-
-    Mat m=(Mat_<int>(3,3)<<1,2,3,  4,5,6,  7,8,9) ;
-    Mat n=(Mat_<int>(3,3)<<2,4,6,  1,1,1,  1,1,1) ;
-    Mat o=(Mat_<int>(3,3)<<1,1,1,  1,1,1,  1,1,1) ;
-    Mat p(o) ;
-
-    cout << p << endl ;
-    o = n/m ;
-    cout << p << endl ;
-    return 0 ;
+    pthread_mutex_init(&gMutex, NULL) ;
+    //cout << "hello " << getpid() << endl;
+    //pthread_create(&_tid, NULL, listener, NULL) ;
 #endif
 
     char                _c = 0 ;
@@ -3454,9 +3523,6 @@ int main( int argc, char** argv )
     int                 _printLastN = 0/*dont print*/ ;
     char*               _hotData = NULL ;
     char*               _searchingDate = NULL ;     // to find the firstLooking_date
-#if THREAD_SUPPORT
-    pthread_t           _tid = 0 ;
-#endif
 
     /* import data from files
      * _args[0]                  :   stock name  //cannot support chinese...
@@ -3570,13 +3636,6 @@ int main( int argc, char** argv )
     //string cmd = "xdotool search --sync --name \"" + stockId + "\" windowunmap windowmap --overrideredirect 1";
     //system(cmd.c_str());
 
-#if THREAD_SUPPORT
-    pthread_mutex_init(&gMutex, NULL) ;
-    //cout << "hello " << getpid() << endl;
-    block_signals();
-    pthread_create(&_tid, NULL, listener, NULL) ;
-#endif
-
     /* creat all views */
     //{
 #if 0
@@ -3656,7 +3715,7 @@ int main( int argc, char** argv )
         }
 
         _c = 0 ;
-        _c = waitKey(1000*100) ;
+        _c = waitKey(100); //@ do not wait too long, respons SIGUSR1 ASAP
         static uint64_t last_timestamp = 0;
         uint64_t now = get_timestamp_ms();
         uint64_t gap = now - last_timestamp;
