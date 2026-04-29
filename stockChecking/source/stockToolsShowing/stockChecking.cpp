@@ -77,7 +77,7 @@
     /*  (8)rsi24,          (9)pwri6,       (10)pwri12,     (11)pwri24,    (12)rsiFuture6,    (13)pwriFuture12  (14)exchange,  */    \
     /*  (15)volume,        (16)value,      (17)liveValue,  (18)date       (19)rsiCustom      (20)pwriCustom                   */    \
     /*  (21)xcgAvgICustom  (22)gEgrData    (23)highestAmp  (24)open       (25)hig            (26)low                          */    \
-    /*  (27)ystdClose      (28)5kline      (29)22kline     (30)66kline    (31)132kline       (32)264kline                     */    \
+    /*  (27)ystdClose      (28)5kline      (29)22kline     (30)66kline    (31)132kline       (32)264kline      (33)klineCV    */    \
     long _date ;                                                                                                    \
     int  _i = ( (lastN)==ALL_ITEMS || gMessData.cols<=(lastN) )? 0 : gMessData.cols-(lastN);                        \
     for( ; _i < gMessData.cols; _i ++){                                                                             \
@@ -115,6 +115,7 @@
              << (gKLine66.at<double>(0,_i))<< " "             /* 66 key line */                                     \
              << (gKLine132.at<double>(0,_i))<< " "            /* 132 key line */                                    \
              << (gKLine264.at<double>(0,_i))<< " "            /* 264 key line */                                    \
+             << (gCvData.at<double>(0,_i))<< " "              /* kline cofficent variantion */                      \
              << endl ;                                                                                              \
     }                                                                                                               \
 }
@@ -185,6 +186,8 @@ enum DATA_TYPE{
     DATA_TYPE_XCG ,
     DATA_TYPE_DATE ,
     DATA_TYPE_EAGER ,
+    DATA_TYPE_CV,               //@ cofficent variantion
+    DATA_TYPE_CV_MACD,
     DATA_TYPE_RSI6 ,        /* stock index, do not change its position */
     DATA_TYPE_RSI14 ,       /* stock index, do not change its position */
     DATA_TYPE_RSI24 ,       /* stock index, do not change its position */
@@ -306,7 +309,7 @@ static int              gPanelH = MAX_WIN_HEIGHT ;
 Mat gPanel, gMainView, gBottomView, gIndexView, gTopStatus_view, gLeftDetailsView, gMessData;
 Mat gLinesData, gLinesInfo, gYstdData, gHigData, gLowData, gOpenData, gCloseData, gAmpData, gXcgData, gVolData, gVol5, gVol22, gVol66, gVol132, gVol264, gValData, gLvalData,
     gKLine5, gKLine22, gKLine66, gKLine132, gKLine264,
-    gMACD_DIF, gMACD_DEA, gMACD, gPwrData, gDateData, gEgrData, gRsi6Data, gRsi14Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri14Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
+    gMACD_DIF, gMACD_DEA, gMACD, gCvMACD, gPwrData, gDateData, gEgrData, gCvData, gRsi6Data, gRsi14Data, gRsiCustomData, gRsi24Data, gPwri6Data, gPwri14Data, gPwriCustomData, gPwri24Data, gXcgAvgICustomData ;
 
 //@ mark mode
 //@ use m<key> to creat a mark with the name <key>
@@ -640,49 +643,49 @@ double _getAvg(const Mat &m, Mat &out, size_t days, bool checkLastOne, bool fill
 }
 
 #if 1   //@ macd
-double _getEMA(int period, int n, Mat &m, double preEMA=0)
+double _getEMA(int period, int n, Mat &datas, double preEMA=0)
 {
-    assert(period>1 && n>=0 && n<m.cols);
+    assert(period>1 && n>=0 && n<datas.cols);
 
-    double close = m.row(DATA_TYPE_CLOSE).at<double>(0,n) ;
+    double data = datas.row(DATA_TYPE_CLOSE).at<double>(0,n) ;
     if(n==0) {
-        return close;
+        return data;
     }
 
     double alpha = 2.0/(period+1);
-    return alpha*close + (1-alpha)*(preEMA? preEMA : _getEMA(period, n-1, m));
+    return alpha*data + (1-alpha)*(preEMA? preEMA : _getEMA(period, n-1, datas));
 }
 
-void _getEMA(int period, Mat &data, Mat &ema)
+void _getEMA(int period, Mat &datas, Mat &ema)
 {
-    int n = data.cols;
+    int n = datas.cols;
     double last = 0;
 
     for(int i=0; i<n; i++) {
-        last = _getEMA(period, i, data, last);
+        last = _getEMA(period, i, datas, last);
         ema.at<double>(0,i) = last;
     }
 
     return;
 }
 
-void _getDIF(Mat &m, Mat &dif, int key1=12, int key2=26)
+void _getDIF(Mat &datas, Mat &dif, int key1=12, int key2=26)
 {
-//  assert(m.cols == dif.cols);
+//  assert(datas.cols == dif.cols);
 
-    Mat ema_fast(1, m.cols, CV_64F);
-    Mat ema_slow(1, m.cols, CV_64F);
+    Mat ema_fast(1, datas.cols, CV_64F);
+    Mat ema_slow(1, datas.cols, CV_64F);
 
-    _getEMA(key1, m, ema_fast);
-    _getEMA(key2, m, ema_slow);
+    _getEMA(key1, datas, ema_fast);
+    _getEMA(key2, datas, ema_slow);
     dif = ema_fast - ema_slow;
 
     return;
 }
 
-void _getDEA(Mat &m, Mat &dea, int key=9)
+void _getDEA(Mat &datas, Mat &dea, int key=9)
 {
-    _getEMA(key, m, dea);
+    _getEMA(key, datas, dea);
     return;
 }
 
@@ -795,6 +798,43 @@ double _getUpDnRateIndexer(const Mat &m, Mat &out, size_t days, bool positiveSrc
     return (checkLastOne ? _rateIndexer : 0) ;
 }
 
+//@ mu, population mean, 均值
+inline
+double getMu(const Mat &m, int base_on_this_one)
+{
+    assert(m.cols && base_on_this_one < m.cols);
+
+    if(base_on_this_one>=0) {
+        return m.at<double>(0, base_on_this_one);
+    }
+
+    double  t = 0;
+    for (auto i = 0; i < m.cols; i++) {
+        t += m.at<double>(0, i);
+    }
+    return t / m.cols;
+}
+
+//@ sigma, 标准差
+double getSigma(const Mat &m, double &mu, int base_on_this_one)
+{
+    double  t = 0;
+    mu = getMu(m, base_on_this_one);
+    for (auto i=0; i<m.cols; i++) {
+        double delt = m.at<double>(0, i)-mu;
+        t += delt*delt;
+    }
+
+    return sqrt(t/m.cols);
+}
+
+//@ CV, cofficent of variantion, 变异系数, 发散程度
+double getCV(const Mat &m, double &mu, double &sigma, int base_on_this_one=-1)
+{
+    sigma = getSigma(m, mu, base_on_this_one);
+    return mu? sigma/mu : 0;
+}
+
 int importData(
         const char*  hisFilename,
         const char*  hotFilename,
@@ -874,7 +914,7 @@ int importData(
     /* extract history&hot data */
     {
         Mat _linesData, _dateData, _higData, _lowData, _opnData, _clsData, _ystdData, _ampData, _xcgData, _volData, _valData, _avrgPrice, _lvalData,
-            _pwrData, _egrData, _rsi6Data, _rsi14Data, _rsi24Data, _pwri6Data, _pwri14Data, _pwri24Data,
+            _pwrData, _egrData, _cvData, _cvMACD, _rsi6Data, _rsi14Data, _rsi24Data, _pwri6Data, _pwri14Data, _pwri24Data,
             _xcgAvgICustomData, _rsiCustomData, _pwriCustomData, _dif, _dea, _macd;
 
         _linesData         = _m.rowRange(DATA_TYPE_CLOSE, DATA_TYPE_LOW+1) ;
@@ -895,6 +935,8 @@ int importData(
         _dea               = _m.row(DATA_TYPE_MACD_DEA);
         _macd              = _m.row(DATA_TYPE_MACD);
         _egrData           = _m.row(DATA_TYPE_EAGER) ;
+        _cvData            = _m.row(DATA_TYPE_CV);
+        _cvMACD            = _m.row(DATA_TYPE_CV_MACD);
         _rsi6Data          = _m.row(DATA_TYPE_RSI6) ;
         _rsi14Data         = _m.row(DATA_TYPE_RSI14) ;
         _rsi24Data         = _m.row(DATA_TYPE_RSI24) ;
@@ -967,7 +1009,7 @@ int importData(
                             }else if(IS_BIG_DISK(stockId)){
                                 gDailyDealAverage = (gDailyClose+_cnt*_dailyData.at<double>(DAILY_DATA_TYPE_DEAL_AVG, _cnt-1))/(_cnt+1) ;
                             }else{
-                                gDailyDealAverage = gDailyValue/gDailyVolume ;
+                                gDailyDealAverage = gDailyValue/gDailyVolume*10 ;
                             }
                             _dailyData.at<double>(DAILY_DATA_TYPE_DEAL_AVG, _cnt) = gDailyDealAverage ;
                             /* update volume of each unit */
@@ -1335,6 +1377,7 @@ int importData(
         /* caculate average/eager datas*/
         {
             
+            Mat cv_data(1, 6, CV_64F);
             for (i = 0 ; i < outputMat.cols ; i ++){
                 /* 5 days (1 week) */
                 _total5  = (i < WEEK_DAYS) ? _total5 + _linesData.at<double>(0,i) : _total5 + _linesData.at<double>(0,i) - _linesData.at<double>(0, i-WEEK_DAYS) ;
@@ -1366,6 +1409,16 @@ int importData(
                 if(i>=EAGER_CHECKING_DUR) _upDays -= ((_ampData.at<double>(0,i-EAGER_CHECKING_DUR) > 0) ? 1 : 0) ;
                 _eager = _upDays / (EAGER_CHECKING_DUR*1.0) * 100 ;
                 _egrData.at<double>(0, i) = _eager ;
+
+                /* cv: cofficent variantion of avg,5k,22k,66k,132k,264k */
+                cv_data.at<double>(0,0) = _avrgPrice.at<double>(0,i);
+                cv_data.at<double>(0,1) = _average5;
+                cv_data.at<double>(0,2) = _average22;
+                cv_data.at<double>(0,3) = _average66;
+                cv_data.at<double>(0,4) = _average132;
+                cv_data.at<double>(0,5) = _average264;
+                double unused1, unused2;
+                _cvData.at<double>(0,i) = 100*getCV(cv_data, unused1, unused2, 5/*base on yearlines*/);
             }
         }
 
@@ -1385,6 +1438,15 @@ int importData(
             _getDIF(close, _dif);
             _getDEA(_dif, _dea);
             _getMACD(_dif, _dea, _macd);
+        }
+
+        //@ cv_macd
+        {
+            Mat tmp1(1, _cvData.cols, CV_64F);
+            Mat tmp2(1, _cvData.cols, CV_64F);
+            _getDIF(_cvData, tmp1);
+            _getDEA(tmp1, tmp2);
+            _getMACD(tmp1, tmp2, _cvMACD);
         }
 
         /* caculate PWRI */
@@ -1852,8 +1914,7 @@ void _doRefreshView(void)
                 scale,
                 Rect(LINE_MARGIN_L, LINE_MARGIN_T, gBottomView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gBottomView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
                 Scalar(255,195,0),
-                //PAINT_TYPE_FILLED_RECT,
-                PAINT_TYPE_LINE,
+                PAINT_TYPE_FILLED_RECT, //PAINT_TYPE_LINE,
                 true) ;
         paintData(_xcg_n_avg.row(1),
                 _panel,
@@ -1991,6 +2052,49 @@ void _doRefreshView(void)
         }
     }
 
+    /* draw CvMACD on the index view */
+    if (GET_SWITCHER_STATUS(indexSwitchers,6-1/*based on 0*/)) {
+
+        //@ init
+        Mat _macd = gCvData; //gCvMACD;
+        Mat _macd_nml(_macd.rows, _macd.cols, CV_64F);
+        int _posY = 0;
+
+        //@ normalize
+        if (!GET_SWITCHER_STATUS(sysSwitchers,AUTO_FIT)) {
+            double first_macd = _macd.at<double>(0,0);
+            _macd.at<double>(0,0) = 0;
+            normalize(_macd, _macd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _macd_nml.at<double>(0,0) ;
+            _macd_nml = _macd_nml.colRange(dataRangeStart, dataRangeEnd);
+            _macd.at<double>(0,0) = first_macd;
+        }else{
+            _macd = _macd.colRange(dataRangeStart, dataRangeEnd);
+            _macd_nml = _macd_nml.colRange(dataRangeStart, dataRangeEnd);
+            double first_macd = _macd.at<double>(0,0);
+            _macd.at<double>(0,0) = 0;
+            normalize(_macd, _macd_nml, 0+1, gIndexView.rows-LINE_MARGIN_T-LINE_MARGIN_B-1, NORM_MINMAX);
+            _posY = _macd_nml.at<double>(0,0) ;
+            _macd.at<double>(0,0) = first_macd;
+        }
+
+        //@ draw macd
+        paintData(_macd_nml,
+                gIndexView,
+                scale,
+                Rect(LINE_MARGIN_L, LINE_MARGIN_T, gIndexView.cols - LINE_MARGIN_L - LINE_MARGIN_R, gIndexView.rows - LINE_MARGIN_T - LINE_MARGIN_B),
+                Scalar(0,255,0),
+                //PAINT_TYPE_FILLED_RECT,
+                PAINT_TYPE_LINE,
+                true) ;
+
+        //@ reference line
+        line(   gIndexView,
+                Point(0+LINE_MARGIN_L, gIndexView.rows -LINE_MARGIN_B -1 -_posY),
+                Point(gIndexView.cols - LINE_MARGIN_R -1, gIndexView.rows -LINE_MARGIN_B -1 -_posY),
+                Scalar(0,0,255), 1, LINE_8 ) ;
+    }
+
     /* draw other indexers */
     {
         size_t  i ;
@@ -2012,24 +2116,19 @@ void _doRefreshView(void)
                         _color = Scalar(0,255,0) ;
                         _src = gRsi24Data ;
                         break ;
-                    case 3:
 #if 0
+                    case 3:
                         _color = Scalar(0,255,255) ;
                         _src = gPwri6Data ;
                         break ;
-#endif
                     case 4:
-#if 0
                         _color = Scalar(0,255,255) ;
                         _src = gPwri14Data ;
                         break ;
-#endif
-                        continue;
                     case 5:
                         _color = Scalar(0,255,255) ;
                         _src = gPwri24Data ;
                         break ;
-#if 0
                     case 6:
                         _color = Scalar(0,255,0) ;
                         _src = gRsiCustomData ;
@@ -2043,6 +2142,9 @@ void _doRefreshView(void)
                         _src = gXcgAvgICustomData;
                         break ;
 #else
+                    case 3:
+                    case 4:
+                    case 5:
                     case 6:
                     case 7:
                     case 8:
@@ -3121,6 +3223,8 @@ void _doRefreshData(
     gMACD_DEA          = outputMat.row(DATA_TYPE_MACD_DEA) ;
     gMACD              = outputMat.row(DATA_TYPE_MACD) ;
     gEgrData           = outputMat.row(DATA_TYPE_EAGER) ;
+    gCvData            = outputMat.row(DATA_TYPE_CV);
+    gCvMACD            = outputMat.row(DATA_TYPE_CV_MACD);
     gRsi6Data          = outputMat.row(DATA_TYPE_RSI6) ;
     gRsi14Data         = outputMat.row(DATA_TYPE_RSI14) ;
     gRsi24Data         = outputMat.row(DATA_TYPE_RSI24) ;

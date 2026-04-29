@@ -70,16 +70,19 @@ high_risk_signals="
 
 if [[ ${fix:0:1} == '-' ]]; then
     fix=${fix:1};
+    price_trend="\033[32mBearish\033[0m";
     signals="$worse_signals";
 elif [[ ${fix:0:1} == '+' ]]; then
     fix=${fix:1};
+    price_trend="\033[31mBullish\033[0m";
     signals="$high_risk_signals";
 else
+    price_trend="\033[34mGood\033[0m";
     signals="$better_signals";
 fi
 
 sig_pats=$(echo "$signals" | sed 's/[ \t]*#.*//; /^[ \t]*$/d; s/\(_[^_]*\)\{'$fix'\}$//; s/$/ /;')
-echo -en "\n* match $today's stocks in $seg_data with\n\n$sig_pats\n\n===============\n\n" >&2
+echo -en "\n* match $today's [$price_trend] stocks in $seg_data with\n\n$sig_pats\n\n===============\n\n" >&2
 grep -Ff <(echo "$sig_pats") $seg_data  |
     grep " $today ....[^-]"             |
     awk '{ print $NF, "#"$1, $9;}'      | #cat - ; exit

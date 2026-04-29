@@ -4,6 +4,12 @@
 #@ 格式: getHot.qt.batch.sh stocklist
 #@ 从腾讯网获取所有stocklist中股票当前数据，保存至(覆盖) ~/StockData/*hot
 
+#@ 批量获取数据时的bug,
+#@ 0000001 和 1000001，获取的数据中股票代码都是 '000001, 导致数据被覆盖
+#@ 解决方案, 使用 getHot.qt.sh 来获取单支股票数据
+#@ getHot.qt.sh <<< 0000001
+#@ getHot.qt.sh <<< 1000001
+
 codes=$(
 awk '
     {
@@ -40,6 +46,7 @@ awk -F '[~/]' -v date=$DATE -v time=$TIME   \
         }
         {
             code = "\047"$3;            # (2)代码
+            _68xx = (substr(code,2,2) == "68");
             name = "-";                 # (3)名称
             close_ = $4+0;              # (4)收盘价
             high = $34+0;               # (5)最高
@@ -49,7 +56,7 @@ awk -F '[~/]' -v date=$DATE -v time=$TIME   \
             change_amt = $32+0;         # (9)涨跌额
             change_pct = $33+0;         # (10)涨跌幅
             turnover = $41+0;           # (11)换手率
-            volume = $37/100;           # (12)成交量
+            volume = _68xx? ($37/100) : ($37+0);               # (12)成交量
             amount = $38/1000;          # (13)成交额
             total_mv = $47*100000000;   # (14)总市值
             float_mv = $48*100000000;   # (15)流通市值
