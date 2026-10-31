@@ -2744,7 +2744,10 @@ void _doRefreshView(void)
         s.str("/") ;
         for( i = 0 ; i < viewData.rows; i++ ){
             if( GET_SWITCHER_STATUS(linesSwitchers,i) ){
-                s << i + 1 << '/' ;
+                if (i==idxFocusedLine) s << '[';
+                s << i + 1;
+                if (i==idxFocusedLine) s << ']';
+                s << '/';
             }
         }
         putText( gLeftDetailsView, s.str(), Point(20,54+3*text_hi), 0, 0.4, Scalar(200,200,200), 0, LINE_AA );
