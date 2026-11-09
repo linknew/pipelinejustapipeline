@@ -5,7 +5,7 @@ Usage()
     echo -en "
     Usage:
 
-        $(basename $0) [-gen] [-group=<n_group1>,<n_group2>,...]
+        $(basename $0) [-gen] [--update] [-group=<n_group1>,<n_group2>,...]
 
         -gen:	gen index data
         -group:	specify each group numbers
@@ -18,6 +18,7 @@ for i in $@; do
     case $i in 
 		-h|--help) Usage; exit;;
         -gen) gen_index_data=true;;
+        -update) update=true;;
         -group=*) group=${i#*=};;
         -*) echo "** unknown option: $i"; exit;;
     esac
@@ -44,7 +45,7 @@ from=2009-01-09; to=2999-12-31
 
 if  [[ $gen_index_data == true ]]; then
     [[ ! -d index_data ]] && { mkdir index_data || { echo "** error $?"; exit; } }
-    playStockList.sh --update --print --output=index_data/{} <(echo "$list")
+    playStockList.sh ${update:+--update} --print --output=index_data/{} <(echo "$list")
 fi
 
 
